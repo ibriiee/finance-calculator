@@ -1,0 +1,72 @@
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+export function formatCurrency(amount: number, currency: string, compact = false): string {
+  const absAmount = Math.abs(amount)
+  let formatted: string
+
+  if (compact && absAmount >= 1000) {
+    const k = absAmount / 1000
+    formatted = k % 1 === 0 ? `${k}K` : `${k.toFixed(1)}K`
+  } else {
+    formatted = absAmount.toLocaleString('en-US', {
+      minimumFractionDigits: currency === 'gold_grams' || currency === 'silver_grams' ? 2 : 0,
+      maximumFractionDigits: currency === 'gold_grams' || currency === 'silver_grams' ? 4 : 0,
+    })
+  }
+
+  const symbols: Record<string, string> = {
+    AED: 'AED ', PKR: 'PKR ', USD: '$ ', gold_grams: '', silver_grams: ''
+  }
+  const suffix = currency === 'gold_grams' ? 'g gold' : currency === 'silver_grams' ? 'g silver' : ''
+  const prefix = symbols[currency] ?? `${currency} `
+
+  return `${amount < 0 ? '-' : ''}${prefix}${formatted}${suffix}`
+}
+
+export function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+export function daysAgo(date: string): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
+}
+
+export function daysUntil(date: string): number {
+  return Math.floor((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+}
+
+export function getLagDays(workDate: string, receivedDate?: string | null): number {
+  const end = receivedDate ? new Date(receivedDate) : new Date()
+  return Math.floor((end.getTime() - new Date(workDate).getTime()) / (1000 * 60 * 60 * 24))
+}
+
+export function getLagColor(days: number): string {
+  if (days <= 30) return 'text-emerald-400'
+  if (days <= 45) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+export function getProgressColor(pct: number): string {
+  if (pct >= 80) return '#10B981'
+  if (pct >= 50) return '#C9A84C'
+  return '#EF4444'
+}
+
+export function calcMonthsRemaining(targetDate: string): number {
+  const now = new Date()
+  const target = new Date(targetDate)
+  return Math.max(0, (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth())
+}
+
+export function shortDate(date: string): string {
+  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+}
+
+export function monthYear(date: string): string {
+  return new Date(date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+}
