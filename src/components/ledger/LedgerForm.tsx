@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
@@ -23,7 +23,7 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
     if (!form.amount || !form.description) return
     setSaving(true)
     // direction: 'i_paid' = from_user is other (they paid for me), to_user is me
-    // Actually: i_paid means I paid FOR them → I'm from_user (creditor)
+    // Actually: i_paid means I paid FOR them â†’ I'm from_user (creditor)
     const from = form.direction === 'i_paid' ? userId : otherUser!.id
     const to   = form.direction === 'i_paid' ? otherUser!.id : userId
     await supabase.from('brother_ledger').insert({
@@ -37,7 +37,7 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8"
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl overflow-y-auto max-h-[85vh] p-5 pb-8"
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
@@ -94,10 +94,12 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Log Transaction'}
+            {saving ? 'Savingâ€¦' : 'Log Transaction'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
+

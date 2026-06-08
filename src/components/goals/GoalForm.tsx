@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
@@ -33,7 +33,7 @@ export default function GoalForm({ onClose, onSaved }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8"
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl overflow-y-auto max-h-[85vh] p-5 pb-8"
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
@@ -54,7 +54,7 @@ export default function GoalForm({ onClose, onSaved }: Props) {
                   border: `1px solid ${form.goal_type === t ? 'var(--gold)' : 'var(--border)'}`,
                   color: form.goal_type === t ? 'var(--gold)' : 'var(--text-muted)',
                 }}>
-                {t === 'joint' ? '👥 Joint' : '👤 Individual'}
+                {t === 'joint' ? 'ðŸ‘¥ Joint' : 'ðŸ‘¤ Individual'}
               </button>
             ))}
           </div>
@@ -79,10 +79,12 @@ export default function GoalForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Create Goal'}
+            {saving ? 'Savingâ€¦' : 'Create Goal'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
+

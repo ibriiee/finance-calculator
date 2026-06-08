@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
@@ -33,7 +33,7 @@ export default function LoanForm({ onClose, onSaved }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8"
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl overflow-y-auto max-h-[85vh] p-5 pb-8"
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
@@ -74,7 +74,7 @@ export default function LoanForm({ onClose, onSaved }: Props) {
 
           {isGold && (
             <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(201,168,76,0.1)', color: 'var(--gold)' }}>
-              ℹ Gold/silver loans: return same grams at today's price (Qard Hasan rule)
+              â„¹ Gold/silver loans: return same grams at today's price (Qard Hasan rule)
             </div>
           )}
 
@@ -98,10 +98,12 @@ export default function LoanForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Save Loan'}
+            {saving ? 'Savingâ€¦' : 'Save Loan'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
+

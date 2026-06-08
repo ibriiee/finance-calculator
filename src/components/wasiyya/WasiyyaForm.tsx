@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
@@ -32,17 +32,17 @@ export default function WasiyyaForm({ onClose, onSaved }: Props) {
   }
 
   const cats: { key: typeof form.category; icon: string; label: string }[] = [
-    { key: 'asset', icon: '🏦', label: 'Asset' },
-    { key: 'debt', icon: '💸', label: 'Debt' },
-    { key: 'instruction', icon: '📋', label: 'Instruction' },
-    { key: 'password', icon: '🔑', label: 'Password' },
-    { key: 'contact', icon: '👤', label: 'Contact' },
-    { key: 'message', icon: '💌', label: 'Message' },
+    { key: 'asset', icon: 'ðŸ¦', label: 'Asset' },
+    { key: 'debt', icon: 'ðŸ’¸', label: 'Debt' },
+    { key: 'instruction', icon: 'ðŸ“‹', label: 'Instruction' },
+    { key: 'password', icon: 'ðŸ”‘', label: 'Password' },
+    { key: 'contact', icon: 'ðŸ‘¤', label: 'Contact' },
+    { key: 'message', icon: 'ðŸ’Œ', label: 'Message' },
   ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8"
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl overflow-y-auto max-h-[85vh] p-5 pb-8"
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
@@ -93,7 +93,7 @@ export default function WasiyyaForm({ onClose, onSaved }: Props) {
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
             <input type="checkbox" checked={form.is_sensitive} onChange={e => F('is_sensitive', e.target.checked)} className="w-4 h-4 accent-[var(--gold)]" />
             <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>🔒 Mark as sensitive</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>ðŸ”’ Mark as sensitive</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Content hidden behind tap-to-reveal</p>
             </div>
           </label>
@@ -102,10 +102,12 @@ export default function WasiyyaForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Save Entry'}
+            {saving ? 'Savingâ€¦' : 'Save Entry'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
+
