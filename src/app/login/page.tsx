@@ -146,7 +146,7 @@ export default function LoginPage() {
     setError(''); setLoading(true)
     const { error: err } = await supabase.auth.signInWithPassword({ email: selectedUser.email, password })
     setLoading(false)
-    if (err) setError('Wrong password. Try again.')
+    if (err) setError(err.message)   // show the real reason (wrong password / email not confirmed / etc.)
     else { router.push('/dashboard'); router.refresh() }
   }
 
