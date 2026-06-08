@@ -9,6 +9,7 @@ interface Props { onClose: () => void; onSaved: () => void; userId: string; othe
 export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     direction: 'i_paid' as 'i_paid' | 'they_paid', // i_paid = I fronted money for them
     amount: '', currency: 'AED' as 'AED' | 'PKR',
@@ -21,18 +22,24 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
 
   async function save() {
     if (!form.amount || !form.description) return
+    if (!otherUser?.id) {
+      setError('Your brother\'s profile isn\'t loaded yet. Make sure both accounts exist, then reopen this page.')
+      return
+    }
     setSaving(true)
-    // direction: 'i_paid' = from_user is other (they paid for me), to_user is me
-    // Actually: i_paid means I paid FOR them → I'm from_user (creditor)
-    const from = form.direction === 'i_paid' ? userId : otherUser!.id
-    const to   = form.direction === 'i_paid' ? otherUser!.id : userId
-    await supabase.from('brother_ledger').insert({
+    setError('')
+    // i_paid = I fronted money FOR them → I'm the creditor (from_user)
+    const from = form.direction === 'i_paid' ? userId : otherUser.id
+    const to   = form.direction === 'i_paid' ? otherUser.id : userId
+    const { error: insErr } = await supabase.from('brother_ledger').insert({
       from_user_id: from, to_user_id: to,
       amount: parseFloat(form.amount), currency: form.currency,
       category: form.category as any, description: form.description,
       transaction_date: form.transaction_date, source_type: 'manual', is_settled: false,
     })
-    setSaving(false); onSaved(); onClose()
+    setSaving(false)
+    if (insErr) { setError(insErr.message); return }
+    onSaved(); onClose()
   }
 
   return (
@@ -89,6 +96,12 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
 
           <input type="date" value={form.transaction_date} onChange={e => F('transaction_date', e.target.value)}
             className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+
+          {error && (
+            <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>
+              ⚠ {error}
+            </div>
+          )}
 
           <button onClick={save} disabled={saving || !form.amount || !form.description}
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"

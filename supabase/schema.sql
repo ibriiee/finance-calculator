@@ -310,8 +310,10 @@ ALTER TABLE public.goal_contributions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wasiyya_entries    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rates_cache        ENABLE ROW LEVEL SECURITY;
 
--- Profiles: own row only
-CREATE POLICY "profiles_own" ON public.profiles FOR ALL USING (auth.uid() = id);
+-- Profiles: everyone (both brothers) can READ all profiles; write own row only
+CREATE POLICY "profiles_select_all" ON public.profiles FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "profiles_update_own" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "profiles_insert_own" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Income: owner sees own; also shared entries visible to all authenticated (optional)
 CREATE POLICY "income_own" ON public.income_projects FOR ALL USING (auth.uid() = owner_id);
