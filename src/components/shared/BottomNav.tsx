@@ -15,7 +15,7 @@ const NAV = [
 export default function BottomNav() {
   const path = usePathname()
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t pb-safe"
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 border-t border-l border-r pb-safe"
          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-around px-2 pt-2">
         {NAV.map(({ href, icon: Icon, label }) => {
