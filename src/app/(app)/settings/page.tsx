@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { User, Bell, Percent, Calendar, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid } from 'lucide-react'
+import { User, Bell, Percent, Calendar, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2 } from 'lucide-react'
 import type { Profile } from '@/types/database.types'
 
 const MODULES: { key: string; label: string }[] = [
@@ -26,6 +26,14 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState<null | 'export' | 'reset'>(null)
+  const [testMode, setTestMode] = useState(false)
+
+  useEffect(() => { setTestMode(localStorage.getItem('mizan_test_mode') === '1') }, [])
+  function toggleTestMode(v: boolean) {
+    setTestMode(v)
+    localStorage.setItem('mizan_test_mode', v ? '1' : '0')
+  }
   const [form, setForm] = useState({
     display_name: '', sadaka_pct: 20, hawl_start_date: '',
     default_currency: 'AED', nisab_basis: 'silver',
@@ -90,6 +98,43 @@ export default function SettingsPage() {
   async function logout() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  // Tables to include in backup / reset
+  const DATA_TABLES = [
+    'income_projects', 'sadaka_entries', 'sadaka_recipients', 'brother_ledger',
+    'ledger_settlements', 'external_ledger', 'loans', 'loan_repayments',
+    'shared_costs', 'zakat_snapshots', 'financial_goals', 'goal_contributions',
+    'wasiyya_entries', 'joint_accounts', 'joint_account_txns',
+  ]
+
+  async function exportData() {
+    setBusy('export')
+    const backup: Record<string, any> = { exported_at: new Date().toISOString(), tables: {} }
+    for (const t of DATA_TABLES) {
+      const { data } = await supabase.from(t).select('*')
+      backup.tables[t] = data ?? []
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setBusy(null)
+  }
+
+  async function resetData() {
+    const ok = prompt('This permanently deletes ALL financial data (income, sadaka, ledger, joint account, zakat, goals, loans, splits, wasiyya, recipients). Your account & settings stay.\n\nType DELETE to confirm.')
+    if (ok !== 'DELETE') return
+    setBusy('reset')
+    for (const t of DATA_TABLES) {
+      // delete every row the current policies allow this user to remove
+      await supabase.from(t).delete().not('id', 'is', null)
+    }
+    setBusy(null)
+    alert('All test data cleared. You can now start with real data.')
   }
 
   if (loading) return <LoadingSpinner />
@@ -271,12 +316,55 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      {/* Test mode */}
+      <div className="card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <FlaskConical size={15} style={{ color: 'var(--gold)' }} />
+          <h3 className="text-sm font-semibold">Test Mode</h3>
+        </div>
+        <label className="flex items-center justify-between p-3 rounded-xl cursor-pointer" style={{ background: 'var(--surface-2)' }}>
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show a TEST banner while trying things out</span>
+          <div className="relative">
+            <input type="checkbox" className="sr-only peer" checked={testMode} onChange={e => toggleTestMode(e.target.checked)} />
+            <div className="w-11 h-6 rounded-full peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"
+              style={{ background: testMode ? 'var(--gold)' : 'var(--border)' }} />
+          </div>
+        </label>
+        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+          When you're done testing, export a backup then reset the data below to start with real figures.
+        </p>
+      </div>
+
+      {/* Data & backup */}
+      <div className="card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Database size={15} style={{ color: 'var(--gold)' }} />
+          <h3 className="text-sm font-semibold">Data &amp; Backup</h3>
+        </div>
+        <button onClick={exportData} disabled={busy !== null}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mb-2"
+          style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+          {busy === 'export' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          {busy === 'export' ? 'Preparing…' : 'Export backup (JSON)'}
+        </button>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+          Downloads every record to a file on your device. Keep it safe — that's your backup.
+          (Supabase also keeps the live database; this is an extra offline copy.)
+        </p>
+        <button onClick={resetData} disabled={busy !== null}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+          {busy === 'reset' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+          {busy === 'reset' ? 'Clearing…' : 'Reset all financial data'}
+        </button>
+      </div>
+
       {/* Save button */}
       <button onClick={save} disabled={saving}
         className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
         style={{ background: saved ? '#10B981' : 'var(--gold)', color: '#0a0a0a', transition: 'background 0.3s' }}>
         {saving && <Loader2 size={15} className="animate-spin" />}
-        {saved ? '✓ Saved!' : saving ? 'Saving…' : 'Save Settings'}
+        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Settings'}
       </button>
 
       {/* Logout */}

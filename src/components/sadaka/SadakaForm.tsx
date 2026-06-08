@@ -4,22 +4,25 @@ import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import type { Currency } from '@/types/database.types'
 
-interface Props { onClose: () => void; onSaved: () => void }
+interface Props { onClose: () => void; onSaved: () => void; editItem?: any }
 
-export default function SadakaForm({ onClose, onSaved }: Props) {
+export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const supabase = createClient()
+  const isEdit = !!editItem
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [me, setMe] = useState<{ id: string; name: string } | null>(null)
   const [other, setOther] = useState<{ id: string; name: string } | null>(null)
   const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({
-    amount_owed: '', currency: 'AED' as Currency,
-    is_advance: false,
+    amount_owed: editItem?.amount_owed ? String(editItem.amount_owed) : '',
+    currency: (editItem?.currency ?? 'AED') as Currency,
+    is_advance: editItem?.is_advance ?? false,
     on_behalf: 'me' as 'me' | 'other' | 'joint',  // whose sadaka this is
-    recipient_id: '', recipient_name: '', recipient_type: 'named_relative',
-    location: 'UAE', method: 'cash', notes: '',
-    status: 'pending',
+    recipient_id: editItem?.recipient_id ?? '', recipient_name: editItem?.recipient_name ?? '',
+    recipient_type: editItem?.recipient_type ?? 'named_relative',
+    location: editItem?.location ?? 'UAE', method: editItem?.method ?? 'cash', notes: editItem?.notes ?? '',
+    status: editItem?.status ?? 'pending',
   })
   const F = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }))
 
@@ -35,6 +38,11 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
       setMe({ id: user!.id, name: mine?.display_name ?? 'Me' })
       if (theirs) setOther({ id: theirs.id, name: theirs.display_name ?? 'Brother' })
       setRecipients(((recs as any) ?? []).map((r: any) => ({ id: r.id, name: r.name })))
+      // derive on_behalf for edit mode
+      if (editItem) {
+        const ob = editItem.is_joint ? 'joint' : (editItem.owner_id && editItem.owner_id !== user!.id ? 'other' : 'me')
+        setForm(p => ({ ...p, on_behalf: ob }))
+      }
     })()
   }, [])
 
@@ -51,9 +59,8 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
     const ownerId = form.on_behalf === 'other' ? other!.id : me.id
     const shared = form.on_behalf !== 'me'   // brother's or joint entries are visible to both
 
-    const { error: insErr } = await supabase.from('sadaka_entries').insert({
+    const payload: any = {
       owner_id: ownerId,
-      added_by_id: me.id,
       amount_owed: amount, amount_given: given,
       currency: form.currency, status: form.status,
       is_advance: form.is_advance || form.status === 'advance_given',
@@ -65,9 +72,15 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
       recipient_type: form.recipient_type as any,
       location: form.location as any, method: form.method as any,
       notes: form.notes || null,
-    })
+    }
+    let err
+    if (isEdit) {
+      ;({ error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id))
+    } else {
+      ;({ error: err } = await supabase.from('sadaka_entries').insert({ ...payload, added_by_id: me.id }))
+    }
     setSaving(false)
-    if (insErr) { setError(insErr.message); return }
+    if (err) { setError(err.message); return }
     onSaved(); onClose()
   }
 
@@ -77,7 +90,7 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold">Add Sadaka Entry</h2>
+          <h2 className="text-base font-bold">{isEdit ? 'Edit' : 'Add'} Sadaka Entry</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}><X size={16} /></button>
         </div>
 
@@ -183,7 +196,7 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Save Sadaka'}
+            {saving ? 'Saving…' : isEdit ? 'Update Sadaka' : 'Save Sadaka'}
           </button>
         </div>
       </div>

@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check } from 'lucide-react'
+import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock } from 'lucide-react'
 import IncomeForm from '@/components/income/IncomeForm'
 import type { IncomeProject } from '@/types/database.types'
 
@@ -174,11 +174,16 @@ export default function IncomePage() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 mt-3">
-                  {item.status === 'pending' && (
+                {/* Actions — locked once payment received */}
+                {item.status === 'received' ? (
+                  <div className="flex items-center gap-1.5 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <Lock size={11} /> Locked — payment received, entry can't be changed
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={async () => {
+                        if (!confirm('Mark as received? This locks the entry — it can no longer be edited or deleted.')) return
                         await supabase.from('income_projects').update({
                           status: 'received',
                           actual_received_date: new Date().toISOString().split('T')[0]
@@ -189,16 +194,16 @@ export default function IncomePage() {
                       style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
                       <Check size={12} /> Mark Received
                     </button>
-                  )}
-                  <button onClick={() => { setEditItem(item); setShowForm(true) }}
-                    className="px-3 py-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
-                    <Pencil size={13} />
-                  </button>
-                  <button onClick={() => deleteItem(item.id)}
-                    className="px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+                    <button onClick={() => { setEditItem(item); setShowForm(true) }}
+                      className="px-3 py-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => deleteItem(item.id)}
+                      className="px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

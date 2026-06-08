@@ -24,7 +24,33 @@ body {
   color: var(--text-primary);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
   overscroll-behavior: none;
+}
+
+/* Pleasant text-selection highlight (was default blue) */
+::selection {
+  background: rgba(201, 168, 76, 0.28);
+  color: #fff;
+}
+::-moz-selection {
+  background: rgba(201, 168, 76, 0.28);
+  color: #fff;
+}
+
+/* Desktop: surround the centered phone-width app with a rich backdrop
+   instead of flat dead-black on both sides. */
+@media (min-width: 768px) {
+  body {
+    background-color: #050505;
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(201,168,76,0.10), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(124,106,45,0.10), transparent 45%),
+      linear-gradient(180deg, #070707, #030303);
+    background-attachment: fixed;
+  }
 }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }

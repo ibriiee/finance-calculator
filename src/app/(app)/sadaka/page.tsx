@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, HandHeart, Check, Users, ChevronRight } from 'lucide-react'
+import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock } from 'lucide-react'
 import Link from 'next/link'
 import SadakaForm from '@/components/sadaka/SadakaForm'
 import type { SadakaEntry } from '@/types/database.types'
@@ -15,6 +15,7 @@ export default function SadakaPage() {
   const [entries, setEntries] = useState<SadakaEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editItem, setEditItem] = useState<SadakaEntry | null>(null)
   const [filter, setFilter] = useState<'pending' | 'given' | 'all'>('pending')
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
@@ -71,7 +72,7 @@ export default function SadakaPage() {
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
       <ModuleHeader title="Sadaka" subtitle={`${(sadakaRate * 100).toFixed(0)}% self-tax · ${entries.length} entries`}
         action={
-          <button onClick={() => setShowForm(true)}
+          <button onClick={() => { setEditItem(null); setShowForm(true) }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             <Plus size={14} /> Add
@@ -203,27 +204,45 @@ export default function SadakaPage() {
                 </div>
               )}
 
-              {/* Mark given button */}
-              {entry.status !== 'given' && (
-                <button
-                  onClick={async () => {
-                    await supabase.from('sadaka_entries').update({
-                      status: 'given', amount_given: entry.amount_owed,
-                      date_given: new Date().toISOString().split('T')[0],
-                    }).eq('id', entry.id)
-                    load()
-                  }}
-                  className="mt-3 w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
-                  style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                  <Check size={13} /> Mark as Given
-                </button>
+              {/* Actions — locked once given */}
+              {entry.status === 'given' ? (
+                <div className="flex items-center gap-1.5 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <Lock size={11} /> Given — locked, can't be edited or deleted
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={async () => {
+                      await supabase.from('sadaka_entries').update({
+                        status: 'given', amount_given: entry.amount_owed,
+                        date_given: new Date().toISOString().split('T')[0],
+                      }).eq('id', entry.id)
+                      load()
+                    }}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+                    style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                    <Check size={13} /> Mark as Given
+                  </button>
+                  <button onClick={() => { setEditItem(entry); setShowForm(true) }}
+                    className="px-3 py-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                    <Pencil size={13} />
+                  </button>
+                  <button onClick={async () => {
+                      if (!confirm('Delete this sadaka entry?')) return
+                      await supabase.from('sadaka_entries').delete().eq('id', entry.id)
+                      load()
+                    }}
+                    className="px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               )}
             </div>
           ))}
         </div>
       )}
 
-      {showForm && <SadakaForm onClose={() => setShowForm(false)} onSaved={load} />}
+      {showForm && <SadakaForm onClose={() => { setShowForm(false); setEditItem(null) }} onSaved={load} editItem={editItem} />}
     </div>
   )
 }
