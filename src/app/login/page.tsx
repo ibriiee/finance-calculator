@@ -15,7 +15,7 @@ const USERS = [
   {
     name: 'Abu Bakar',
     avatar: 'A',
-    photo: '/avatars/abubakar.jpeg',
+    photo: '/avatars/abubakar.png',
     email: process.env.NEXT_PUBLIC_USER_2_EMAIL ?? '',
     gradient: 'linear-gradient(135deg, #7C6A2D, #C9A84C)',
   },
