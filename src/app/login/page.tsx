@@ -9,14 +9,14 @@ const USERS = [
     name: 'Ibrahim',
     email: 'ibrahim_naeem@outlook.com',
     avatar: 'I',
-    title: 'Co-founder · Dubai',
+    photo: '/avatars/ibrahim.jpg',
     gradient: 'linear-gradient(135deg, #C9A84C, #F5D78E)',
   },
   {
     name: 'Abu Bakar',
     avatar: 'A',
+    photo: '/avatars/abubakar.jpg',
     email: process.env.NEXT_PUBLIC_USER_2_EMAIL ?? '',
-    title: 'Co-founder · Dubai',
     gradient: 'linear-gradient(135deg, #7C6A2D, #C9A84C)',
   },
 ]
@@ -228,32 +228,53 @@ export default function LoginPage() {
         {/* ── STEP: PICK USER ── */}
         {step === 'pick' && (
           <div className="animate-slide-up">
-            <p className="text-center text-sm mb-6 font-medium" style={{ color: 'var(--text-secondary)' }}>Who's signing in?</p>
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-4">
               {USERS.map(user => (
                 <button key={user.name} onClick={() => selectUser(user)}
-                  className="group relative flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 active:scale-[0.98] hover:scale-[1.02]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,168,76,0.15)', backdropFilter: 'blur(10px)' }}>
-                  <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ background: 'rgba(201,168,76,0.04)' }} />
-                  <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-                    style={{ background: user.gradient, boxShadow: '0 4px 20px rgba(201,168,76,0.3)' }}>
-                    <span className="text-xl font-bold text-black">{user.avatar}</span>
+                  className="group relative flex flex-col items-center gap-3 p-5 rounded-3xl transition-all duration-300 active:scale-[0.96] hover:scale-[1.03]"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(201,168,76,0.15)',
+                    backdropFilter: 'blur(12px)',
+                  }}>
+
+                  {/* Hover glow */}
+                  <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+                    style={{ background: 'rgba(201,168,76,0.05)', boxShadow: '0 0 30px rgba(201,168,76,0.08) inset' }} />
+
+                  {/* Gold ring around photo */}
+                  <div className="relative">
+                    <div className="absolute -inset-1 rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                      style={{ background: `conic-gradient(from 0deg, #C9A84C, #F5D78E, #7C6A2D, #C9A84C)`, borderRadius: '50%' }} />
+                    <div className="relative w-20 h-20 rounded-full overflow-hidden"
+                      style={{ border: '2px solid #080808' }}>
+                      {/* Try to load photo, fall back to initial */}
+                      <img
+                        src={user.photo}
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style') }}
+                      />
+                      {/* Fallback initial — hidden when photo loads */}
+                      <div className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-black"
+                        style={{ background: user.gradient, display: 'none' }}>
+                        {user.avatar}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-left flex-1">
-                    <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>{user.name}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{user.title}</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 group-hover:translate-x-1"
-                    style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
+
+                  {/* Name */}
+                  <p className="relative font-bold text-base tracking-wide" style={{ color: 'var(--text-primary)' }}>
+                    {user.name}
+                  </p>
+
+                  {/* Subtle gold underline on hover */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 h-0.5 rounded-full w-0 group-hover:w-8 transition-all duration-300"
+                    style={{ background: 'var(--gold)' }} />
                 </button>
               ))}
             </div>
-            <p className="text-center text-xs mt-6" style={{ color: 'var(--text-muted)' }}>🔒 Private app · Ibrahim & Abu Bakar only</p>
+            <p className="text-center text-xs mt-6" style={{ color: 'var(--text-muted)' }}>🔒 Private · tap your name to sign in</p>
           </div>
         )}
 
