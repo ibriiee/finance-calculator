@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react'
+import Image from 'next/image'
 
 const USERS = [
   {
@@ -236,10 +237,12 @@ export default function LoginPage() {
 
                   {/* Full-bleed photo — top half */}
                   <div className="relative w-full h-44 overflow-hidden">
-                    <img
+                    <Image
                       src={user.photo}
                       alt={user.name}
-                      className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                      fill
+                      className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                      sizes="200px"
                     />
                     {/* Gradient fade bottom */}
                     <div className="absolute inset-0"
