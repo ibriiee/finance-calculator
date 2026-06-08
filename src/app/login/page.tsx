@@ -110,6 +110,15 @@ export default function LoginPage() {
 
   useEffect(() => { setMounted(true) }, [])
 
+  // If Supabase sends a recovery link here, forward to reset-password page with token intact
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash
+    if (hash.includes('type=recovery') || (hash.includes('access_token') && hash.includes('type=recovery'))) {
+      router.replace('/auth/reset-password' + hash)
+    }
+  }, [])
+
   // Countdown timer for resend
   useEffect(() => {
     if (resendCooldown <= 0) return
