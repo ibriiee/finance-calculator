@@ -4,8 +4,21 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { User, Bell, Percent, Calendar, LogOut, RefreshCw, Scale, Loader2 } from 'lucide-react'
+import { User, Bell, Percent, Calendar, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid } from 'lucide-react'
 import type { Profile } from '@/types/database.types'
+
+const MODULES: { key: string; label: string }[] = [
+  { key: 'income', label: 'Income & Projects' },
+  { key: 'sadaka', label: 'Sadaka' },
+  { key: 'ledger', label: 'Brother Ledger' },
+  { key: 'goals', label: 'Goals' },
+  { key: 'loans', label: 'Loans' },
+  { key: 'splits', label: 'Shared Splits' },
+  { key: 'wasiyya', label: 'Wasiyya' },
+  { key: 'zakat', label: 'Zakat' },
+  { key: 'joint_account', label: 'Joint Bank Account' },
+]
+const DEFAULT_MODULES = Object.fromEntries(MODULES.map(m => [m.key, true]))
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -15,6 +28,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [form, setForm] = useState({
     display_name: '', sadaka_pct: 20, hawl_start_date: '',
+    default_currency: 'AED', nisab_basis: 'silver',
+    enabled_modules: DEFAULT_MODULES as Record<string, boolean>,
     notify_income_received: true, notify_ledger_update: true, notify_sadaka_due: true,
     notify_zakat_due: true,
   })
@@ -30,6 +45,9 @@ export default function SettingsPage() {
         display_name: data.display_name ?? '',
         sadaka_pct: data.sadaka_pct ? Math.round(data.sadaka_pct * 100) : 20,
         hawl_start_date: data.hawl_start_date ?? '',
+        default_currency: (data as any).default_currency ?? 'AED',
+        nisab_basis: (data as any).nisab_basis ?? 'silver',
+        enabled_modules: { ...DEFAULT_MODULES, ...((data as any).enabled_modules ?? {}) },
         notify_income_received: data.notify_income_received ?? true,
         notify_ledger_update: data.notify_ledger_update ?? true,
         notify_sadaka_due: data.notify_sadaka_due ?? true,
@@ -50,6 +68,9 @@ export default function SettingsPage() {
       display_name: form.display_name || null,
       sadaka_pct: form.sadaka_pct / 100,
       hawl_start_date: form.hawl_start_date || null,
+      default_currency: form.default_currency,
+      nisab_basis: form.nisab_basis,
+      enabled_modules: form.enabled_modules,
       notify_income_received: form.notify_income_received,
       notify_ledger_update: form.notify_ledger_update,
       notify_sadaka_due: form.notify_sadaka_due,
@@ -87,6 +108,77 @@ export default function SettingsPage() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Email: <span style={{ color: 'var(--text-secondary)' }}>{profile?.email}</span>
           </p>
+        </div>
+      )
+    },
+    {
+      title: 'Currency',
+      icon: Coins,
+      content: (
+        <div>
+          <label className="text-xs mb-2 block" style={{ color: 'var(--text-muted)' }}>Default display currency</label>
+          <div className="grid grid-cols-2 gap-2">
+            {['AED', 'PKR'].map(c => (
+              <button key={c} type="button" onClick={() => F('default_currency', c)}
+                className="py-2.5 rounded-xl text-sm font-medium"
+                style={{
+                  background: form.default_currency === c ? 'var(--gold-dim)' : 'var(--surface-2)',
+                  border: `1px solid ${form.default_currency === c ? 'var(--gold)' : 'var(--border)'}`,
+                  color: form.default_currency === c ? 'var(--gold)' : 'var(--text-muted)',
+                }}>{c}</button>
+            ))}
+          </div>
+          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+            Spending & sadaka always show both AED and PKR. Earning stays in AED.
+          </p>
+        </div>
+      )
+    },
+    {
+      title: 'Zakat Nisab',
+      icon: Scale,
+      content: (
+        <div>
+          <label className="text-xs mb-2 block" style={{ color: 'var(--text-muted)' }}>Threshold basis</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { val: 'silver', label: 'Silver (612.36g)' },
+              { val: 'gold', label: 'Gold (87.48g)' },
+            ].map(o => (
+              <button key={o.val} type="button" onClick={() => F('nisab_basis', o.val)}
+                className="py-2.5 rounded-xl text-xs font-medium"
+                style={{
+                  background: form.nisab_basis === o.val ? 'var(--gold-dim)' : 'var(--surface-2)',
+                  border: `1px solid ${form.nisab_basis === o.val ? 'var(--gold)' : 'var(--border)'}`,
+                  color: form.nisab_basis === o.val ? 'var(--gold)' : 'var(--text-muted)',
+                }}>{o.label}</button>
+            ))}
+          </div>
+          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+            Silver is the lower (more cautious) threshold. Both are shown in the Zakat module.
+          </p>
+        </div>
+      )
+    },
+    {
+      title: 'Modules',
+      icon: LayoutGrid,
+      content: (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Turn off what you don't use — it hides from nav & home.</p>
+          {MODULES.map(({ key, label }) => (
+            <label key={key} className="flex items-center justify-between p-3 rounded-xl cursor-pointer"
+              style={{ background: 'var(--surface-2)' }}>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+              <div className="relative">
+                <input type="checkbox" className="sr-only peer"
+                  checked={form.enabled_modules[key] !== false}
+                  onChange={e => F('enabled_modules', { ...form.enabled_modules, [key]: e.target.checked })} />
+                <div className="w-11 h-6 rounded-full peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"
+                  style={{ background: form.enabled_modules[key] !== false ? 'var(--gold)' : 'var(--border)' }} />
+              </div>
+            </label>
+          ))}
         </div>
       )
     },
