@@ -70,3 +70,24 @@ body {
 
 /* Bottom nav safe area */
 .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+
+/* Login page animations */
+@keyframes float-up {
+  0%   { transform: translateY(0) scale(1);   opacity: 0.4; }
+  50%  { opacity: 0.6; }
+  100% { transform: translateY(-100vh) scale(0.5); opacity: 0; }
+}
+.animate-float-up { animation: float-up linear infinite; }
+
+@keyframes shimmer {
+  0%   { transform: translateX(-200%) skewX(-12deg); }
+  100% { transform: translateX(400%) skewX(-12deg); }
+}
+.animate-shimmer { animation: shimmer 2.5s ease-in-out infinite; }
+
+/* Page transitions */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 0.4s ease-out; }
