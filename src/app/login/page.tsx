@@ -145,8 +145,9 @@ export default function LoginPage() {
   async function sendOtp() {
     if (!selectedUser) return
     setError(''); setLoading(true)
-    const { error: err } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: selectedUser.email,
+      options: { shouldCreateUser: false },
     })
     setLoading(false)
     if (err) { setError(err.message); return }
@@ -162,7 +163,7 @@ export default function LoginPage() {
     const { error: err } = await supabase.auth.verifyOtp({
       email: selectedUser.email,
       token: otp,
-      type: 'recovery',
+      type: 'email',
     })
     setLoading(false)
     if (err) setError('Wrong or expired code. Check your email.')
