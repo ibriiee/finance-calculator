@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
@@ -98,19 +98,19 @@ export default function ZakatPage() {
     { key: 'crypto_aed', label: 'Crypto (AED value)' },
     { key: 'business_assets_aed', label: 'Business Assets AED' },
     { key: 'receivables_aed', label: 'Money owed to you AED' },
-    { key: 'liabilities_aed', label: '— Liabilities / Debts AED' },
+    { key: 'liabilities_aed', label: 'â€” Liabilities / Debts AED' },
   ]
 
   if (loading) return <LoadingSpinner />
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="Zakat" subtitle="Hanafi school · 2.5% on net wealth" />
+      <ModuleHeader title="back Zakat" subtitle="Hanafi school Â· 2.5% on net wealth" />
 
       {/* Live rates info */}
       <div className="card p-3 flex gap-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-        <span>🟡 Gold: AED {rates.gold}/g</span>
-        <span>⚪ Silver: AED {rates.silver}/g</span>
+        <span>ðŸŸ¡ Gold: AED {rates.gold}/g</span>
+        <span>âšª Silver: AED {rates.silver}/g</span>
         <span>PKR: {rates.pkr.toFixed(4)}</span>
       </div>
 
@@ -119,7 +119,7 @@ export default function ZakatPage() {
         <Info size={14} style={{ color: 'var(--gold)' }} className="mt-0.5 shrink-0" />
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
           Nisab threshold: {NISAB_GOLD_GRAMS}g gold = <strong style={{ color: 'var(--gold)' }}>AED {(NISAB_GOLD_GRAMS * rates.gold).toFixed(0)}</strong>
-          {hawlStart && ` · Hawl: ${Math.floor((Date.now() - new Date(hawlStart).getTime()) / 86400000)} days`}
+          {hawlStart && ` Â· Hawl: ${Math.floor((Date.now() - new Date(hawlStart).getTime()) / 86400000)} days`}
         </p>
       </div>
 
@@ -178,7 +178,7 @@ export default function ZakatPage() {
             )}
             {result.hawlDays < 354 && (
               <p className="text-xs text-amber-400 mt-1">
-                ⚠ Hawl: {result.hawlDays}/354 days complete — {354 - result.hawlDays} days remaining
+                âš  Hawl: {result.hawlDays}/354 days complete â€” {354 - result.hawlDays} days remaining
               </p>
             )}
           </div>
@@ -186,7 +186,7 @@ export default function ZakatPage() {
           <button onClick={saveSnapshot} disabled={saving}
             className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold"
             style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
-            💾 Save This Year's Snapshot
+            ðŸ’¾ Save This Year's Snapshot
           </button>
         </div>
       )}
@@ -221,3 +221,4 @@ export default function ZakatPage() {
     </div>
   )
 }
+

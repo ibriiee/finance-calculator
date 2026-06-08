@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
@@ -27,13 +27,13 @@ export default function SplitsPage() {
 
   useEffect(() => { load() }, [])
 
-  const catIcons: Record<string, string> = { house: '🏠', vehicle: '🚗', gift: '🎁', charity: '🤲', investment: '📈', business: '💼', other: '•' }
+  const catIcons: Record<string, string> = { house: 'ðŸ ', vehicle: 'ðŸš—', gift: 'ðŸŽ', charity: 'ðŸ¤²', investment: 'ðŸ“ˆ', business: 'ðŸ’¼', other: 'â€¢' }
 
   if (loading) return <LoadingSpinner />
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="Shared Splits" subtitle="Expenses split between both"
+      <ModuleHeader title="back Shared Splits" subtitle="Expenses split between both"
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -44,7 +44,7 @@ export default function SplitsPage() {
 
       {splits.length === 0 ? (
         <EmptyState icon={Scissors} title="No shared expenses"
-          description="Log house rent, car costs, gifts — split the right way" />
+          description="Log house rent, car costs, gifts â€” split the right way" />
       ) : (
         <div className="flex flex-col gap-3">
           {splits.map(split => {
@@ -59,8 +59,8 @@ export default function SplitsPage() {
                       <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{split.name}</p>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {shortDate(split.cost_date)}
-                        {split.is_recurring && ' · Monthly'}
-                        · Paid by {split.paid_by === 'both' ? 'both' : split.paid_by === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
+                        {split.is_recurring && ' Â· Monthly'}
+                        Â· Paid by {split.paid_by === 'both' ? 'both' : split.paid_by === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
                       </p>
                     </div>
                   </div>
@@ -107,7 +107,7 @@ export default function SplitsPage() {
                     }
                   }} className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
                      style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                    → Push to Ledger
+                    â†’ Push to Ledger
                   </button>
                 )}
               </div>
@@ -120,3 +120,4 @@ export default function SplitsPage() {
     </div>
   )
 }
+

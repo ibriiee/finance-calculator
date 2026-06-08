@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen" style={{ background: 'var(--background)' }}>
       {/* Desktop: centered app shell with subtle border */}
       <div className="mx-auto w-full max-w-md min-h-screen relative"
-        style={{ borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
+        style={{ boxShadow: '0 0 0 1px var(--border)' }}>
         <main className="pb-24">
           {children}
         </main>
