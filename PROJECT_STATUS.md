@@ -89,18 +89,12 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Open items / session handoff (2026-06-08)
-- **Abu Bakar login** — still being verified. Email now hardcoded; login shows real error.
-  Most likely cause was unconfirmed email. Fix SQL to run in Supabase:
-  ```sql
-  UPDATE auth.users
-  SET encrypted_password = crypt('NEWPASSWORD', gen_salt('bf')),
-      email_confirmed_at  = COALESCE(email_confirmed_at, now()),
-      updated_at          = now()
-  WHERE lower(email) = 'bakarnaeem@hotmail.com';
-  ```
-  If it still fails, read the on-screen Supabase error and act on it.
-- Optional cleanup: set `NEXT_PUBLIC_USER_2_EMAIL` in Vercel (not required now that it's hardcoded).
-- All 9 SQL migrations in `supabase/` have been run by the user as of this session.
+- ✅ **Both users log in** (Ibrahim + Abu Bakar). Abu Bakar's issue was an unconfirmed email —
+  fixed via SQL (`email_confirmed_at = now()` + password reset). Email is hardcoded in login page.
+- Note for new Supabase users: create accounts with email auto-confirmed, or run
+  `UPDATE auth.users SET email_confirmed_at = now() WHERE email = '...';`
+- Optional cleanup: set `NEXT_PUBLIC_USER_2_EMAIL` in Vercel (not required — hardcoded).
+- All 9 SQL migrations in `supabase/` have been run as of this session.
 
 ## Roadmap / TODO
 - [ ] When income amount is edited, adjust the linked sadaka obligation (trigger is insert-only today).
