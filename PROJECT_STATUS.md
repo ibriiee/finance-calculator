@@ -72,6 +72,8 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-08** — Login fix: Abu Bakar email hardcoded (`bakarnaeem@hotmail.com`) since `NEXT_PUBLIC_USER_2_EMAIL` was never set in Vercel; login now shows the real Supabase auth error instead of a generic message.
+- **2026-06-08** — Branded desktop side panels (logo, ميزان wordmark, feature list, Ar-Rahman 55:9 verse) + richer backdrop to fill empty PC sides. Mobile unchanged.
 - **2026-06-08** — Developer Mode (Settings) unlocks edit/delete on locked income/sadaka. Excel (.xls) export alongside JSON. Income shows today's date. Dashboard: Savings (goals) + You-owe (loans+ledger debt) cards.
 - **2026-06-08** — Analytics page (donuts + monthly bars). Income/Sadaka locking once received/given. Sadaka edit/delete. Desktop UI backdrop + typography + selection color. Settings: backup/reset + test mode.
 - **2026-06-08** — Income upgrades: work-started date, ongoing flag, edit/delete, per-entry sadaka-paid status badge.
@@ -85,6 +87,20 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 - **2026-06-08** — Restored UTF-8 (removed mojibake), back buttons on all pages, scrollable form sheets.
 
 ---
+
+## Open items / session handoff (2026-06-08)
+- **Abu Bakar login** — still being verified. Email now hardcoded; login shows real error.
+  Most likely cause was unconfirmed email. Fix SQL to run in Supabase:
+  ```sql
+  UPDATE auth.users
+  SET encrypted_password = crypt('NEWPASSWORD', gen_salt('bf')),
+      email_confirmed_at  = COALESCE(email_confirmed_at, now()),
+      updated_at          = now()
+  WHERE lower(email) = 'bakarnaeem@hotmail.com';
+  ```
+  If it still fails, read the on-screen Supabase error and act on it.
+- Optional cleanup: set `NEXT_PUBLIC_USER_2_EMAIL` in Vercel (not required now that it's hardcoded).
+- All 9 SQL migrations in `supabase/` have been run by the user as of this session.
 
 ## Roadmap / TODO
 - [ ] When income amount is edited, adjust the linked sadaka obligation (trigger is insert-only today).
