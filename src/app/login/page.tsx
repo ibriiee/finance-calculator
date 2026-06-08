@@ -311,12 +311,9 @@ export default function LoginPage() {
                   style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)', width: '50%' }} />}
                 {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in…</> : `Sign in as ${selectedUser.name}`}
               </button>
-              {/* Forgot password link */}
-              <button type="button" onClick={() => { setError(''); setStep('forgot-confirm') }}
-                className="text-center text-xs py-1 transition-opacity hover:opacity-70"
-                style={{ color: 'var(--gold)' }}>
-                Forgot password?
-              </button>
+              <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+                Forgot password? Contact Ibrahim
+              </p>
             </form>
           </div>
         )}
