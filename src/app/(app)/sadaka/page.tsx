@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, HandHeart } from 'lucide-react'
+import { Plus, HandHeart, Check } from 'lucide-react'
 import SadakaForm from '@/components/sadaka/SadakaForm'
 import type { SadakaEntry } from '@/types/database.types'
 
@@ -22,19 +22,30 @@ export default function SadakaPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const [{ data: sadaka }, { data: profile }] = await Promise.all([
       supabase.from('sadaka_entries').select('*').or(`owner_id.eq.${user!.id},is_joint.eq.true`).order('created_at', { ascending: false }),
-      supabase.from('profiles').select('sadaka_rate').eq('id', user!.id).single(),
+      supabase.from('profiles').select('sadaka_pct').eq('id', user!.id).single(),
     ])
     setEntries(sadaka ?? [])
-    setSadakaRate(profile?.sadaka_rate ?? 0.2)
+    setSadakaRate(profile?.sadaka_pct ?? 0.2)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  const totalOwed = entries.filter(e => ['pending', 'partially_given'].includes(e.status))
-    .reduce((s, e) => s + (e.amount_owed - e.amount_given), 0)
-  const totalGiven = entries.filter(e => e.status === 'given')
-    .reduce((s, e) => s + e.amount_given, 0)
+  // Net the whole ledger per currency: advances (given > owed) auto-offset new obligations.
+  function totalsFor(list: SadakaEntry[], cur: string) {
+    const owed = list.filter(e => e.currency === cur).reduce((s, e) => s + Number(e.amount_owed), 0)
+    const given = list.filter(e => e.currency === cur).reduce((s, e) => s + Number(e.amount_given), 0)
+    return {
+      owed, given,
+      pending: Math.max(0, owed - given),   // still to give
+      advance: Math.max(0, given - owed),   // credit carried forward
+    }
+  }
+  const mine = entries.filter(e => !e.is_joint)
+  const joint = entries.filter(e => e.is_joint)
+  const aed = totalsFor(mine, 'AED')
+  const pkr = totalsFor(mine, 'PKR')
+  const jointAed = totalsFor(joint, 'AED')
 
   const filtered = filter === 'all' ? entries
     : filter === 'pending' ? entries.filter(e => ['pending', 'partially_given', 'advance_given'].includes(e.status))
@@ -42,8 +53,8 @@ export default function SadakaPage() {
 
   if (loading) return <LoadingSpinner />
 
-  const LOCATION_LABELS: Record<string, string> = { UAE: '🇦🇪 UAE', Pakistan: '🇵🇰 Pakistan', other: '🌍 Other' }
-  const METHOD_ICONS: Record<string, string> = { cash: '💵', gift: '🎁', food: '🍽', bank_transfer: '🏦', other: '•' }
+  const LOCATION_LABELS: Record<string, string> = { UAE: 'UAE', Pakistan: 'Pakistan', other: 'Other' }
+  const METHOD_LABELS: Record<string, string> = { cash: 'Cash', gift: 'Gift', food: 'Food', bank_transfer: 'Bank transfer', other: 'Other' }
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
@@ -56,20 +67,56 @@ export default function SadakaPage() {
           </button>
         } />
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="card p-3" style={{ border: totalOwed > 0 ? '1px solid rgba(201,168,76,0.4)' : undefined }}>
-          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Still Owed</p>
-          <p className="text-lg font-bold" style={{ color: totalOwed > 0 ? 'var(--gold)' : '#10B981' }}>
-            {formatCurrency(totalOwed, 'AED', true)}
+      {/* Summary — pending / given / advance, per currency */}
+      <div className="card p-4">
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Your Sadaka</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[11px] mb-1" style={{ color: 'var(--text-muted)' }}>Pending</p>
+            <p className="text-base font-bold" style={{ color: aed.pending > 0 ? 'var(--gold)' : '#10B981' }}>
+              {formatCurrency(aed.pending, 'AED', true)}
+            </p>
+            {pkr.pending > 0 && <p className="text-xs" style={{ color: 'var(--gold)' }}>{formatCurrency(pkr.pending, 'PKR', true)}</p>}
+          </div>
+          <div>
+            <p className="text-[11px] mb-1" style={{ color: 'var(--text-muted)' }}>Given</p>
+            <p className="text-base font-bold text-emerald-400">{formatCurrency(aed.given, 'AED', true)}</p>
+            {pkr.given > 0 && <p className="text-xs text-emerald-400">{formatCurrency(pkr.given, 'PKR', true)}</p>}
+          </div>
+          <div>
+            <p className="text-[11px] mb-1" style={{ color: 'var(--text-muted)' }}>Advance</p>
+            <p className="text-base font-bold" style={{ color: 'var(--text-secondary)' }}>
+              {formatCurrency(aed.advance, 'AED', true)}
+            </p>
+            {pkr.advance > 0 && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{formatCurrency(pkr.advance, 'PKR', true)}</p>}
+          </div>
+        </div>
+        {aed.pending === 0 && pkr.pending === 0 && (
+          <p className="text-xs text-emerald-400 mt-3">All sadaka given — you're clear{aed.advance > 0 ? `, with ${formatCurrency(aed.advance, 'AED', true)} in advance credit` : ''} ✓</p>
+        )}
+        {aed.advance > 0 && aed.pending > 0 && (
+          <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
+            Advance credit is auto-offsetting new obligations.
           </p>
-          {totalOwed === 0 && <p className="text-xs text-emerald-400">All given ✓</p>}
-        </div>
-        <div className="card p-3">
-          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Given</p>
-          <p className="text-lg font-bold text-emerald-400">{formatCurrency(totalGiven, 'AED', true)}</p>
-        </div>
+        )}
       </div>
+
+      {/* Joint sadaka summary */}
+      {joint.length > 0 && (
+        <div className="card p-4">
+          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Joint Sadaka (both)</p>
+          <div className="flex items-center justify-between">
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Pending</span>
+            <span className="text-base font-bold" style={{ color: jointAed.pending > 0 ? 'var(--gold)' : '#10B981' }}>
+              {formatCurrency(jointAed.pending, 'AED', true)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Given together</span>
+            <span className="text-sm font-semibold text-emerald-400">{formatCurrency(jointAed.given, 'AED', true)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -98,12 +145,12 @@ export default function SadakaPage() {
                     {entry.is_joint && <StatusBadge status="joint" label="Joint" size="xs" />}
                   </div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {entry.recipient_name ?? 'Unspecified recipient'}
+                    {entry.recipient_name ?? (entry.source_income_id ? 'Obligation from income' : 'Pending obligation')}
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {entry.recipient_type?.replace('_', ' ')}
-                    {entry.location && ` · ${LOCATION_LABELS[entry.location]}`}
-                    {entry.method && ` · ${METHOD_ICONS[entry.method]} ${entry.method.replace('_', ' ')}`}
+                    {entry.location && ` · ${LOCATION_LABELS[entry.location] ?? entry.location}`}
+                    {entry.method && ` · ${METHOD_LABELS[entry.method] ?? entry.method}`}
                     {entry.date_given && ` · ${shortDate(entry.date_given)}`}
                   </p>
                 </div>
@@ -137,9 +184,9 @@ export default function SadakaPage() {
                     }).eq('id', entry.id)
                     load()
                   }}
-                  className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
+                  className="mt-3 w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                  ✓ Mark as Given
+                  <Check size={13} /> Mark as Given
                 </button>
               )}
             </div>
