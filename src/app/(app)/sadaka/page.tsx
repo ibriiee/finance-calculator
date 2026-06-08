@@ -16,16 +16,25 @@ export default function SadakaPage() {
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState<'pending' | 'given' | 'all'>('pending')
   const [sadakaRate, setSadakaRate] = useState(0.2)
+  const [userId, setUserId] = useState('')
+  const [names, setNames] = useState<Record<string, string>>({})
   const supabase = createClient()
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    const [{ data: sadaka }, { data: profile }] = await Promise.all([
-      supabase.from('sadaka_entries').select('*').or(`owner_id.eq.${user!.id},is_joint.eq.true`).order('created_at', { ascending: false }),
+    setUserId(user!.id)
+    const [{ data: sadaka }, { data: profile }, { data: profs }] = await Promise.all([
+      supabase.from('sadaka_entries').select('*')
+        .or(`owner_id.eq.${user!.id},is_joint.eq.true,shared.eq.true`)
+        .order('created_at', { ascending: false }),
       supabase.from('profiles').select('sadaka_pct').eq('id', user!.id).single(),
+      supabase.from('profiles').select('id, display_name'),
     ])
     setEntries(sadaka ?? [])
     setSadakaRate(profile?.sadaka_pct ?? 0.2)
+    const map: Record<string, string> = {}
+    ;(profs ?? []).forEach((p: any) => { map[p.id] = p.display_name ?? 'Unknown' })
+    setNames(map)
     setLoading(false)
   }
 
@@ -41,11 +50,12 @@ export default function SadakaPage() {
       advance: Math.max(0, given - owed),   // credit carried forward
     }
   }
-  const mine = entries.filter(e => !e.is_joint)
+  const mine = entries.filter(e => !e.is_joint && e.owner_id === userId)
   const joint = entries.filter(e => e.is_joint)
   const aed = totalsFor(mine, 'AED')
   const pkr = totalsFor(mine, 'PKR')
   const jointAed = totalsFor(joint, 'AED')
+  const jointPkr = totalsFor(joint, 'PKR')
 
   const filtered = filter === 'all' ? entries
     : filter === 'pending' ? entries.filter(e => ['pending', 'partially_given', 'advance_given'].includes(e.status))
@@ -107,13 +117,15 @@ export default function SadakaPage() {
           <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Joint Sadaka (both)</p>
           <div className="flex items-center justify-between">
             <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Pending</span>
-            <span className="text-base font-bold" style={{ color: jointAed.pending > 0 ? 'var(--gold)' : '#10B981' }}>
-              {formatCurrency(jointAed.pending, 'AED', true)}
+            <span className="text-base font-bold" style={{ color: (jointAed.pending + jointPkr.pending) > 0 ? 'var(--gold)' : '#10B981' }}>
+              {formatCurrency(jointAed.pending, 'AED', true)}{jointPkr.pending > 0 && ` · ${formatCurrency(jointPkr.pending, 'PKR', true)}`}
             </span>
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Given together</span>
-            <span className="text-sm font-semibold text-emerald-400">{formatCurrency(jointAed.given, 'AED', true)}</span>
+            <span className="text-sm font-semibold text-emerald-400">
+              {formatCurrency(jointAed.given, 'AED', true)}{jointPkr.given > 0 && ` · ${formatCurrency(jointPkr.given, 'PKR', true)}`}
+            </span>
           </div>
         </div>
       )}
@@ -153,6 +165,13 @@ export default function SadakaPage() {
                     {entry.method && ` · ${METHOD_LABELS[entry.method] ?? entry.method}`}
                     {entry.date_given && ` · ${shortDate(entry.date_given)}`}
                   </p>
+                  {entry.added_by_id && (entry.shared || entry.is_joint || entry.owner_id !== userId) && (
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                      {entry.owner_id !== userId && entry.owner_id ? `For ${names[entry.owner_id] ?? 'brother'} · ` : ''}
+                      Added by {entry.added_by_id === userId ? 'you' : (names[entry.added_by_id] ?? 'brother')}
+                      {' · '}{shortDate(entry.created_at)}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-base font-bold" style={{ color: 'var(--gold)' }}>
