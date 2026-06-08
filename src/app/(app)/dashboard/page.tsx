@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, TrendingUp, HandHeart, Scale, ArrowLeftRight, Target, AlertCircle, LogOut } from 'lucide-react'
+import { ArrowRight, TrendingUp, HandHeart, Scale, ArrowLeftRight, Target, AlertCircle, LogOut, CreditCard, Scissors, ScrollText, Landmark } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
 
 export default async function DashboardPage() {
@@ -278,15 +278,16 @@ export default async function DashboardPage() {
       )}
 
       {/* Quick links */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {[
-          { href: '/loans',  label: 'Loans',   icon: '💳' },
-          { href: '/splits', label: 'Splits',  icon: '✂️' },
-          { href: '/wasiyya',label: 'Wasiyya', icon: '📜' },
-        ].map(({ href, label, icon }) => (
+          { href: '/joint',   label: 'Joint',   Icon: Landmark },
+          { href: '/loans',   label: 'Loans',   Icon: CreditCard },
+          { href: '/splits',  label: 'Splits',  Icon: Scissors },
+          { href: '/wasiyya', label: 'Wasiyya', Icon: ScrollText },
+        ].map(({ href, label, Icon }) => (
           <Link key={href} href={href}
-            className="card-inner p-3 flex flex-col items-center gap-1 rounded-xl">
-            <span className="text-xl">{icon}</span>
+            className="card-inner p-3 flex flex-col items-center gap-1.5 rounded-xl">
+            <Icon size={18} style={{ color: 'var(--gold)' }} />
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</span>
           </Link>
         ))}

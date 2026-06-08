@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Briefcase, HandHeart, Scale, ArrowLeftRight, CreditCard, Layers, Target, ScrollText, Settings } from 'lucide-react'
+import { LayoutDashboard, Briefcase, HandHeart, Scale, ArrowLeftRight, CreditCard, Layers, Target, ScrollText, Settings, Landmark } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -11,6 +11,7 @@ const NAV = [
   { href: '/income',     icon: Briefcase,        label: 'Income', key: 'income' },
   { href: '/sadaka',     icon: HandHeart,         label: 'Sadaka', key: 'sadaka' },
   { href: '/ledger',     icon: ArrowLeftRight,    label: 'Ledger', key: 'ledger' },
+  { href: '/joint',      icon: Landmark,          label: 'Joint',  key: 'joint_account' },
   { href: '/goals',      icon: Target,            label: 'Goals',  key: 'goals' },
   { href: '/settings',   icon: Settings,          label: 'Settings', key: null },
 ]
