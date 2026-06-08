@@ -17,7 +17,7 @@ const USERS = [
     name: 'Abu Bakar',
     avatar: 'A',
     photo: '/avatars/abubakar.png',
-    email: process.env.NEXT_PUBLIC_USER_2_EMAIL ?? '',
+    email: 'bakarnaeem@hotmail.com',
     gradient: 'linear-gradient(135deg, #7C6A2D, #C9A84C)',
   },
 ]
