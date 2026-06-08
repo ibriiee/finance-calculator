@@ -6,7 +6,8 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, HandHeart, Check } from 'lucide-react'
+import { Plus, HandHeart, Check, Users, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
 import SadakaForm from '@/components/sadaka/SadakaForm'
 import type { SadakaEntry } from '@/types/database.types'
 
@@ -129,6 +130,15 @@ export default function SadakaPage() {
           </div>
         </div>
       )}
+
+      {/* Recipients link */}
+      <Link href="/recipients" className="card p-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users size={15} style={{ color: 'var(--gold)' }} />
+          <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Recipients — who's paid & who's overdue</span>
+        </div>
+        <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+      </Link>
 
       {/* Tabs */}
       <div className="flex gap-2">

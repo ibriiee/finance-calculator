@@ -12,11 +12,12 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
   const [error, setError] = useState('')
   const [me, setMe] = useState<{ id: string; name: string } | null>(null)
   const [other, setOther] = useState<{ id: string; name: string } | null>(null)
+  const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({
     amount_owed: '', currency: 'AED' as Currency,
     is_advance: false,
     on_behalf: 'me' as 'me' | 'other' | 'joint',  // whose sadaka this is
-    recipient_name: '', recipient_type: 'named_relative',
+    recipient_id: '', recipient_name: '', recipient_type: 'named_relative',
     location: 'UAE', method: 'cash', notes: '',
     status: 'pending',
   })
@@ -25,11 +26,15 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profs } = await supabase.from('profiles').select('id, display_name')
+      const [{ data: profs }, { data: recs }] = await Promise.all([
+        supabase.from('profiles').select('id, display_name'),
+        supabase.from('sadaka_recipients').select('id, name').eq('is_active', true).order('name'),
+      ])
       const mine = profs?.find((p: any) => p.id === user!.id)
       const theirs = profs?.find((p: any) => p.id !== user!.id)
       setMe({ id: user!.id, name: mine?.display_name ?? 'Me' })
       if (theirs) setOther({ id: theirs.id, name: theirs.display_name ?? 'Brother' })
+      setRecipients(((recs as any) ?? []).map((r: any) => ({ id: r.id, name: r.name })))
     })()
   }, [])
 
@@ -55,7 +60,8 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
       is_joint: isJoint, shared,
       joint_ibrahim_pct: 0.5,
       date_given: given > 0 ? new Date().toISOString().split('T')[0] : null,
-      recipient_name: form.recipient_name || null,
+      recipient_id: form.recipient_id || null,
+      recipient_name: form.recipient_name || (form.recipient_id ? recipients.find(r => r.id === form.recipient_id)?.name : null) || null,
       recipient_type: form.recipient_type as any,
       location: form.location as any, method: form.method as any,
       notes: form.notes || null,
@@ -87,8 +93,18 @@ export default function SadakaForm({ onClose, onSaved }: Props) {
               className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
 
-          <input placeholder="Recipient name (optional)" value={form.recipient_name} onChange={e => F('recipient_name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          {recipients.length > 0 && (
+            <select value={form.recipient_id} onChange={e => F('recipient_id', e.target.value)}
+              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="">Saved recipient (optional)…</option>
+              {recipients.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          )}
+
+          {!form.recipient_id && (
+            <input placeholder="Or type recipient name (optional)" value={form.recipient_name} onChange={e => F('recipient_name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <select value={form.recipient_type} onChange={e => F('recipient_type', e.target.value)}

@@ -1,0 +1,71 @@
+'use client'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { X, Loader2 } from 'lucide-react'
+
+interface Props { onClose: () => void; onSaved: () => void }
+
+export default function RecipientForm({ onClose, onSaved }: Props) {
+  const supabase = createClient()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [form, setForm] = useState({ name: '', relation: 'relative', location: 'UAE', contact: '', notes: '' })
+  const F = (f: string, v: string) => setForm(p => ({ ...p, [f]: v }))
+
+  async function save() {
+    if (!form.name) return
+    setSaving(true); setError('')
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: err } = await supabase.from('sadaka_recipients').insert({
+      name: form.name, relation: form.relation, location: form.location,
+      contact: form.contact || null, notes: form.notes || null,
+      created_by_id: user!.id, is_active: true,
+    })
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onSaved(); onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8 max-h-[88vh] overflow-y-auto"
+           style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold">New Recipient</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}><X size={16} /></button>
+        </div>
+        <div className="flex flex-col gap-3">
+          <input placeholder="Name (e.g. Norine Aunty)" value={form.name} onChange={e => F('name', e.target.value)}
+            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div className="grid grid-cols-2 gap-2">
+            <select value={form.relation} onChange={e => F('relation', e.target.value)}
+              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="relative">Relative</option>
+              <option value="needy">Needy</option>
+              <option value="widow">Widow</option>
+              <option value="student">Student</option>
+              <option value="masjid">Masjid</option>
+              <option value="other">Other</option>
+            </select>
+            <select value={form.location} onChange={e => F('location', e.target.value)}
+              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="UAE">UAE</option>
+              <option value="Pakistan">Pakistan</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <input placeholder="Contact (phone / optional)" value={form.contact} onChange={e => F('contact', e.target.value)}
+            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <input placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)}
+            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          {error && <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>⚠ {error}</div>}
+          <button onClick={save} disabled={saving || !form.name}
+            className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+            style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+            {saving && <Loader2 size={15} className="animate-spin" />}{saving ? 'Saving…' : 'Add Recipient'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
