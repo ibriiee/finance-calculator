@@ -26,13 +26,22 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [busy, setBusy] = useState<null | 'export' | 'reset'>(null)
+  const [busy, setBusy] = useState<null | 'export' | 'excel' | 'reset'>(null)
   const [testMode, setTestMode] = useState(false)
+  const [devMode, setDevMode] = useState(false)
 
-  useEffect(() => { setTestMode(localStorage.getItem('mizan_test_mode') === '1') }, [])
+  useEffect(() => {
+    setTestMode(localStorage.getItem('mizan_test_mode') === '1')
+    setDevMode(localStorage.getItem('mizan_dev_mode') === '1')
+  }, [])
   function toggleTestMode(v: boolean) {
     setTestMode(v)
     localStorage.setItem('mizan_test_mode', v ? '1' : '0')
+  }
+  function toggleDevMode(v: boolean) {
+    if (v && !confirm('Developer Mode lets you EDIT and DELETE entries that are normally locked (received income, given sadaka).\n\nThis can corrupt your real records and break sadaka/zakat calculations. Only use it to fix mistakes. Continue?')) return
+    setDevMode(v)
+    localStorage.setItem('mizan_dev_mode', v ? '1' : '0')
   }
   const [form, setForm] = useState({
     display_name: '', sadaka_pct: 20, hawl_start_date: '',
@@ -120,6 +129,35 @@ export default function SettingsPage() {
     const a = document.createElement('a')
     a.href = url
     a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setBusy(null)
+  }
+
+  function esc(v: any) {
+    const s = v === null || v === undefined ? '' : String(v)
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+
+  async function exportExcel() {
+    setBusy('excel')
+    let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>'
+    for (const t of DATA_TABLES) {
+      const { data } = await supabase.from(t).select('*')
+      const rows = (data as any[]) ?? []
+      html += `<h3>${t}</h3>`
+      if (rows.length === 0) { html += '<p>(no data)</p>'; continue }
+      const cols = Object.keys(rows[0])
+      html += '<table border="1"><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>'
+      rows.forEach(r => { html += '<tr>' + cols.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>' })
+      html += '</table><br/>'
+    }
+    html += '</body></html>'
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.xls`
     a.click()
     URL.revokeObjectURL(url)
     setBusy(null)
@@ -333,6 +371,19 @@ export default function SettingsPage() {
         <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
           When you're done testing, export a backup then reset the data below to start with real figures.
         </p>
+
+        {/* Developer mode */}
+        <label className="flex items-center justify-between p-3 rounded-xl cursor-pointer mt-3" style={{ background: 'var(--surface-2)' }}>
+          <span className="text-sm" style={{ color: '#F59E0B' }}>Developer Mode — unlock edit/delete on locked entries</span>
+          <div className="relative">
+            <input type="checkbox" className="sr-only peer" checked={devMode} onChange={e => toggleDevMode(e.target.checked)} />
+            <div className="w-11 h-6 rounded-full peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"
+              style={{ background: devMode ? '#F59E0B' : 'var(--border)' }} />
+          </div>
+        </label>
+        <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+          ⚠ Lets you change received income & given sadaka. Can corrupt records — use only to fix mistakes, then turn off.
+        </p>
       </div>
 
       {/* Data & backup */}
@@ -341,12 +392,20 @@ export default function SettingsPage() {
           <Database size={15} style={{ color: 'var(--gold)' }} />
           <h3 className="text-sm font-semibold">Data &amp; Backup</h3>
         </div>
-        <button onClick={exportData} disabled={busy !== null}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mb-2"
-          style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
-          {busy === 'export' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          {busy === 'export' ? 'Preparing…' : 'Export backup (JSON)'}
-        </button>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <button onClick={exportData} disabled={busy !== null}
+            className="py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+            {busy === 'export' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            JSON
+          </button>
+          <button onClick={exportExcel} disabled={busy !== null}
+            className="py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+            {busy === 'excel' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Excel
+          </button>
+        </div>
         <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
           Downloads every record to a file on your device. Keep it safe — that's your backup.
           (Supabase also keeps the live database; this is an extra offline copy.)

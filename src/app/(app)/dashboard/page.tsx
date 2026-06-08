@@ -81,6 +81,26 @@ export default async function DashboardPage() {
     return { ...g, saved, pct: Math.min(100, Math.round((saved / g.target_amount) * 100)) }
   })
 
+  // Loans I owe (AED), net of repayments
+  const { data: loansData } = await supabase.from('loans')
+    .select('id, loan_type, currency_type, original_amount, status')
+    .eq('owner_id', user!.id)
+    .neq('status', 'cleared')
+  const loanIds = (loansData ?? []).map((l: any) => l.id)
+  const { data: repays } = loanIds.length
+    ? await supabase.from('loan_repayments').select('loan_id, amount').in('loan_id', loanIds)
+    : { data: [] }
+  let loanDebtAed = 0
+  ;(loansData ?? []).forEach((l: any) => {
+    if (l.loan_type === 'i_owe' && l.currency_type === 'AED') {
+      const repaid = (repays ?? []).filter((r: any) => r.loan_id === l.id).reduce((s: number, r: any) => s + Number(r.amount), 0)
+      loanDebtAed += Math.max(0, Number(l.original_amount) - repaid)
+    }
+  })
+  const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
+  const totalOwedAed = loanDebtAed + ledgerDebtAed
+  const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
+
   const userName = profile?.display_name ?? 'Ibrahim'
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'
 
@@ -132,6 +152,27 @@ export default async function DashboardPage() {
             </span>
           </div>
         )}
+      </div>
+
+      {/* Savings & what you owe */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="card p-3">
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Savings (goals)</p>
+          <p className="text-lg font-bold text-emerald-400">{formatCurrency(totalSavingsAed, 'AED', true)}</p>
+        </div>
+        <div className="card p-3" style={{ border: totalOwedAed > 0 ? '1px solid rgba(239,68,68,0.3)' : undefined }}>
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>You owe (debt)</p>
+          <p className="text-lg font-bold" style={{ color: totalOwedAed > 0 ? '#EF4444' : '#10B981' }}>
+            {totalOwedAed > 0 ? formatCurrency(totalOwedAed, 'AED', true) : 'Clear'}
+          </p>
+          {totalOwedAed > 0 && (
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {loanDebtAed > 0 && `loans ${formatCurrency(loanDebtAed, 'AED', true)}`}
+              {loanDebtAed > 0 && ledgerDebtAed > 0 && ' · '}
+              {ledgerDebtAed > 0 && `ledger ${formatCurrency(ledgerDebtAed, 'AED', true)}`}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Brother Ledger */}

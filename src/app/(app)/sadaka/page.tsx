@@ -16,6 +16,7 @@ export default function SadakaPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<SadakaEntry | null>(null)
+  const [devMode, setDevMode] = useState(false)
   const [filter, setFilter] = useState<'pending' | 'given' | 'all'>('pending')
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
@@ -40,7 +41,7 @@ export default function SadakaPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
 
   // Net the whole ledger per currency: advances (given > owed) auto-offset new obligations.
   function totalsFor(list: SadakaEntry[], cur: string) {
@@ -204,25 +205,27 @@ export default function SadakaPage() {
                 </div>
               )}
 
-              {/* Actions — locked once given */}
-              {entry.status === 'given' ? (
+              {/* Actions — locked once given (unless Developer Mode) */}
+              {entry.status === 'given' && !devMode ? (
                 <div className="flex items-center gap-1.5 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
                   <Lock size={11} /> Given — locked, can't be edited or deleted
                 </div>
               ) : (
                 <div className="flex items-center gap-2 mt-3">
-                  <button
-                    onClick={async () => {
-                      await supabase.from('sadaka_entries').update({
-                        status: 'given', amount_given: entry.amount_owed,
-                        date_given: new Date().toISOString().split('T')[0],
-                      }).eq('id', entry.id)
-                      load()
-                    }}
-                    className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
-                    style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                    <Check size={13} /> Mark as Given
-                  </button>
+                  {entry.status !== 'given' && (
+                    <button
+                      onClick={async () => {
+                        await supabase.from('sadaka_entries').update({
+                          status: 'given', amount_given: entry.amount_owed,
+                          date_given: new Date().toISOString().split('T')[0],
+                        }).eq('id', entry.id)
+                        load()
+                      }}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+                      style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                      <Check size={13} /> Mark as Given
+                    </button>
+                  )}
                   <button onClick={() => { setEditItem(entry); setShowForm(true) }}
                     className="px-3 py-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
                     <Pencil size={13} />

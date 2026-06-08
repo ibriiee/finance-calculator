@@ -17,7 +17,10 @@ export default function IncomePage() {
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<IncomeProject | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'received'>('all')
+  const [devMode, setDevMode] = useState(false)
   const supabase = createClient()
+
+  useEffect(() => { setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
 
   async function load() {
     const [{ data }, { data: sadaka }] = await Promise.all([
@@ -62,6 +65,11 @@ export default function IncomePage() {
             <Plus size={14} /> Add
           </button>
         } />
+
+      {/* Current month */}
+      <p className="text-xs -mt-1" style={{ color: 'var(--text-muted)' }}>
+        {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+      </p>
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3">
@@ -174,8 +182,8 @@ export default function IncomePage() {
                   </div>
                 </div>
 
-                {/* Actions — locked once payment received */}
-                {item.status === 'received' ? (
+                {/* Actions — locked once payment received (unless Developer Mode) */}
+                {item.status === 'received' && !devMode ? (
                   <div className="flex items-center gap-1.5 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
                     <Lock size={11} /> Locked — payment received, entry can't be changed
                   </div>
