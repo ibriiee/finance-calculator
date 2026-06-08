@@ -22,7 +22,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Module | Route | Status | Notes |
 |--------|-------|--------|-------|
 | Dashboard | `/dashboard` | ✅ | Summary cards + quick links (icons, no emoji) |
-| Income | `/income` | ⚠️ basic | Always individual, AED. TODO: start date, ongoing flag, edit/delete, mark-final, "sadaka paid" tag |
+| Income | `/income` | ✅ | Individual. Start date, ongoing flag, edit/delete, per-entry **sadaka-paid status**. Editing does NOT re-trigger sadaka (insert-only trigger) |
 | Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution |
 | Recipients | `/recipients` | ✅ | Directory of sadaka recipients; total received, last paid, overdue→prioritise flags, **WhatsApp export**. Linked from Sadaka + selectable in SadakaForm |
 | Brother Ledger | `/ledger` | ✅ | IOU between brothers; fixed profile-read RLS hang |
@@ -47,6 +47,7 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 6. `joint-account.sql` — `joint_accounts` + `joint_account_txns` + RLS + realtime
 7. `zakat-paid.sql` — `zakat_paid`, `zakat_paid_date`, `nisab_basis`, `due_date`
 8. `sadaka-recipients.sql` — recipient directory + `recipient_id` on sadaka (Sadaka v2)
+9. `income-upgrades.sql` — `work_started_date`, `is_ongoing`; income own RLS for update/delete
 
 ---
 
@@ -63,6 +64,7 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-08** — Income upgrades: work-started date, ongoing flag, edit/delete, per-entry sadaka-paid status badge.
 - **2026-06-08** — Sadaka v2: recipient directory `/recipients` (totals, last-paid, overdue prioritisation, WhatsApp export); recipient picker in SadakaForm; PROJECT_STATUS.md + AGENTS.md maintenance loop added.
 - **2026-06-08** — Zakat upgrade (silver nisab active + gold ref, pay-by date, yearly paid log).
 - **2026-06-08** — Joint Account module built (accounts, deposits/withdrawals, fairness, AED↔PKR, realtime).
@@ -75,8 +77,7 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Roadmap / TODO
-- [ ] Income upgrades: work-start date, ongoing flag, edit/delete, mark-final, **tag income as sadaka-paid**
-      (link gig → sadaka given from it; show cleared vs pending earnings).
 - [ ] Analytics/charts: doughnut/rings, monthly earning vs sadaka trends, breakdowns.
+- [ ] When income amount is edited, adjust the linked sadaka obligation (trigger is insert-only today).
 - [ ] Gate dashboard tiles (Loans/Splits/Wasiyya/Joint) by module toggles (nav already gated).
 - [ ] Wasiyya rethink (user unhappy with current shape).

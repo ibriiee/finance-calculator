@@ -4,36 +4,53 @@ import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import type { Currency, IncomeType, Ownership } from '@/types/database.types'
 
-interface Props { onClose: () => void; onSaved: () => void }
+interface Props { onClose: () => void; onSaved: () => void; editItem?: any }
 
-export default function IncomeForm({ onClose, onSaved }: Props) {
+export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const isEdit = !!editItem
   const [form, setForm] = useState({
-    name: '', type: 'gig' as IncomeType, currency: 'AED' as Currency,
-    amount: '', work_completed_date: new Date().toISOString().split('T')[0],
-    expected_payment_date: '', ownership: 'ibrahim' as Ownership, notes: '',
+    name: editItem?.name ?? '',
+    type: (editItem?.type ?? 'gig') as IncomeType,
+    currency: (editItem?.currency ?? 'AED') as Currency,
+    amount: editItem?.amount ? String(editItem.amount) : '',
+    work_started_date: editItem?.work_started_date ?? '',
+    work_completed_date: editItem?.work_completed_date ?? new Date().toISOString().split('T')[0],
+    expected_payment_date: editItem?.expected_payment_date ?? '',
+    ownership: (editItem?.ownership ?? 'ibrahim') as Ownership,
+    is_ongoing: editItem?.is_ongoing ?? false,
+    notes: editItem?.notes ?? '',
   })
 
   async function save() {
     if (!form.name || !form.amount) return
-    setSaving(true)
+    setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('income_projects').insert({
-      owner_id: user!.id,
+    const payload = {
       name: form.name, type: form.type, currency: form.currency,
       amount: parseFloat(form.amount),
-      work_completed_date: form.work_completed_date,
+      work_started_date: form.work_started_date || null,
+      work_completed_date: form.is_ongoing ? null : form.work_completed_date,
       expected_payment_date: form.expected_payment_date || null,
-      ownership: form.ownership, notes: form.notes || null,
-      status: 'pending', sadaka_triggered: false,
-    })
+      ownership: form.ownership, is_ongoing: form.is_ongoing,
+      notes: form.notes || null,
+    }
+    let err
+    if (isEdit) {
+      ;({ error: err } = await supabase.from('income_projects').update(payload).eq('id', editItem.id))
+    } else {
+      ;({ error: err } = await supabase.from('income_projects').insert({
+        ...payload, owner_id: user!.id, status: 'pending', sadaka_triggered: false,
+      }))
+    }
     setSaving(false)
-    onSaved()
-    onClose()
+    if (err) { setError(err.message); return }
+    onSaved(); onClose()
   }
 
-  const F = (field: string, val: string) => setForm(p => ({ ...p, [field]: val }))
+  const F = (field: string, val: any) => setForm(p => ({ ...p, [field]: val }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
@@ -41,7 +58,7 @@ export default function IncomeForm({ onClose, onSaved }: Props) {
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold">Add Income / Project</h2>
+          <h2 className="text-base font-bold">{isEdit ? 'Edit' : 'Add'} Income / Project</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}>
             <X size={16} />
           </button>
@@ -81,25 +98,40 @@ export default function IncomeForm({ onClose, onSaved }: Props) {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work completed</label>
-              <input type="date" value={form.work_completed_date} onChange={e => F('work_completed_date', e.target.value)}
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work started</label>
+              <input type="date" value={form.work_started_date} onChange={e => F('work_started_date', e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Expected payment</label>
-              <input type="date" value={form.expected_payment_date} onChange={e => F('expected_payment_date', e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work completed</label>
+              <input type="date" value={form.work_completed_date} disabled={form.is_ongoing}
+                onChange={e => F('work_completed_date', e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm disabled:opacity-40" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
             </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.is_ongoing} onChange={e => F('is_ongoing', e.target.checked)}
+              className="w-4 h-4 rounded accent-[var(--gold)]" />
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Work is still ongoing (no completion date yet)</span>
+          </label>
+
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Expected payment</label>
+            <input type="date" value={form.expected_payment_date} onChange={e => F('expected_payment_date', e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
 
           <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
             className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
 
+          {error && <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>⚠ {error}</div>}
+
           <button onClick={save} disabled={saving || !form.name || !form.amount}
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: (!form.name || !form.amount) ? 'var(--border)' : 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Save Income'}
+            {saving ? 'Saving…' : isEdit ? 'Update Income' : 'Save Income'}
           </button>
         </div>
       </div>
