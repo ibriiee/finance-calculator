@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, TrendingUp, HandHeart, Scale, ArrowLeftRight, Target, AlertCircle, LogOut, CreditCard, Scissors, ScrollText, Landmark } from 'lucide-react'
+import { ArrowRight, TrendingUp, HandHeart, Scale, ArrowLeftRight, Target, AlertCircle, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3 } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
 
 export default async function DashboardPage() {
@@ -276,6 +276,16 @@ export default async function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Analytics banner */}
+      <Link href="/analytics" className="card p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={16} style={{ color: 'var(--gold)' }} />
+          <span className="text-sm font-semibold">Analytics</span>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>earnings & sadaka insights</span>
+        </div>
+        <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
+      </Link>
 
       {/* Quick links */}
       <div className="grid grid-cols-4 gap-2">

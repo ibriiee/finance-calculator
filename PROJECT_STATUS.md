@@ -32,7 +32,15 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Loans | `/loans` | ✅ basic | Qard Hasan tracking |
 | Splits | `/splits` | ✅ basic | Shared costs |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
-| Settings | `/settings` | ✅ | Currency, nisab basis, **module on/off toggles**, sadaka %, hawl, notifications |
+| Analytics | `/analytics` | ✅ | Custom SVG charts: sadaka-vs-earnings donut, 6-month earned/sadaka bars, sadaka-by-location donut, stat tiles |
+| Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset** |
+
+### Locking & data rules
+- Income: once **Received**, entry is locked (no edit/delete).
+- Sadaka: once **Given**, entry is locked (no edit/delete). Otherwise editable/deletable.
+- Settings → Data & Backup: export all records to JSON; "Reset all financial data" clears every
+  module's data (keeps account+settings) for the test→real transition.
+- Test mode: localStorage flag `mizan_test_mode`; shows a TEST banner (TestBanner component).
 
 ---
 
@@ -64,6 +72,7 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-08** — Analytics page (donuts + monthly bars). Income/Sadaka locking once received/given. Sadaka edit/delete. Desktop UI backdrop + typography + selection color. Settings: backup/reset + test mode.
 - **2026-06-08** — Income upgrades: work-started date, ongoing flag, edit/delete, per-entry sadaka-paid status badge.
 - **2026-06-08** — Sadaka v2: recipient directory `/recipients` (totals, last-paid, overdue prioritisation, WhatsApp export); recipient picker in SadakaForm; PROJECT_STATUS.md + AGENTS.md maintenance loop added.
 - **2026-06-08** — Zakat upgrade (silver nisab active + gold ref, pay-by date, yearly paid log).
@@ -77,7 +86,8 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Roadmap / TODO
-- [ ] Analytics/charts: doughnut/rings, monthly earning vs sadaka trends, breakdowns.
 - [ ] When income amount is edited, adjust the linked sadaka obligation (trigger is insert-only today).
+- [ ] Gate dashboard tiles (Loans/Splits/Wasiyya/Joint/Analytics) by module toggles (nav already gated).
+- [ ] Wasiyya rethink (user unhappy with current shape).
 - [ ] Gate dashboard tiles (Loans/Splits/Wasiyya/Joint) by module toggles (nav already gated).
 - [ ] Wasiyya rethink (user unhappy with current shape).
