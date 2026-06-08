@@ -231,50 +231,38 @@ export default function LoginPage() {
             <div className="grid grid-cols-2 gap-4">
               {USERS.map(user => (
                 <button key={user.name} onClick={() => selectUser(user)}
-                  className="group relative flex flex-col items-center gap-3 p-5 rounded-3xl transition-all duration-300 active:scale-[0.96] hover:scale-[1.03]"
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(201,168,76,0.15)',
-                    backdropFilter: 'blur(12px)',
-                  }}>
+                  className="group relative flex flex-col items-center rounded-3xl overflow-hidden transition-all duration-300 active:scale-[0.97]"
+                  style={{ border: '1px solid rgba(201,168,76,0.2)', background: 'rgba(20,16,8,0.8)', backdropFilter: 'blur(20px)' }}>
 
-                  {/* Hover glow */}
-                  <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-all duration-300"
-                    style={{ background: 'rgba(201,168,76,0.05)', boxShadow: '0 0 30px rgba(201,168,76,0.08) inset' }} />
+                  {/* Full-bleed photo — top half */}
+                  <div className="relative w-full h-44 overflow-hidden">
+                    <img
+                      src={user.photo}
+                      alt={user.name}
+                      className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {/* Gradient fade bottom */}
+                    <div className="absolute inset-0"
+                      style={{ background: 'linear-gradient(to bottom, transparent 40%, rgba(14,11,4,0.95) 100%)' }} />
 
-                  {/* Gold ring around photo */}
-                  <div className="relative">
-                    <div className="absolute -inset-1 rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-                      style={{ background: `conic-gradient(from 0deg, #C9A84C, #F5D78E, #7C6A2D, #C9A84C)`, borderRadius: '50%' }} />
-                    <div className="relative w-20 h-20 rounded-full overflow-hidden"
-                      style={{ border: '2px solid #080808' }}>
-                      {/* Try to load photo, fall back to initial */}
-                      <img
-                        src={user.photo}
-                        alt={user.name}
-                        className="w-full h-full object-cover"
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style') }}
-                      />
-                      {/* Fallback initial — hidden when photo loads */}
-                      <div className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-black"
-                        style={{ background: user.gradient, display: 'none' }}>
-                        {user.avatar}
-                      </div>
-                    </div>
+                    {/* Gold glow on hover */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                      style={{ background: 'linear-gradient(to bottom, rgba(201,168,76,0.08), transparent)' }} />
                   </div>
 
-                  {/* Name */}
-                  <p className="relative font-bold text-base tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                    {user.name}
-                  </p>
-
-                  {/* Subtle gold underline on hover */}
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 h-0.5 rounded-full w-0 group-hover:w-8 transition-all duration-300"
-                    style={{ background: 'var(--gold)' }} />
+                  {/* Name area */}
+                  <div className="w-full px-4 pt-1 pb-4 text-center">
+                    <p className="font-bold text-base whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
+                      {user.name}
+                    </p>
+                    {/* Gold line indicator */}
+                    <div className="mx-auto mt-2 h-0.5 rounded-full w-6 group-hover:w-10 transition-all duration-300"
+                      style={{ background: 'var(--gold)' }} />
+                  </div>
                 </button>
               ))}
             </div>
-            <p className="text-center text-xs mt-6" style={{ color: 'var(--text-muted)' }}>🔒 Private · tap your name to sign in</p>
+            <p className="text-center text-xs mt-5" style={{ color: 'var(--text-muted)' }}>🔒 Private · tap your name to sign in</p>
           </div>
         )}
 
