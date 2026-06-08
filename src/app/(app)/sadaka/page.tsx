@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
@@ -42,12 +42,12 @@ export default function SadakaPage() {
 
   if (loading) return <LoadingSpinner />
 
-  const LOCATION_LABELS: Record<string, string> = { UAE: 'ðŸ‡¦ðŸ‡ª UAE', Pakistan: 'ðŸ‡µðŸ‡° Pakistan', other: 'ðŸŒ Other' }
-  const METHOD_ICONS: Record<string, string> = { cash: 'ðŸ’µ', gift: 'ðŸŽ', food: 'ðŸ½', bank_transfer: 'ðŸ¦', other: 'â€¢' }
+  const LOCATION_LABELS: Record<string, string> = { UAE: '🇦🇪 UAE', Pakistan: '🇵🇰 Pakistan', other: '🌍 Other' }
+  const METHOD_ICONS: Record<string, string> = { cash: '💵', gift: '🎁', food: '🍽', bank_transfer: '🏦', other: '•' }
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="back Sadaka" subtitle={`${(sadakaRate * 100).toFixed(0)}% self-tax Â· ${entries.length} entries`}
+      <ModuleHeader title="Sadaka" subtitle={`${(sadakaRate * 100).toFixed(0)}% self-tax · ${entries.length} entries`}
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -63,7 +63,7 @@ export default function SadakaPage() {
           <p className="text-lg font-bold" style={{ color: totalOwed > 0 ? 'var(--gold)' : '#10B981' }}>
             {formatCurrency(totalOwed, 'AED', true)}
           </p>
-          {totalOwed === 0 && <p className="text-xs text-emerald-400">All given âœ“</p>}
+          {totalOwed === 0 && <p className="text-xs text-emerald-400">All given ✓</p>}
         </div>
         <div className="card p-3">
           <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Given</p>
@@ -102,9 +102,9 @@ export default function SadakaPage() {
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {entry.recipient_type?.replace('_', ' ')}
-                    {entry.location && ` Â· ${LOCATION_LABELS[entry.location]}`}
-                    {entry.method && ` Â· ${METHOD_ICONS[entry.method]} ${entry.method.replace('_', ' ')}`}
-                    {entry.date_given && ` Â· ${shortDate(entry.date_given)}`}
+                    {entry.location && ` · ${LOCATION_LABELS[entry.location]}`}
+                    {entry.method && ` · ${METHOD_ICONS[entry.method]} ${entry.method.replace('_', ' ')}`}
+                    {entry.date_given && ` · ${shortDate(entry.date_given)}`}
                   </p>
                 </div>
                 <div className="text-right">
@@ -139,7 +139,7 @@ export default function SadakaPage() {
                   }}
                   className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
                   style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                  âœ“ Mark as Given
+                  ✓ Mark as Given
                 </button>
               )}
             </div>
@@ -151,4 +151,3 @@ export default function SadakaPage() {
     </div>
   )
 }
-

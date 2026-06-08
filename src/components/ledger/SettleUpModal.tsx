@@ -47,7 +47,7 @@ export default function SettleUpModal({ onClose, onSaved, userId, aedBalance, pk
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8"
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8 max-h-[88vh] overflow-y-auto"
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">

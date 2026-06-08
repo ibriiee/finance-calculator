@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
@@ -31,7 +31,7 @@ export default function SplitForm({ onClose, onSaved }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl overflow-y-auto max-h-[85vh] p-5 pb-8"
+      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8 max-h-[88vh] overflow-y-auto"
            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
@@ -46,12 +46,12 @@ export default function SplitForm({ onClose, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <select value={form.category} onChange={e => F('category', e.target.value)}
               className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="house">ðŸ  House</option>
-              <option value="vehicle">ðŸš— Vehicle</option>
-              <option value="gift">ðŸŽ Gift</option>
-              <option value="charity">ðŸ¤² Charity</option>
-              <option value="investment">ðŸ“ˆ Investment</option>
-              <option value="business">ðŸ’¼ Business</option>
+              <option value="house">🏠 House</option>
+              <option value="vehicle">🚗 Vehicle</option>
+              <option value="gift">🎁 Gift</option>
+              <option value="charity">🤲 Charity</option>
+              <option value="investment">📈 Investment</option>
+              <option value="business">💼 Business</option>
               <option value="other">Other</option>
             </select>
             <select value={form.currency} onChange={e => F('currency', e.target.value)}
@@ -102,12 +102,10 @@ export default function SplitForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Savingâ€¦' : 'Save Split'}
+            {saving ? 'Saving…' : 'Save Split'}
           </button>
         </div>
       </div>
     </div>
   )
 }
-
-

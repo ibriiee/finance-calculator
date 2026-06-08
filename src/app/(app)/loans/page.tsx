@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
@@ -55,7 +55,7 @@ export default function LoansPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="back Loans" subtitle={`${outstanding.length} outstanding`}
+      <ModuleHeader title="Loans" subtitle={`${outstanding.length} outstanding`}
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -78,7 +78,7 @@ export default function LoansPage() {
 
       {loans.length === 0 ? (
         <EmptyState icon={CreditCard} title="No loans recorded"
-          description="Track loans you owe or are owed â€” with Islamic repayment rules" />
+          description="Track loans you owe or are owed — with Islamic repayment rules" />
       ) : (
         <div className="flex flex-col gap-3">
           {loans.map(loan => {
@@ -97,7 +97,7 @@ export default function LoansPage() {
                     <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{loan.counterparty_name}</p>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                       Taken {shortDate(loan.date_taken)}
-                      {loan.due_date && ` Â· Due ${shortDate(loan.due_date)}`}
+                      {loan.due_date && ` · Due ${shortDate(loan.due_date)}`}
                     </p>
                   </div>
                   <div className="text-right">
@@ -111,7 +111,7 @@ export default function LoansPage() {
                 </div>
                 {isOverdue && (
                   <div className="mt-2 px-3 py-1.5 rounded-lg text-xs text-red-400" style={{ background: 'rgba(239,68,68,0.1)' }}>
-                    âš  Overdue
+                    ⚠ Overdue
                   </div>
                 )}
                 {loan.notes && (
@@ -123,7 +123,7 @@ export default function LoansPage() {
                     load()
                   }} className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
                      style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-                    âœ“ Mark Cleared
+                    ✓ Mark Cleared
                   </button>
                 )}
               </div>
@@ -136,4 +136,3 @@ export default function LoansPage() {
     </div>
   )
 }
-

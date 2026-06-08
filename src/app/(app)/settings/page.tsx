@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -150,7 +150,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="Settings" subtitle="back Your preferences" />
+      <ModuleHeader title="Settings" subtitle="Your preferences" />
 
       {sections.map(({ title, icon: Icon, content }) => (
         <div key={title} className="card p-4">
@@ -175,7 +175,7 @@ export default function SettingsPage() {
           className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
           style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
           {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          {refreshing ? 'Refreshingâ€¦' : 'Refresh Rates Now'}
+          {refreshing ? 'Refreshing…' : 'Refresh Rates Now'}
         </button>
       </div>
 
@@ -184,7 +184,7 @@ export default function SettingsPage() {
         className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
         style={{ background: saved ? '#10B981' : 'var(--gold)', color: '#0a0a0a', transition: 'background 0.3s' }}>
         {saving && <Loader2 size={15} className="animate-spin" />}
-        {saved ? 'âœ“ Saved!' : saving ? 'Savingâ€¦' : 'Save Settings'}
+        {saved ? '✓ Saved!' : saving ? 'Saving…' : 'Save Settings'}
       </button>
 
       {/* Logout */}
@@ -196,9 +196,8 @@ export default function SettingsPage() {
       </button>
 
       <p className="text-center text-xs pb-4" style={{ color: 'var(--text-muted)' }}>
-        Mizan v1.0 Â· Built for Ibrahim & Abu Bakar
+        Mizan v1.0 · Built for Ibrahim & Abu Bakar
       </p>
     </div>
   )
 }
-

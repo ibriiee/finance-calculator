@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate, getLagDays, getLagColor } from '@/lib/utils'
@@ -38,7 +38,7 @@ export default function IncomePage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="back Income & Projects" subtitle={`${items.length} entries`}
+      <ModuleHeader title="Income & Projects" subtitle={`${items.length} entries`}
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -100,7 +100,7 @@ export default function IncomePage() {
                   <div className="flex-1 mr-3">
                     <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
                     <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--text-muted)' }}>
-                      {item.type.replace('_', ' ')} Â· {item.ownership === 'shared' ? 'Shared' : item.ownership === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
+                      {item.type.replace('_', ' ')} · {item.ownership === 'shared' ? 'Shared' : item.ownership === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
@@ -118,19 +118,19 @@ export default function IncomePage() {
                     <span style={{ color: 'var(--text-muted)' }}>Worked {shortDate(item.work_completed_date)}</span>
                     {item.expected_payment_date && (
                       <>
-                        <span style={{ color: 'var(--border)' }}>Â·</span>
+                        <span style={{ color: 'var(--border)' }}>·</span>
                         <span className={isOverdue ? 'text-red-400' : ''} style={{ color: isOverdue ? undefined : 'var(--text-muted)' }}>
-                          {isOverdue ? 'âš  Due ' : 'Due '}{shortDate(item.expected_payment_date)}
+                          {isOverdue ? '⚠ Due ' : 'Due '}{shortDate(item.expected_payment_date)}
                         </span>
                       </>
                     )}
                     {item.actual_received_date && (
                       <>
-                        <span style={{ color: 'var(--border)' }}>Â·</span>
+                        <span style={{ color: 'var(--border)' }}>·</span>
                         <span className="text-emerald-400">Rcvd {shortDate(item.actual_received_date)}</span>
                       </>
                     )}
-                    <span style={{ color: 'var(--border)' }}>Â·</span>
+                    <span style={{ color: 'var(--border)' }}>·</span>
                     <span className={lagColor}>{lagDays}d lag</span>
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export default function IncomePage() {
                     }}
                     className="mt-3 w-full py-2 rounded-lg text-xs font-semibold transition-all"
                     style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-                    âœ“ Mark as Received
+                    ✓ Mark as Received
                   </button>
                 )}
               </div>
@@ -160,4 +160,3 @@ export default function IncomePage() {
     </div>
   )
 }
-

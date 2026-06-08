@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { shortDate } from '@/lib/utils'
@@ -35,14 +35,14 @@ export default function WasiyyaPage() {
   }
 
   const categoryIcons: Record<string, string> = {
-    asset: 'ðŸ¦', debt: 'ðŸ’¸', instruction: 'ðŸ“‹', password: 'ðŸ”‘', contact: 'ðŸ‘¤', message: 'ðŸ’Œ',
+    asset: '🏦', debt: '💸', instruction: '📋', password: '🔑', contact: '👤', message: '💌',
   }
 
   if (loading) return <LoadingSpinner />
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="back Wasiyya" subtitle="Digital will vault Â· private"
+      <ModuleHeader title="Wasiyya" subtitle="Digital will vault · private"
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -70,12 +70,12 @@ export default function WasiyyaPage() {
               <div key={entry.id} className="card p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 flex-1 mr-3">
-                    <span className="text-xl">{categoryIcons[entry.category] ?? 'ðŸ“„'}</span>
+                    <span className="text-xl">{categoryIcons[entry.category] ?? '📄'}</span>
                     <div>
                       <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{entry.title}</p>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {entry.category.charAt(0).toUpperCase() + entry.category.slice(1)} Â· {shortDate(entry.created_at)}
-                        {entry.is_sensitive && ' Â· ðŸ”’ Sensitive'}
+                        {entry.category.charAt(0).toUpperCase() + entry.category.slice(1)} · {shortDate(entry.created_at)}
+                        {entry.is_sensitive && ' · 🔒 Sensitive'}
                       </p>
                     </div>
                   </div>
@@ -94,7 +94,7 @@ export default function WasiyyaPage() {
 
                 {entry.is_sensitive && !isRevealed && (
                   <div className="mt-3 p-3 rounded-lg text-xs text-center" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
-                    ðŸ”’ Tap eye icon to reveal sensitive content
+                    🔒 Tap eye icon to reveal sensitive content
                   </div>
                 )}
 
@@ -110,7 +110,7 @@ export default function WasiyyaPage() {
                 {entry.beneficiary_name && (
                   <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                     Beneficiary: <span style={{ color: 'var(--text-secondary)' }}>{entry.beneficiary_name}</span>
-                    {entry.beneficiary_contact && ` Â· ${entry.beneficiary_contact}`}
+                    {entry.beneficiary_contact && ` · ${entry.beneficiary_contact}`}
                   </p>
                 )}
               </div>
@@ -123,4 +123,3 @@ export default function WasiyyaPage() {
     </div>
   )
 }
-

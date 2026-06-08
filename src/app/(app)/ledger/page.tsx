@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
@@ -59,7 +59,7 @@ export default function LedgerPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="back Brother Ledger" subtitle="Ibrahim & Abu Bakar"
+      <ModuleHeader title="Brother Ledger" subtitle="Ibrahim & Abu Bakar"
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -74,7 +74,7 @@ export default function LedgerPage() {
         {aedBalance === 0 && pkrBalance === 0 ? (
           <div className="flex items-center gap-2">
             <CheckCircle2 size={20} className="text-emerald-400" />
-            <span className="text-base font-semibold text-emerald-400">All clear â€” nothing outstanding</span>
+            <span className="text-base font-semibold text-emerald-400">All clear — nothing outstanding</span>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -105,7 +105,7 @@ export default function LedgerPage() {
             <button onClick={() => setShowSettle(true)}
               className="mt-1 w-full py-2.5 rounded-xl text-sm font-semibold"
               style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-              âœ“ Settle Up
+              ✓ Settle Up
             </button>
           </div>
         )}
@@ -146,8 +146,8 @@ export default function LedgerPage() {
                     <div>
                       <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{entry.description}</p>
                       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {CATEGORY_LABELS[entry.category]} Â· {shortDate(entry.transaction_date)}
-                        {entry.is_settled && ' Â· Settled'}
+                        {CATEGORY_LABELS[entry.category]} · {shortDate(entry.transaction_date)}
+                        {entry.is_settled && ' · Settled'}
                       </p>
                     </div>
                   </div>
@@ -156,7 +156,7 @@ export default function LedgerPage() {
                       {isPayer ? '-' : '+'}{formatCurrency(entry.amount, entry.currency)}
                     </p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {isPayer ? `you â†’ ${otherUser?.display_name}` : `${otherUser?.display_name} â†’ you`}
+                      {isPayer ? `you → ${otherUser?.display_name}` : `${otherUser?.display_name} → you`}
                     </p>
                   </div>
                 </div>
@@ -171,4 +171,3 @@ export default function LedgerPage() {
     </div>
   )
 }
-

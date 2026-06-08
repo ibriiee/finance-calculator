@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate, calcMonthsRemaining } from '@/lib/utils'
@@ -55,7 +55,7 @@ export default function GoalsPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="back Financial Goals" subtitle={`${goals.length} active goals`}
+      <ModuleHeader title="Financial Goals" subtitle={`${goals.length} active goals`}
         action={
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -85,13 +85,13 @@ export default function GoalsPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                         style={{ background: goal.goal_type === 'joint' ? 'rgba(168,85,247,0.15)' : 'var(--gold-dim)', color: goal.goal_type === 'joint' ? '#a855f7' : 'var(--gold)' }}>
-                        {goal.goal_type === 'joint' ? 'ðŸ‘¥ Joint' : 'ðŸ‘¤ Individual'}
+                        {goal.goal_type === 'joint' ? '👥 Joint' : '👤 Individual'}
                       </span>
                     </div>
                     <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>{goal.name}</h3>
                     {goal.target_date && (
                       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        Target: {shortDate(goal.target_date)} Â· {monthsLeft ?? 0} months left
+                        Target: {shortDate(goal.target_date)} · {monthsLeft ?? 0} months left
                       </p>
                     )}
                   </div>
@@ -152,7 +152,7 @@ export default function GoalsPage() {
                         style={{ background: 'var(--gold)', color: '#0a0a0a' }}>Add</button>
                       <button onClick={() => setContributing(null)}
                         className="px-3 py-2 rounded-lg text-sm"
-                        style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>âœ•</button>
+                        style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>✕</button>
                     </div>
                   ) : (
                     <button onClick={() => setContributing(goal.id)}
@@ -164,7 +164,7 @@ export default function GoalsPage() {
                 )}
                 {goal.pct >= 100 && (
                   <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
-                    <span>ðŸŽ‰</span> Goal reached!
+                    <span>🎉</span> Goal reached!
                   </div>
                 )}
               </div>
@@ -177,4 +177,3 @@ export default function GoalsPage() {
     </div>
   )
 }
-
