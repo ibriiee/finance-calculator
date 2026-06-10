@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { ownershipForEmail } from '@/lib/utils'
 import { X, Loader2 } from 'lucide-react'
 import type { Currency, IncomeType, Ownership } from '@/types/database.types'
 
@@ -23,6 +24,15 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
     is_ongoing: editItem?.is_ongoing ?? false,
     notes: editItem?.notes ?? '',
   })
+
+  // New entries default to the logged-in user's ownership, not a fixed name
+  useEffect(() => {
+    if (isEdit) return
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const mine = ownershipForEmail(user?.email)
+      if (mine) setForm(p => ({ ...p, ownership: mine }))
+    })
+  }, [])
 
   async function save() {
     if (!form.name || !form.amount) return
@@ -90,7 +100,6 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
               className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
               <option value="AED">AED</option>
               <option value="PKR">PKR</option>
-              <option value="USD">USD</option>
             </select>
             <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
               className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />

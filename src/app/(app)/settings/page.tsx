@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { User, Bell, Percent, Calendar, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2 } from 'lucide-react'
+import { User, Percent, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2 } from 'lucide-react'
 import type { Profile } from '@/types/database.types'
 
 const MODULES: { key: string; label: string }[] = [
@@ -47,8 +47,6 @@ export default function SettingsPage() {
     display_name: '', sadaka_pct: 20, hawl_start_date: '',
     default_currency: 'AED', nisab_basis: 'silver',
     enabled_modules: DEFAULT_MODULES as Record<string, boolean>,
-    notify_income_received: true, notify_ledger_update: true, notify_sadaka_due: true,
-    notify_zakat_due: true,
   })
   const supabase = createClient()
   const router = useRouter()
@@ -65,10 +63,6 @@ export default function SettingsPage() {
         default_currency: (data as any).default_currency ?? 'AED',
         nisab_basis: (data as any).nisab_basis ?? 'silver',
         enabled_modules: { ...DEFAULT_MODULES, ...((data as any).enabled_modules ?? {}) },
-        notify_income_received: data.notify_income_received ?? true,
-        notify_ledger_update: data.notify_ledger_update ?? true,
-        notify_sadaka_due: data.notify_sadaka_due ?? true,
-        notify_zakat_due: data.notify_zakat_due ?? true,
       })
     }
     setLoading(false)
@@ -88,10 +82,6 @@ export default function SettingsPage() {
       default_currency: form.default_currency,
       nisab_basis: form.nisab_basis,
       enabled_modules: form.enabled_modules,
-      notify_income_received: form.notify_income_received,
-      notify_ledger_update: form.notify_ledger_update,
-      notify_sadaka_due: form.notify_sadaka_due,
-      notify_zakat_due: form.notify_zakat_due,
     }).eq('id', user!.id)
     setSaving(false)
     setSaved(true)
@@ -164,7 +154,7 @@ export default function SettingsPage() {
   }
 
   async function resetData() {
-    const ok = prompt('This permanently deletes ALL financial data (income, sadaka, ledger, joint account, zakat, goals, loans, splits, wasiyya, recipients). Your account & settings stay.\n\nType DELETE to confirm.')
+    const ok = prompt('This permanently deletes ALL financial data (income, sadaka, ledger, joint account, zakat, goals, loans, splits, wasiyya, recipients). Your account & settings stay.\n\n⚠ Shared records (ledger, joint account, splits, shared sadaka) are deleted for BOTH of you — make sure your brother is okay with this and export a backup first.\n\nType DELETE to confirm.')
     if (ok !== 'DELETE') return
     setBusy('reset')
     for (const t of DATA_TABLES) {
@@ -294,30 +284,6 @@ export default function SettingsPage() {
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             Zakat is due after 354 days (1 lunar year) above nisab
           </p>
-        </div>
-      )
-    },
-    {
-      title: 'Notifications',
-      icon: Bell,
-      content: (
-        <div className="flex flex-col gap-2">
-          {[
-            { key: 'notify_income_received', label: 'Income marked received' },
-            { key: 'notify_ledger_update', label: 'Ledger balance updates' },
-            { key: 'notify_sadaka_due', label: 'Sadaka payment reminders' },
-            { key: 'notify_zakat_due', label: 'Zakat hawl completion' },
-          ].map(({ key, label }) => (
-            <label key={key} className="flex items-center justify-between p-3 rounded-xl cursor-pointer"
-              style={{ background: 'var(--surface-2)' }}>
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-              <div className="relative">
-                <input type="checkbox" className="sr-only peer" checked={(form as any)[key]} onChange={e => F(key, e.target.checked)} />
-                <div className="w-11 h-6 rounded-full peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"
-                  style={{ background: (form as any)[key] ? 'var(--gold)' : 'var(--border)' }} />
-              </div>
-            </label>
-          ))}
         </div>
       )
     },

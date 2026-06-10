@@ -24,9 +24,9 @@ async function fetchGoldSilverPrices(): Promise<{ goldUsd: number; silverUsd: nu
         }
       }
     }
-    // Fallback: goldapi.io
-    const apiKey2 = process.env.GOLDAPI_KEY
-    if (apiKey2) {
+    // goldapi.io — key is named GOLD_API_KEY in .env.local / Vercel
+    const apiKey2 = process.env.GOLD_API_KEY ?? process.env.GOLDAPI_KEY
+    if (apiKey2 && !apiKey2.startsWith('your-') && !apiKey2.startsWith('get-')) {
       const [goldRes, silverRes] = await Promise.all([
         fetch('https://www.goldapi.io/api/XAU/USD', { headers: { 'x-access-token': apiKey2 } }),
         fetch('https://www.goldapi.io/api/XAG/USD', { headers: { 'x-access-token': apiKey2 } }),
@@ -88,8 +88,9 @@ export async function GET() {
   const pkrToAed = pkrToUsd * usdToAed
 
   // Gold: troy oz → gram = oz / 31.1035
-  const goldUsdOz = metalPrices?.goldUsd ?? 2300
-  const silverUsdOz = metalPrices?.silverUsd ?? 27
+  // Fallbacks are only used when no API key is configured — keep them roughly current
+  const goldUsdOz = metalPrices?.goldUsd ?? 4000
+  const silverUsdOz = metalPrices?.silverUsd ?? 50
   const goldAedGram = (goldUsdOz / 31.1035) * usdToAed
   const silverAedGram = (silverUsdOz / 31.1035) * usdToAed
 

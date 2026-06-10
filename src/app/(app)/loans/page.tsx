@@ -10,7 +10,7 @@ import { Plus, CreditCard } from 'lucide-react'
 import LoanForm from '@/components/loans/LoanForm'
 import type { Loan } from '@/types/database.types'
 
-const RATES_DEFAULTS = { gold_aed_gram: 330, silver_aed_gram: 3.8 }
+const RATES_DEFAULTS = { gold_aed_gram: 472, silver_aed_gram: 5.9 }
 
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
@@ -28,7 +28,7 @@ export default function LoansPage() {
     if (r) {
       const rMap: Record<string, number> = {}
       r.forEach((row: any) => { rMap[row.rate_type] = row.rate_value })
-      setRates({ gold_aed_gram: rMap.gold_aed_gram ?? 330, silver_aed_gram: rMap.silver_aed_gram ?? 3.8 })
+      setRates({ gold_aed_gram: rMap.gold_aed_gram ?? 472, silver_aed_gram: rMap.silver_aed_gram ?? 5.9 })
     }
     setLoading(false)
   }

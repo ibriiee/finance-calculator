@@ -20,15 +20,20 @@ export default function GoalsPage() {
   const [showForm, setShowForm] = useState(false)
   const [contributing, setContributing] = useState<string | null>(null)
   const [contribAmount, setContribAmount] = useState('')
+  const [names, setNames] = useState<Record<string, string>>({})
   const supabase = createClient()
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: g }, { data: c }] = await Promise.all([
+    const [{ data: g }, { data: c }, { data: profs }] = await Promise.all([
       supabase.from('financial_goals').select('*').or(`owner_id.eq.${user!.id},goal_type.eq.joint`).eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('goal_contributions').select('*'),
+      supabase.from('profiles').select('id, display_name'),
     ])
+    const nameMap: Record<string, string> = {}
+    ;(profs ?? []).forEach((p: any) => { nameMap[p.id] = p.display_name ?? 'User' })
+    setNames(nameMap)
     const withProgress = (g ?? []).map(goal => {
       const contribs = (c ?? []).filter(x => x.goal_id === goal.id)
       const saved = contribs.reduce((s, x) => s + x.amount, 0)
@@ -74,9 +79,12 @@ export default function GoalsPage() {
             const monthlyNeeded = monthsLeft && monthsLeft > 0
               ? (goal.target_amount - goal.saved) / monthsLeft : null
             const color = goal.pct >= 80 ? '#10B981' : goal.pct >= 50 ? 'var(--gold)' : '#EF4444'
-            const myContribs = goal.contributions.filter(c => c.contributor_id === userId)
-            const myTotal = myContribs.reduce((s, c) => s + c.amount, 0)
-            const otherTotal = goal.saved - myTotal
+            // per-person totals keyed by actual contributor, not hardcoded names
+            const byPerson: Record<string, number> = {}
+            goal.contributions.forEach(c => {
+              if (c.contributor_id) byPerson[c.contributor_id] = (byPerson[c.contributor_id] ?? 0) + c.amount
+            })
+            const personIds = Object.keys(names)
 
             return (
               <div key={goal.id} className="card p-4">
@@ -120,14 +128,12 @@ export default function GoalsPage() {
                 {/* Joint breakdown */}
                 {goal.goal_type === 'joint' && goal.saved > 0 && (
                   <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div className="card-inner p-2 text-center">
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Ibrahim</p>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--gold)' }}>{formatCurrency(myTotal, goal.currency, true)}</p>
-                    </div>
-                    <div className="card-inner p-2 text-center">
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Abu Bakar</p>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--gold)' }}>{formatCurrency(otherTotal, goal.currency, true)}</p>
-                    </div>
+                    {personIds.map(id => (
+                      <div key={id} className="card-inner p-2 text-center">
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{names[id]}{id === userId ? ' (you)' : ''}</p>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--gold)' }}>{formatCurrency(byPerson[id] ?? 0, goal.currency, true)}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
 

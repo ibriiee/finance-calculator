@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatCurrency, shortDate } from '@/lib/utils'
+import { formatCurrency, shortDate, ownershipForEmail } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowRight, TrendingUp, HandHeart, Scale, ArrowLeftRight, Target, AlertCircle, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3 } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -20,22 +20,29 @@ export default async function DashboardPage() {
     .gte('work_completed_date', monthStart.toISOString().split('T')[0])
     .in('ownership', ['ibrahim', 'abu_bakar', 'shared'])
 
+  const myOwnership = ownershipForEmail(user!.email ?? profile?.email)
   const myIncome = monthIncome?.filter(i =>
-    i.ownership === 'shared' ||
-    (i.ownership === 'ibrahim' && profile?.display_name === 'Ibrahim') ||
-    (i.ownership === 'abu_bakar' && profile?.display_name === 'Abu Bakar')
+    i.ownership === 'shared' || i.ownership === myOwnership
   ) ?? []
 
   const totalEarned = myIncome.filter(i => i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
   const totalReceived = myIncome.filter(i => i.status === 'received' && i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
 
-  // Sadaka pending
-  const { data: sadakaPending } = await supabase.from('sadaka_entries')
+  // Sadaka pending — same netting as the Sadaka module: per currency,
+  // advances (given > owed) offset new obligations
+  const { data: sadakaEntries } = await supabase.from('sadaka_entries')
     .select('amount_owed, amount_given, currency')
     .eq('owner_id', user!.id)
-    .in('status', ['pending', 'partially_given'])
+    .eq('is_joint', false)
 
-  const sadakaOwed = sadakaPending?.reduce((s, e) => s + e.amount_owed - e.amount_given, 0) ?? 0
+  const netPending = (cur: string) => {
+    const list = (sadakaEntries ?? []).filter(e => e.currency === cur)
+    const owed = list.reduce((s, e) => s + Number(e.amount_owed), 0)
+    const given = list.reduce((s, e) => s + Number(e.amount_given), 0)
+    return Math.max(0, owed - given)
+  }
+  const sadakaOwedAed = netPending('AED')
+  const sadakaOwedPkr = netPending('PKR')
 
   // Brother ledger balance
   const { data: ledgerEntries } = await supabase.from('brother_ledger')
@@ -101,6 +108,10 @@ export default async function DashboardPage() {
   const totalOwedAed = loanDebtAed + ledgerDebtAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
 
+  // Respect Settings → Modules toggles (default: enabled)
+  const enabledModules: Record<string, boolean> = (profile as any)?.enabled_modules ?? {}
+  const enabled = (key: string) => enabledModules[key] !== false
+
   const userName = profile?.display_name ?? 'Ibrahim'
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'
 
@@ -121,6 +132,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Income summary card */}
+      {enabled('income') && (
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -153,6 +165,7 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Savings & what you owe */}
       <div className="grid grid-cols-2 gap-3">
@@ -176,6 +189,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Brother Ledger */}
+      {enabled('ledger') && (
       <Link href="/ledger" className="card p-4 block">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -211,8 +225,10 @@ export default async function DashboardPage() {
           </div>
         )}
       </Link>
+      )}
 
       {/* Sadaka */}
+      {enabled('sadaka') && (
       <Link href="/sadaka" className="card p-4 block">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -221,20 +237,23 @@ export default async function DashboardPage() {
           </div>
           <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
         </div>
-        {sadakaOwed > 0 ? (
+        {sadakaOwedAed > 0 || sadakaOwedPkr > 0 ? (
           <div className="flex items-center justify-between">
             <span className="text-xs animate-pulse-gold" style={{ color: 'var(--gold)' }}>Pending charity</span>
-            <span className="text-base font-bold" style={{ color: 'var(--gold)' }}>
-              {formatCurrency(sadakaOwed, 'AED', true)}
+            <span className="text-base font-bold text-right" style={{ color: 'var(--gold)' }}>
+              {sadakaOwedAed > 0 && formatCurrency(sadakaOwedAed, 'AED', true)}
+              {sadakaOwedAed > 0 && sadakaOwedPkr > 0 && ' · '}
+              {sadakaOwedPkr > 0 && formatCurrency(sadakaOwedPkr, 'PKR', true)}
             </span>
           </div>
         ) : (
           <p className="text-sm text-emerald-400 font-medium">All Sadaka given ✓</p>
         )}
       </Link>
+      )}
 
       {/* Goals preview */}
-      {goalProgress && goalProgress.length > 0 && (
+      {enabled('goals') && goalProgress && goalProgress.length > 0 && (
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -265,6 +284,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Zakat status */}
+      {enabled('zakat') && (
       <Link href="/zakat" className="card p-4 block">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -288,9 +308,10 @@ export default async function DashboardPage() {
           </div>
         </div>
       </Link>
+      )}
 
       {/* Pending payments */}
-      {pendingProjects && pendingProjects.length > 0 && (
+      {enabled('income') && pendingProjects && pendingProjects.length > 0 && (
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold">Awaiting Payment</p>
@@ -328,14 +349,14 @@ export default async function DashboardPage() {
         <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
       </Link>
 
-      {/* Quick links */}
+      {/* Quick links — gated by module toggles */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { href: '/joint',   label: 'Joint',   Icon: Landmark },
-          { href: '/loans',   label: 'Loans',   Icon: CreditCard },
-          { href: '/splits',  label: 'Splits',  Icon: Scissors },
-          { href: '/wasiyya', label: 'Wasiyya', Icon: ScrollText },
-        ].map(({ href, label, Icon }) => (
+          { href: '/joint',   label: 'Joint',   Icon: Landmark,   key: 'joint_account' },
+          { href: '/loans',   label: 'Loans',   Icon: CreditCard, key: 'loans' },
+          { href: '/splits',  label: 'Splits',  Icon: Scissors,   key: 'splits' },
+          { href: '/wasiyya', label: 'Wasiyya', Icon: ScrollText, key: 'wasiyya' },
+        ].filter(({ key }) => enabled(key)).map(({ href, label, Icon }) => (
           <Link key={href} href={href}
             className="card-inner p-3 flex flex-col items-center gap-1.5 rounded-xl">
             <Icon size={18} style={{ color: 'var(--gold)' }} />

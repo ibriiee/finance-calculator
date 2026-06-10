@@ -17,7 +17,7 @@ interface Rates { gold: number; silver: number; pkr: number; usd: number }
 export default function ZakatPage() {
   const [loading, setLoading] = useState(true)
   const [snapshots, setSnapshots] = useState<ZakatSnapshot[]>([])
-  const [rates, setRates] = useState<Rates>({ gold: 330, silver: 3.8, pkr: 0.013, usd: 3.6725 })
+  const [rates, setRates] = useState<Rates>({ gold: 472, silver: 5.9, pkr: 0.013, usd: 3.6725 })
   const [hawlStart, setHawlStart] = useState<string | null>(null)
   const [nisabBasis, setNisabBasis] = useState<'silver' | 'gold'>('silver')
   const [assets, setAssets] = useState({
@@ -42,12 +42,16 @@ export default function ZakatPage() {
     if (rCache) {
       const m: Record<string, number> = {}
       rCache.forEach((r: any) => { m[r.rate_type] = r.rate_value })
-      setRates({ gold: m.gold_aed_gram ?? 330, silver: m.silver_aed_gram ?? 3.8, pkr: m.pkr_to_aed ?? 0.013, usd: m.usd_to_aed ?? 3.6725 })
+      setRates({ gold: m.gold_aed_gram ?? 472, silver: m.silver_aed_gram ?? 5.9, pkr: m.pkr_to_aed ?? 0.013, usd: m.usd_to_aed ?? 3.6725 })
     }
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // Refresh the rates cache in the background (server keeps a 1h TTL), then re-read
+    fetch('/api/rates').then(r => { if (r.ok) load() }).catch(() => {})
+  }, [])
 
   function calculate() {
     const n = (s: string) => parseFloat(s || '0') || 0

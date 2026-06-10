@@ -55,7 +55,7 @@ export default function WasiyyaPage() {
       <div className="card-inner p-3 flex items-start gap-2">
         <Lock size={14} style={{ color: 'var(--gold)' }} className="mt-0.5 shrink-0" />
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          This vault is encrypted and private. Only you can see your wasiyya entries. Designate a trusted person by sharing your login.
+          This vault is private to your account — only you can see your wasiyya entries. Avoid storing raw passwords here; note where they're kept (e.g. a password manager) instead.
         </p>
       </div>
 

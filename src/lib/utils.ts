@@ -28,6 +28,18 @@ export function formatCurrency(amount: number, currency: string, compact = false
   return `${amount < 0 ? '-' : ''}${prefix}${formatted}${suffix}`
 }
 
+// Maps the two account holders to income `ownership` values by email,
+// so renaming a profile in Settings never breaks income attribution.
+export const USER_OWNERSHIP: Record<string, 'ibrahim' | 'abu_bakar'> = {
+  'ibrahim_naeem@outlook.com': 'ibrahim',
+  'bakarnaeem@hotmail.com': 'abu_bakar',
+}
+
+export function ownershipForEmail(email: string | null | undefined): 'ibrahim' | 'abu_bakar' | null {
+  if (!email) return null
+  return USER_OWNERSHIP[email.toLowerCase()] ?? null
+}
+
 export function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }

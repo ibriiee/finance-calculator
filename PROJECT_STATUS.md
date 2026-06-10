@@ -56,6 +56,8 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 7. `zakat-paid.sql` — `zakat_paid`, `zakat_paid_date`, `nisab_basis`, `due_date`
 8. `sadaka-recipients.sql` — recipient directory + `recipient_id` on sadaka (Sadaka v2)
 9. `income-upgrades.sql` — `work_started_date`, `is_ongoing`; income own RLS for update/delete
+10. `sadaka-trigger-v2.sql` — **NOT YET RUN** — shared income splits sadaka 50/50 (one entry per
+    brother at his own pct); editing income amount adjusts linked not-yet-given sadaka
 
 ---
 
@@ -72,6 +74,16 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-10** — 360 review fixes: forgot-password OTP flow wired up on login; rates route reads
+  `GOLD_API_KEY` (was wrong env name; fallbacks updated $4000/oz gold, $50/oz silver — **get a real
+  goldapi.io key into .env.local + Vercel for live nisab**); zakat page auto-refreshes rates;
+  joint-goal breakdown uses real profile names (was swapped for Abu Bakar); dashboard pending-sadaka
+  now netted per currency (AED·PKR, no more mixing); dashboard income matched by email not
+  display-name; dashboard cards/quick-links gated by module toggles; IncomeForm defaults ownership
+  to logged-in user; USD removed from Income/Sadaka forms (was invisible in totals); sw.js now
+  actually caches for offline; decorative notification toggles removed from Settings; reset-data
+  warning covers shared tables; wasiyya copy no longer claims encryption. New migration
+  `sadaka-trigger-v2.sql` (run it!).
 - **2026-06-08** — Login fix: Abu Bakar email hardcoded (`bakarnaeem@hotmail.com`) since `NEXT_PUBLIC_USER_2_EMAIL` was never set in Vercel; login now shows the real Supabase auth error instead of a generic message.
 - **2026-06-08** — Branded desktop side panels (logo, ميزان wordmark, feature list, Ar-Rahman 55:9 verse) + richer backdrop to fill empty PC sides. Mobile unchanged.
 - **2026-06-08** — Developer Mode (Settings) unlocks edit/delete on locked income/sadaka. Excel (.xls) export alongside JSON. Income shows today's date. Dashboard: Savings (goals) + You-owe (loans+ledger debt) cards.
@@ -97,8 +109,10 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 - All 9 SQL migrations in `supabase/` have been run as of this session.
 
 ## Roadmap / TODO
-- [ ] When income amount is edited, adjust the linked sadaka obligation (trigger is insert-only today).
-- [ ] Gate dashboard tiles (Loans/Splits/Wasiyya/Joint/Analytics) by module toggles (nav already gated).
+- [ ] **Run `supabase/sadaka-trigger-v2.sql` in Supabase SQL Editor** (shared-income split + edit adjustment).
+- [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars
+      (currently the placeholder, so gold/silver use static fallbacks).
 - [ ] Wasiyya rethink (user unhappy with current shape).
-- [ ] Gate dashboard tiles (Loans/Splits/Wasiyya/Joint) by module toggles (nav already gated).
-- [ ] Wasiyya rethink (user unhappy with current shape).
+- [ ] Real notifications (push/email via Supabase Edge Functions) — toggles were removed until this exists.
+
+> All bugs from the 2026-06-10 360 review were fixed on 2026-06-10 — see Changelog.
