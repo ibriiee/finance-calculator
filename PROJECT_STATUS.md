@@ -74,6 +74,15 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-11** — **Form sheets hidden behind bottom nav fixed**: all 11 bottom-sheet forms
+  (Income, Sadaka, Recipient, Ledger, SettleUp, Joint Account, Joint Txn, Goal, Loan, Split,
+  Wasiyya) used `z-50` — same as BottomNav, which renders later in the DOM and covered the
+  save/currency buttons (user couldn't create a Joint Account on mobile). All sheets raised to
+  `z-[60]`. Also fixed `.env.local`: `NEXT_PUBLIC_SUPABASE_URL` had a stray `/rest/v1/` suffix
+  that broke ALL auth on localhost (production Vercel env was correct, so prod was unaffected).
+  Full logged-in walkthrough test done on localhost (mobile viewport): every page loads, every
+  form opens fully above the nav with save button clickable, joint-account create verified
+  end-to-end against Supabase (test row deleted after), zero console/server errors.
 - **2026-06-10** — 360 review fixes: forgot-password OTP flow wired up on login; rates route reads
   `GOLD_API_KEY` (was wrong env name; fallbacks updated $4000/oz gold, $50/oz silver — **get a real
   goldapi.io key into .env.local + Vercel for live nisab**); zakat page auto-refreshes rates;
@@ -100,19 +109,15 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 
 ---
 
-## Open items / session handoff (2026-06-08)
-- ✅ **Both users log in** (Ibrahim + Abu Bakar). Abu Bakar's issue was an unconfirmed email —
-  fixed via SQL (`email_confirmed_at = now()` + password reset). Email is hardcoded in login page.
-- Note for new Supabase users: create accounts with email auto-confirmed, or run
-  `UPDATE auth.users SET email_confirmed_at = now() WHERE email = '...';`
-- Optional cleanup: set `NEXT_PUBLIC_USER_2_EMAIL` in Vercel (not required — hardcoded).
-- All 9 SQL migrations in `supabase/` have been run as of this session.
+## Open items / session handoff (2026-06-10)
+- ✅ **Both users log in** (Ibrahim + Abu Bakar).
+- ✅ All 360-review bugs fixed and deployed (commit `3c07126`, live at `fin9-ivory.vercel.app`).
+- ✅ Migrations 1–9 run in Supabase.
 
 ## Roadmap / TODO
-- [ ] **Run `supabase/sadaka-trigger-v2.sql` in Supabase SQL Editor** (shared-income split + edit adjustment).
-- [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars
-      (currently the placeholder, so gold/silver use static fallbacks).
-- [ ] Wasiyya rethink (user unhappy with current shape).
-- [ ] Real notifications (push/email via Supabase Edge Functions) — toggles were removed until this exists.
-
-> All bugs from the 2026-06-10 360 review were fixed on 2026-06-10 — see Changelog.
+- [ ] **Run `supabase/sadaka-trigger-v2.sql` in Supabase SQL Editor** (shared-income 50/50 sadaka
+      split + edit-amount adjustment trigger). Safe to re-run.
+- [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars.
+      Until then, fallback rates are used (gold AED 472/g, silver AED 5.9/g).
+- [ ] Wasiyya rethink (user unhappy with current shape — deferred).
+- [ ] Real push/email notifications via Supabase Edge Functions (toggles removed until implemented).
