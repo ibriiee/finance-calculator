@@ -38,17 +38,18 @@ export default function SplitForm({ onClose, onSaved }: Props) {
     const fromJoint = form.paid_by === 'both' && form.paid_from_joint
       ? jointAccounts.find(a => a.id === form.paid_from_joint) : null
 
-    const { error: err } = await supabase.from('shared_costs').insert({
+    const { data: inserted, error: err } = await supabase.from('shared_costs').insert({
       created_by_id: user!.id, name: form.name, category: category as any,
       total_amount: parseFloat(form.total_amount), currency: form.currency as any,
       ibrahim_pct: form.ibrahim_pct / 100, paid_by: form.paid_by as any,
       cost_date: form.cost_date, is_recurring: form.is_recurring,
       notes: form.breakdown.trim() || null,
-      ledger_entry_created: !!fromJoint,  // paid from joint money → nothing to settle between brothers
-    })
+      ledger_entry_created: false,
+    }).select('id').single()
     if (err) { setSaving(false); setError(err.message); return }
 
-    // Paid from the joint account → record the withdrawal there too
+    // Paid from the joint account → record the withdrawal there too,
+    // and only then mark the split as settled (nothing left to push to ledger)
     if (fromJoint) {
       const { error: txnErr } = await supabase.from('joint_account_txns').insert({
         account_id: fromJoint.id, txn_type: 'withdrawal', contributor_id: null,
@@ -59,10 +60,11 @@ export default function SplitForm({ onClose, onSaved }: Props) {
       })
       if (txnErr) {
         setSaving(false)
-        setError(`Split saved, but joint withdrawal failed: ${txnErr.message}`)
+        setError(`Split saved, but the joint withdrawal failed: ${txnErr.message}. Add the withdrawal manually in Joint Account.`)
         onSaved()
         return
       }
+      await supabase.from('shared_costs').update({ ledger_entry_created: true }).eq('id', inserted!.id)
     }
     setSaving(false); onSaved(); onClose()
   }

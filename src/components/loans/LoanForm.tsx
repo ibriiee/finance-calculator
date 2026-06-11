@@ -43,7 +43,8 @@ export default function LoanForm({ onClose, onSaved }: Props) {
     }
     let { error: err } = await supabase.from('loans').insert({ ...row, added_by_id: me })
     // Until migration 12 (loans-shared.sql) runs, the column doesn't exist — save without it
-    if (err?.message.includes('added_by_id')) {
+    // (42703 = Postgres undefined column, PGRST204 = PostgREST column not in schema cache)
+    if (err && (err.code === '42703' || err.code === 'PGRST204' || err.message.includes('added_by_id'))) {
       ({ error: err } = await supabase.from('loans').insert(row))
     }
     setSaving(false)

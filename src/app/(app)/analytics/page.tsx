@@ -27,7 +27,7 @@ export default function AnalyticsPage() {
     const [{ data: inc }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }] = await Promise.all([
       supabase.from('income_projects').select('amount, currency, status, work_completed_date, created_at').eq('owner_id', user!.id),
       supabase.from('sadaka_entries').select('amount_owed, amount_given, currency, location, date_given, created_at').or(`owner_id.eq.${user!.id},is_joint.eq.true`),
-      supabase.from('loans').select('id, owner_id, loan_type, currency_type, original_amount, status').neq('status', 'cleared'),
+      supabase.from('loans').select('id, owner_id, loan_type, currency_type, original_amount, status').eq('owner_id', user!.id).neq('status', 'cleared'),
       supabase.from('loan_repayments').select('loan_id, amount'),
       supabase.from('brother_ledger').select('from_user_id, to_user_id, amount, currency').eq('is_settled', false),
       supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
@@ -36,7 +36,7 @@ export default function AnalyticsPage() {
     ])
     setIncome((inc as any) ?? [])
     setSadaka((sad as any) ?? [])
-    setLoans(((lns as any) ?? []).filter((l: any) => l.owner_id === user!.id))
+    setLoans((lns as any) ?? [])
     setRepays((reps as any) ?? [])
     setLedger((led as any) ?? [])
     setSavings((sav as any) ?? [])

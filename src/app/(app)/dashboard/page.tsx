@@ -206,12 +206,16 @@ export default async function DashboardPage() {
 
       {/* Savings & what you owe — both tap through to their modules */}
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/savings" className="card p-3 block">
-          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Savings</p>
-          <p className="font-display text-lg font-semibold text-emerald-400">{formatCurrency(totalSavingsAed + stashAed, 'AED', true)}</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {stashPkr > 0 ? `+ ${formatCurrency(stashPkr, 'PKR', true)} stashed · ` : ''}goals + stash →
+        <Link href={enabled('savings') ? '/savings' : '/goals'} className="card p-3 block">
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{enabled('savings') ? 'Savings' : 'Savings (goals)'}</p>
+          <p className="font-display text-lg font-semibold text-emerald-400">
+            {formatCurrency(totalSavingsAed + (enabled('savings') ? stashAed : 0), 'AED', true)}
           </p>
+          {enabled('savings') && (
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {stashPkr > 0 ? `+ ${formatCurrency(stashPkr, 'PKR', true)} stashed · ` : ''}goals + stash →
+            </p>
+          )}
         </Link>
         <Link href="/loans" className="card p-3 block" style={{ border: totalOwedAed > 0 ? '1px solid rgba(239,68,68,0.3)' : undefined }}>
           <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>You owe (debt)</p>

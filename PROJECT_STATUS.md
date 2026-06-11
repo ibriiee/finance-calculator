@@ -80,6 +80,13 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-11** — **Post-deploy review pass (multi-angle code review of the feedback round)**:
+  Settings backup/export/reset now includes `savings_entries`; new **Savings module toggle** in
+  Settings (dashboard card falls back to goals-only when off); analytics loans query filtered to
+  owner at the source; SplitForm marks `ledger_entry_created` only **after** the joint withdrawal
+  succeeds (no phantom-settled splits if the txn insert fails); LoanForm pre-migration fallback
+  also matches Postgres/PostgREST error codes (42703/PGRST204). Build clean; dashboard/settings
+  verified against live data on localhost.
 - **2026-06-11** — **Feedback round: 9 fixes/features.** (1) *Income delete fixed*: it was silently
   blocked by FKs (sadaka/goals referenced income with no ON DELETE) — `sadaka-sync.sql` makes them
   SET NULL, deletes not-yet-given sadaka with the income, and recalcs pending sadaka when the % is
