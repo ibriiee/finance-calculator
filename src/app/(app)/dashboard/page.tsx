@@ -8,33 +8,74 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch profile
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user!.id).single()
-  const { data: profiles } = await supabase.from('profiles').select('id, display_name') as { data: Array<{ id: string; display_name: string | null }> | null }
-  const otherProfile = profiles?.find(p => p.id !== user!.id)
-
-  // Income this month
+  // All independent reads in parallel — these were sequential before and
+  // made every "back to home" navigation feel slow.
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
-  const { data: monthIncome } = await supabase.from('income_projects')
-    .select('amount, status, currency, ownership')
-    .gte('work_completed_date', monthStart.toISOString().split('T')[0])
-    .in('ownership', ['ibrahim', 'abu_bakar', 'shared'])
+  const [
+    { data: profile },
+    { data: profiles },
+    { data: monthIncome },
+    { data: sadakaEntries },
+    { data: ledgerEntries },
+    { data: pendingProjects },
+    { data: latestZakat },
+    { data: goals },
+    { data: loansData },
+    { data: jointAccounts },
+    { data: jointTxns },
+    { data: savingsEntries },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user!.id).single(),
+    supabase.from('profiles').select('id, display_name') as any,
+    supabase.from('income_projects')
+      .select('amount, status, currency, ownership')
+      .gte('work_completed_date', monthStart.toISOString().split('T')[0])
+      .in('ownership', ['ibrahim', 'abu_bakar', 'shared']),
+    supabase.from('sadaka_entries')
+      .select('amount_owed, amount_given, currency')
+      .eq('owner_id', user!.id)
+      .eq('is_joint', false),
+    supabase.from('brother_ledger')
+      .select('from_user_id, to_user_id, amount, currency')
+      .eq('is_settled', false),
+    supabase.from('income_projects')
+      .select('id, name, amount, currency, expected_payment_date, work_completed_date')
+      .eq('owner_id', user!.id)
+      .eq('status', 'pending')
+      .order('expected_payment_date', { ascending: true })
+      .limit(3),
+    supabase.from('zakat_snapshots')
+      .select('is_wajib, zakat_due_aed, snapshot_year')
+      .eq('owner_id', user!.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single(),
+    supabase.from('financial_goals')
+      .select('id, name, target_amount, currency, target_date, is_active')
+      .or(`owner_id.eq.${user!.id},goal_type.eq.joint`)
+      .eq('is_active', true)
+      .limit(3),
+    supabase.from('loans')
+      .select('id, loan_type, currency_type, original_amount, status')
+      .eq('owner_id', user!.id)
+      .neq('status', 'cleared'),
+    supabase.from('joint_accounts').select('id, name, currency').eq('is_active', true),
+    supabase.from('joint_account_txns').select('account_id, txn_type, contributor_id, amount'),
+    supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
+  ]) as any[]
+  const otherProfile = (profiles as Array<{ id: string; display_name: string | null }> | null)
+    ?.find(p => p.id !== user!.id)
 
   const myOwnership = ownershipForEmail(user!.email ?? profile?.email)
-  const myIncome = monthIncome?.filter(i =>
+  const myIncome = monthIncome?.filter((i: any) =>
     i.ownership === 'shared' || i.ownership === myOwnership
   ) ?? []
 
-  const totalEarned = myIncome.filter(i => i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
-  const totalReceived = myIncome.filter(i => i.status === 'received' && i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
+  const totalEarned = myIncome.filter((i: any) => i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
+  const totalReceived = myIncome.filter((i: any) => i.status === 'received' && i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
 
   // Sadaka pending — same netting as the Sadaka module: per currency,
   // advances (given > owed) offset new obligations
-  const { data: sadakaEntries } = await supabase.from('sadaka_entries')
-    .select('amount_owed, amount_given, currency')
-    .eq('owner_id', user!.id)
-    .eq('is_joint', false)
-
   const netPending = (cur: string) => {
     const list = (sadakaEntries ?? []).filter(e => e.currency === cur)
     const owed = list.reduce((s, e) => s + Number(e.amount_owed), 0)
@@ -45,58 +86,28 @@ export default async function DashboardPage() {
   const sadakaOwedPkr = netPending('PKR')
 
   // Brother ledger balance
-  const { data: ledgerEntries } = await supabase.from('brother_ledger')
-    .select('from_user_id, to_user_id, amount, currency')
-    .eq('is_settled', false)
-
   let aedBalance = 0, pkrBalance = 0
-  ledgerEntries?.forEach(e => {
+  ledgerEntries?.forEach((e: any) => {
     const sign = e.from_user_id === user!.id ? 1 : -1
     if (e.currency === 'AED') aedBalance += sign * e.amount
     if (e.currency === 'PKR') pkrBalance += sign * e.amount
   })
 
-  // Pending income projects
-  const { data: pendingProjects } = await supabase.from('income_projects')
-    .select('id, name, amount, currency, expected_payment_date, work_completed_date')
-    .eq('owner_id', user!.id)
-    .eq('status', 'pending')
-    .order('expected_payment_date', { ascending: true })
-    .limit(3)
+  // Dependent reads (need goal/loan ids) — also in parallel with each other
+  const loanIds = (loansData ?? []).map((l: any) => l.id)
+  const [{ data: contributions }, { data: repays }] = await Promise.all([
+    goals?.length
+      ? supabase.from('goal_contributions').select('goal_id, amount')
+      : Promise.resolve({ data: [] as any[] }),
+    loanIds.length
+      ? supabase.from('loan_repayments').select('loan_id, amount').in('loan_id', loanIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]) as any[]
 
-  // Zakat status
-  const { data: latestZakat } = await supabase.from('zakat_snapshots')
-    .select('is_wajib, zakat_due_aed, snapshot_year')
-    .eq('owner_id', user!.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  // Goals
-  const { data: goals } = await supabase.from('financial_goals')
-    .select('id, name, target_amount, currency, target_date, is_active')
-    .or(`owner_id.eq.${user!.id},goal_type.eq.joint`)
-    .eq('is_active', true)
-    .limit(3)
-
-  const { data: contributions } = goals?.length
-    ? await supabase.from('goal_contributions').select('goal_id, amount')
-    : { data: [] }
-
-  const goalProgress = goals?.map(g => {
-    const saved = contributions?.filter(c => c.goal_id === g.id).reduce((s, c) => s + c.amount, 0) ?? 0
+  const goalProgress = (goals as any[] | null)?.map((g: any) => {
+    const saved = contributions?.filter((c: any) => c.goal_id === g.id).reduce((s: number, c: any) => s + c.amount, 0) ?? 0
     return { ...g, saved, pct: Math.min(100, Math.round((saved / g.target_amount) * 100)) }
   })
-
-  // Loans I owe (AED), net of repayments
-  const { data: loansData } = await supabase.from('loans')
-    .select('id, loan_type, currency_type, original_amount, status')
-    .eq('owner_id', user!.id)
-    .neq('status', 'cleared')
-  const loanIds = (loansData ?? []).map((l: any) => l.id)
-  const { data: repays } = loanIds.length
-    ? await supabase.from('loan_repayments').select('loan_id, amount').in('loan_id', loanIds)
-    : { data: [] }
   let loanDebtAed = 0
   ;(loansData ?? []).forEach((l: any) => {
     if (l.loan_type === 'i_owe' && l.currency_type === 'AED') {
@@ -107,6 +118,25 @@ export default async function DashboardPage() {
   const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
   const totalOwedAed = loanDebtAed + ledgerDebtAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
+
+  // Savings stash (backup money — /savings module)
+  const stash = (cur: string) => (savingsEntries ?? [])
+    .filter((s: any) => s.currency === cur)
+    .reduce((t: number, s: any) => t + (s.txn_type === 'withdrawal' ? -1 : 1) * Number(s.amount), 0)
+  const stashAed = Math.max(0, stash('AED'))
+  const stashPkr = Math.max(0, stash('PKR'))
+
+  // Joint account fairness: persistent nudge while the other brother has chipped in more
+  const chipNudges: { account: string; currency: string; otherName: string; diff: number }[] = []
+  ;(jointAccounts ?? []).forEach((acc: any) => {
+    const deps = (jointTxns ?? []).filter((t: any) => t.account_id === acc.id && t.txn_type === 'deposit')
+    const mine = deps.filter((t: any) => t.contributor_id === user!.id).reduce((s: number, t: any) => s + Number(t.amount), 0)
+    const others = deps.filter((t: any) => t.contributor_id && t.contributor_id !== user!.id).reduce((s: number, t: any) => s + Number(t.amount), 0)
+    if (others > mine) chipNudges.push({
+      account: acc.name, currency: acc.currency,
+      otherName: otherProfile?.display_name ?? 'Your brother', diff: others - mine,
+    })
+  })
 
   // Respect Settings → Modules toggles (default: enabled)
   const enabledModules: Record<string, boolean> = (profile as any)?.enabled_modules ?? {}
@@ -130,6 +160,19 @@ export default async function DashboardPage() {
           </button>
         </form>
       </div>
+
+      {/* Joint chip-in reminder — stays until you've matched your brother */}
+      {enabled('joint_account') && chipNudges.map(n => (
+        <Link key={n.account} href="/joint"
+          className="rounded-xl px-4 py-3 flex items-center justify-between gap-2"
+          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <p className="text-xs leading-relaxed" style={{ color: '#F59E0B' }}>
+            <span className="font-semibold">{n.otherName} chipped in to {n.account}.</span>{' '}
+            Chip in {formatCurrency(n.diff, n.currency)} to be equal.
+          </p>
+          <ArrowRight size={14} className="shrink-0" style={{ color: '#F59E0B' }} />
+        </Link>
+      ))}
 
       {/* Income summary card */}
       {enabled('income') && (
@@ -161,13 +204,16 @@ export default async function DashboardPage() {
       </div>
       )}
 
-      {/* Savings & what you owe */}
+      {/* Savings & what you owe — both tap through to their modules */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="card p-3">
-          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Savings (goals)</p>
-          <p className="font-display text-lg font-semibold text-emerald-400">{formatCurrency(totalSavingsAed, 'AED', true)}</p>
-        </div>
-        <div className="card p-3" style={{ border: totalOwedAed > 0 ? '1px solid rgba(239,68,68,0.3)' : undefined }}>
+        <Link href="/savings" className="card p-3 block">
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Savings</p>
+          <p className="font-display text-lg font-semibold text-emerald-400">{formatCurrency(totalSavingsAed + stashAed, 'AED', true)}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {stashPkr > 0 ? `+ ${formatCurrency(stashPkr, 'PKR', true)} stashed · ` : ''}goals + stash →
+          </p>
+        </Link>
+        <Link href="/loans" className="card p-3 block" style={{ border: totalOwedAed > 0 ? '1px solid rgba(239,68,68,0.3)' : undefined }}>
           <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>You owe (debt)</p>
           <p className="font-display text-lg font-semibold" style={{ color: totalOwedAed > 0 ? '#EF4444' : '#10B981' }}>
             {totalOwedAed > 0 ? formatCurrency(totalOwedAed, 'AED', true) : 'Clear'}
@@ -177,9 +223,10 @@ export default async function DashboardPage() {
               {loanDebtAed > 0 && `loans ${formatCurrency(loanDebtAed, 'AED', true)}`}
               {loanDebtAed > 0 && ledgerDebtAed > 0 && ' · '}
               {ledgerDebtAed > 0 && `ledger ${formatCurrency(ledgerDebtAed, 'AED', true)}`}
+              {' →'}
             </p>
           )}
-        </div>
+        </Link>
       </div>
 
       {/* Brother Ledger */}

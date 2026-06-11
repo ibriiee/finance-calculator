@@ -29,10 +29,11 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Joint Account | `/joint` | ✅ | House account: deposits/withdrawals, balance, equal-share fairness, AED↔PKR, realtime |
 | Zakat | `/zakat` | ✅ | Silver nisab active (+gold ref), assets−liabilities, pay-by date, yearly paid log |
 | Goals | `/goals` | ✅ basic | Individual/joint goals, contributions |
-| Loans | `/loans` | ✅ basic | Qard Hasan tracking |
-| Splits | `/splits` | ✅ basic | Shared costs |
+| Loans | `/loans` | ✅ v2 | Qard Hasan tracking; **both brothers see all loans**, "Added by X" tag, "You owe — by person" breakdown (incl. ledger debt), repayments shown, on-behalf entry |
+| Splits | `/splits` | ✅ v2 | Shared costs; **pay-from-joint-account** (auto withdrawal txn), breakdown bullets (one per line), custom categories, Monthly is a tag only (nothing auto-recurs) |
+| Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
-| Analytics | `/analytics` | ✅ | Custom SVG charts: sadaka-vs-earnings donut, 6-month earned/sadaka bars, sadaka-by-location donut, stat tiles |
+| Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
 | Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset** |
 
 ### Locking & data rules
@@ -58,6 +59,11 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 9. `income-upgrades.sql` — `work_started_date`, `is_ongoing`; income own RLS for update/delete
 10. `sadaka-trigger-v2.sql` — **NOT YET RUN** — shared income splits sadaka 50/50 (one entry per
     brother at his own pct); editing income amount adjusts linked not-yet-given sadaka
+11. `sadaka-sync.sql` — **NOT YET RUN** — fixes income DELETE (FKs were blocking it silently);
+    deleting income removes its not-yet-given sadaka; changing sadaka % recalcs pending obligations
+12. `loans-shared.sql` — **NOT YET RUN** — `added_by_id` on loans + both brothers see all loans
+    (RLS); needed for the "Added by X" tag and on-behalf loan entry
+13. `savings.sql` — **NOT YET RUN** — `savings_entries` table + RLS for the new Savings module
 
 ---
 
@@ -74,6 +80,25 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-11** — **Feedback round: 9 fixes/features.** (1) *Income delete fixed*: it was silently
+  blocked by FKs (sadaka/goals referenced income with no ON DELETE) — `sadaka-sync.sql` makes them
+  SET NULL, deletes not-yet-given sadaka with the income, and recalcs pending sadaka when the % is
+  changed in Settings; delete errors now surface in the UI. (2) *Back navigation sped up*: dashboard's
+  ~12 sequential Supabase queries now run in parallel (`Promise.all`), back arrow is a prefetched
+  `<Link>`, and `dashboard/loading.tsx` gives instant feedback. (3) *Joint chip-in nudge*: amber
+  dashboard banner ("Abu Bakar chipped in to X — chip in PKR 150,000 to be equal") persists until
+  contributions are equal; links to /joint. (4) *You-owe card clickable* → /loans, which now has a
+  "You owe — by person" breakdown (loans net of repayments + brother-ledger debt). (5) *Loans v2*:
+  `loans-shared.sql` adds `added_by_id` + shared visibility; "Added by Abu Bakar" tag, "Whose loan
+  is this?" picker in the form, brother's loans section. (6) *Savings module* (`/savings`,
+  `savings.sql`): stashes per account/place in AED/PKR, deposit/withdraw, dashboard Savings card =
+  goals + stash and links there. (7) *Analytics v2*: Monthly/Yearly toggle (tiles + trend bars by
+  month or year) and a Net Position card folding in loans, ledger debt, savings and goals (PKR→AED)
+  with surplus/loss verdict. (8) *Splits v2*: "paid by Both" can pay straight **from a joint
+  account** (records the withdrawal there, no ledger push needed), breakdown textarea renders as
+  bullets on the card, custom categories, and the Monthly checkbox is explicitly a tag — nothing is
+  ever auto-added. (9) Verified: prod build clean, all 13 routes 200 logged-in, dashboard HTML
+  (live data) shows the chip-in banner/links. **Run migrations 10–13 in Supabase!**
 - **2026-06-11** — **Responsive form modals + app-wide padding fix**. (1) New shared
   `FormSheet` component (`src/components/shared/FormSheet.tsx`) renders every add/edit form via a
   React **portal to `document.body`** — so the overlay is always viewport-relative and can never be
@@ -139,8 +164,10 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 - ✅ Migrations 1–9 run in Supabase.
 
 ## Roadmap / TODO
-- [ ] **Run `supabase/sadaka-trigger-v2.sql` in Supabase SQL Editor** (shared-income 50/50 sadaka
-      split + edit-amount adjustment trigger). Safe to re-run.
+- [ ] **Run migrations 10–13 in Supabase SQL Editor** (all safe to re-run):
+      `sadaka-trigger-v2.sql`, `sadaka-sync.sql`, `loans-shared.sql`, `savings.sql`.
+      Until 11 runs, income delete still fails (but now shows the error); until 12, the
+      "Added by" tag won't appear; until 13, /savings shows a "run migration" banner.
 - [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars.
       Until then, fallback rates are used (gold AED 472/g, silver AED 5.9/g).
 - [ ] Wasiyya rethink (user unhappy with current shape — deferred).

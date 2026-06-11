@@ -54,10 +54,11 @@ export default function SplitsPage() {
               <div key={split.id} className="card p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 flex-1 mr-3">
-                    <span className="text-xl">{catIcons[split.category]}</span>
+                    <span className="text-xl">{catIcons[split.category] ?? '•'}</span>
                     <div>
                       <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{split.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <p className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
+                        {!catIcons[split.category] && `${split.category} · `}
                         {shortDate(split.cost_date)}
                         {split.is_recurring && ' · Monthly'}
                         · Paid by {split.paid_by === 'both' ? 'both' : split.paid_by === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
@@ -68,6 +69,17 @@ export default function SplitsPage() {
                     {formatCurrency(split.total_amount, split.currency)}
                   </span>
                 </div>
+
+                {/* Breakdown bullets (from the form's one-item-per-line notes) */}
+                {split.notes && (
+                  <ul className="mb-3 px-3 py-2 rounded-lg flex flex-col gap-1" style={{ background: 'var(--surface-2)' }}>
+                    {split.notes.split('\n').filter(l => l.trim()).map((line, i) => (
+                      <li key={i} className="text-xs flex gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        <span style={{ color: 'var(--gold)' }}>•</span> {line.trim()}
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="card-inner p-2.5 text-center">

@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, CreditCard } from 'lucide-react'
+import { Plus, CreditCard, UserRound, ArrowLeftRight } from 'lucide-react'
 import LoanForm from '@/components/loans/LoanForm'
 import type { Loan } from '@/types/database.types'
 
@@ -14,30 +15,70 @@ const RATES_DEFAULTS = { gold_aed_gram: 472, silver_aed_gram: 5.9 }
 
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
+  const [repays, setRepays] = useState<{ loan_id: string; amount: number }[]>([])
+  const [names, setNames] = useState<Record<string, string>>({})
+  const [userId, setUserId] = useState('')
+  const [ledgerDebt, setLedgerDebt] = useState<{ currency: string; amount: number; toName: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [rates, setRates] = useState(RATES_DEFAULTS)
   const supabase = createClient()
 
   async function load() {
-    const [{ data: l }, { data: r }] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser()
+    setUserId(user!.id)
+    const [{ data: l }, { data: r }, { data: profs }, { data: reps }, { data: ledger }] = await Promise.all([
       supabase.from('loans').select('*').order('created_at', { ascending: false }),
       supabase.from('rates_cache').select('*'),
+      supabase.from('profiles').select('id, display_name'),
+      supabase.from('loan_repayments').select('loan_id, amount'),
+      supabase.from('brother_ledger').select('from_user_id, to_user_id, amount, currency').eq('is_settled', false),
     ])
     setLoans(l ?? [])
+    setRepays((reps as any) ?? [])
+    const nameMap: Record<string, string> = {}
+    ;(profs ?? []).forEach((p: any) => { nameMap[p.id] = p.display_name ?? 'User' })
+    setNames(nameMap)
     if (r) {
       const rMap: Record<string, number> = {}
       r.forEach((row: any) => { rMap[row.rate_type] = row.rate_value })
       setRates({ gold_aed_gram: rMap.gold_aed_gram ?? 472, silver_aed_gram: rMap.silver_aed_gram ?? 5.9 })
     }
+    // What I owe my brother on the ledger (per currency)
+    const byCur: Record<string, number> = {}
+    let otherId = ''
+    ;(ledger ?? []).forEach((e: any) => {
+      const sign = e.from_user_id === user!.id ? 1 : -1
+      if (sign < 0) otherId = e.from_user_id
+      else otherId = otherId || e.to_user_id
+      byCur[e.currency] = (byCur[e.currency] ?? 0) + sign * Number(e.amount)
+    })
+    setLedgerDebt(Object.entries(byCur)
+      .filter(([, v]) => v < 0)
+      .map(([currency, v]) => ({ currency, amount: -v, toName: nameMap[otherId] ?? 'your brother' })))
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  const outstanding = loans.filter(l => l.status !== 'cleared')
+  const myLoans = loans.filter(l => l.owner_id === userId || !l.owner_id)
+  const brotherLoans = loans.filter(l => l.owner_id && l.owner_id !== userId)
+  const outstanding = myLoans.filter(l => l.status !== 'cleared')
   const iOwe = outstanding.filter(l => l.loan_type === 'i_owe')
   const theyOwe = outstanding.filter(l => l.loan_type === 'they_owe')
+
+  function repaidFor(loanId: string) {
+    return repays.filter(r => r.loan_id === loanId).reduce((s, r) => s + Number(r.amount), 0)
+  }
+
+  // "You owe" grouped by person — loans I owe, net of repayments, per currency
+  const owedByPerson: Record<string, Record<string, number>> = {}
+  iOwe.forEach(l => {
+    const remaining = Math.max(0, Number(l.original_amount) - repaidFor(l.id))
+    if (remaining <= 0) return
+    owedByPerson[l.counterparty_name] = owedByPerson[l.counterparty_name] ?? {}
+    owedByPerson[l.counterparty_name][l.currency_type] = (owedByPerson[l.counterparty_name][l.currency_type] ?? 0) + remaining
+  })
 
   function getReturnDisplay(loan: Loan) {
     if (loan.currency_type === 'gold_grams') {
@@ -49,6 +90,66 @@ export default function LoansPage() {
       return `${loan.original_amount}g silver = AED ${val.toLocaleString()}`
     }
     return formatCurrency(loan.original_amount, loan.currency_type)
+  }
+
+  function LoanCard({ loan, mine }: { loan: Loan; mine: boolean }) {
+    const isOverdue = loan.due_date && new Date(loan.due_date) < new Date() && loan.status !== 'cleared'
+    const isGold = ['gold_grams', 'silver_grams'].includes(loan.currency_type)
+    const addedBy = (loan as any).added_by_id as string | null
+    const addedByOther = addedBy && addedBy !== userId
+    const canEdit = loan.owner_id === userId || addedBy === userId
+    return (
+      <div className="card p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1 mr-3">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <StatusBadge status={loan.loan_type === 'i_owe' ? 'outstanding' : 'given'}
+                label={loan.loan_type === 'i_owe' ? (mine ? 'I Owe' : `${names[loan.owner_id] ?? 'They'} Owes`) : loan.loan_type === 'they_owe' ? 'They Owe' : 'Joint'} size="xs" />
+              <StatusBadge status={loan.status} size="xs" />
+            </div>
+            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{loan.counterparty_name}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Taken {shortDate(loan.date_taken)}
+              {loan.due_date && ` · Due ${shortDate(loan.due_date)}`}
+            </p>
+            {addedByOther && (
+              <p className="text-[11px] mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+                style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                <UserRound size={10} /> Added by {names[addedBy!] ?? 'your brother'}
+              </p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-base font-bold" style={{ color: isGold ? 'var(--gold)' : 'var(--text-primary)' }}>
+              {getReturnDisplay(loan)}
+            </p>
+            {isGold && <p className="text-xs text-amber-400">Today's value (Qard rule)</p>}
+            {repaidFor(loan.id) > 0 && (
+              <p className="text-xs text-emerald-400">repaid {formatCurrency(repaidFor(loan.id), loan.currency_type, true)}</p>
+            )}
+          </div>
+        </div>
+        {isOverdue && (
+          <div className="mt-2 px-3 py-1.5 rounded-lg text-xs text-red-400" style={{ background: 'rgba(239,68,68,0.1)' }}>
+            ⚠ Overdue
+          </div>
+        )}
+        {loan.notes && (
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{loan.notes}</p>
+        )}
+        {loan.status !== 'cleared' && canEdit && (
+          <button onClick={async () => {
+            if (!confirm('Mark this loan as cleared (fully repaid)?')) return
+            const { error } = await supabase.from('loans').update({ status: 'cleared' }).eq('id', loan.id)
+            if (error) { alert(`Could not update: ${error.message}`); return }
+            load()
+          }} className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
+             style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+            ✓ Mark Cleared
+          </button>
+        )}
+      </div>
+    )
   }
 
   if (loading) return <LoadingSpinner />
@@ -76,59 +177,47 @@ export default function LoansPage() {
         </div>
       </div>
 
+      {/* Who you owe — person by person */}
+      {(Object.keys(owedByPerson).length > 0 || ledgerDebt.length > 0) && (
+        <div className="card p-4">
+          <p className="section-label mb-3">You owe — by person</p>
+          <div className="flex flex-col gap-2">
+            {Object.entries(owedByPerson).map(([person, byCur]) => (
+              <div key={person} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                  <UserRound size={13} style={{ color: 'var(--text-muted)' }} /> {person}
+                </span>
+                <span className="font-display font-semibold text-red-400">
+                  {Object.entries(byCur).map(([cur, amt]) =>
+                    cur === 'gold_grams' ? `${amt}g gold` : cur === 'silver_grams' ? `${amt}g silver` : formatCurrency(amt, cur, true)
+                  ).join(' · ')}
+                </span>
+              </div>
+            ))}
+            {ledgerDebt.map(d => (
+              <Link key={d.currency} href="/ledger" className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                  <ArrowLeftRight size={13} style={{ color: 'var(--text-muted)' }} /> {d.toName} (brother ledger) →
+                </span>
+                <span className="font-display font-semibold text-red-400">{formatCurrency(d.amount, d.currency, true)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loans.length === 0 ? (
         <EmptyState icon={CreditCard} title="No loans recorded"
           description="Track loans you owe or are owed — with Islamic repayment rules" />
       ) : (
         <div className="flex flex-col gap-3">
-          {loans.map(loan => {
-            const isOverdue = loan.due_date && new Date(loan.due_date) < new Date() && loan.status !== 'cleared'
-            const isGold = ['gold_grams', 'silver_grams'].includes(loan.currency_type)
-            return (
-              <div key={loan.id} className="card p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 mr-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <StatusBadge status={loan.loan_type === 'i_owe' ? 'outstanding' : 'given'}
-                        label={loan.loan_type === 'i_owe' ? 'I Owe' : loan.loan_type === 'they_owe' ? 'They Owe' : 'Joint'} size="xs" />
-                      <StatusBadge status={loan.status} size="xs" />
-                      {loan.loan_type === 'joint' && <StatusBadge status="joint" size="xs" />}
-                    </div>
-                    <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{loan.counterparty_name}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      Taken {shortDate(loan.date_taken)}
-                      {loan.due_date && ` · Due ${shortDate(loan.due_date)}`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-base font-bold" style={{ color: isGold ? 'var(--gold)' : 'var(--text-primary)' }}>
-                      {getReturnDisplay(loan)}
-                    </p>
-                    {isGold && (
-                      <p className="text-xs text-amber-400">Today's value (Qard rule)</p>
-                    )}
-                  </div>
-                </div>
-                {isOverdue && (
-                  <div className="mt-2 px-3 py-1.5 rounded-lg text-xs text-red-400" style={{ background: 'rgba(239,68,68,0.1)' }}>
-                    ⚠ Overdue
-                  </div>
-                )}
-                {loan.notes && (
-                  <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{loan.notes}</p>
-                )}
-                {loan.status !== 'cleared' && (
-                  <button onClick={async () => {
-                    await supabase.from('loans').update({ status: 'cleared' }).eq('id', loan.id)
-                    load()
-                  }} className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
-                     style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-                    ✓ Mark Cleared
-                  </button>
-                )}
-              </div>
-            )
-          })}
+          {myLoans.map(loan => <LoanCard key={loan.id} loan={loan} mine />)}
+          {brotherLoans.length > 0 && (
+            <>
+              <p className="section-label mt-2">{names[brotherLoans[0].owner_id] ?? 'Brother'}'s loans</p>
+              {brotherLoans.map(loan => <LoanCard key={loan.id} loan={loan} mine={false} />)}
+            </>
+          )}
         </div>
       )}
 

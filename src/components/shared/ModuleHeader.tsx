@@ -1,5 +1,5 @@
 'use client'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,15 +12,14 @@ interface Props {
 }
 
 export default function ModuleHeader({ title, subtitle, back = true, action, className }: Props) {
-  const router = useRouter()
   return (
     <div className={cn('flex items-center justify-between px-4 pt-4 pb-2', className)}>
       <div className="flex items-center gap-3">
         {back && (
-          <button onClick={() => router.push('/dashboard')} aria-label="Back to home"
+          <Link href="/dashboard" prefetch aria-label="Back to home"
             className="p-1.5 -ml-1.5 rounded-lg hover:bg-[var(--surface-2)] transition-colors shrink-0">
             <ArrowLeft size={18} className="text-[var(--text-secondary)]" />
-          </button>
+          </Link>
         )}
         <div>
           <h1 className="font-display text-xl font-semibold text-[var(--text-primary)]">{title}</h1>

@@ -5,22 +5,43 @@ import { formatCurrency } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { Donut, MonthlyBars } from '@/components/analytics/Charts'
-import { TrendingUp, HandHeart, Wallet, Target } from 'lucide-react'
+import { TrendingUp, HandHeart, Wallet, Target, Scale } from 'lucide-react'
 
 export default function AnalyticsPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly')
   const [income, setIncome] = useState<any[]>([])
   const [sadaka, setSadaka] = useState<any[]>([])
+  const [loans, setLoans] = useState<any[]>([])
+  const [repays, setRepays] = useState<any[]>([])
+  const [ledger, setLedger] = useState<any[]>([])
+  const [savings, setSavings] = useState<any[]>([])
+  const [contribs, setContribs] = useState<any[]>([])
+  const [pkrToAed, setPkrToAed] = useState(0.0132)
+  const [userId, setUserId] = useState('')
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    const [{ data: inc }, { data: sad }] = await Promise.all([
+    setUserId(user!.id)
+    const [{ data: inc }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }] = await Promise.all([
       supabase.from('income_projects').select('amount, currency, status, work_completed_date, created_at').eq('owner_id', user!.id),
       supabase.from('sadaka_entries').select('amount_owed, amount_given, currency, location, date_given, created_at').or(`owner_id.eq.${user!.id},is_joint.eq.true`),
+      supabase.from('loans').select('id, owner_id, loan_type, currency_type, original_amount, status').neq('status', 'cleared'),
+      supabase.from('loan_repayments').select('loan_id, amount'),
+      supabase.from('brother_ledger').select('from_user_id, to_user_id, amount, currency').eq('is_settled', false),
+      supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
+      supabase.from('goal_contributions').select('goal_id, amount, contributor_id'),
+      supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
     ])
     setIncome((inc as any) ?? [])
     setSadaka((sad as any) ?? [])
+    setLoans(((lns as any) ?? []).filter((l: any) => l.owner_id === user!.id))
+    setRepays((reps as any) ?? [])
+    setLedger((led as any) ?? [])
+    setSavings((sav as any) ?? [])
+    setContribs((con as any) ?? [])
+    if (rate?.rate_value) setPkrToAed(Number(rate.rate_value))
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -28,31 +49,83 @@ export default function AnalyticsPage() {
   if (loading) return <LoadingSpinner />
 
   const aed = (arr: any[], f: (x: any) => number) => arr.filter(x => x.currency === 'AED').reduce((s, x) => s + f(x), 0)
-  const earned = aed(income, x => Number(x.amount))
-  const received = aed(income.filter(x => x.status === 'received'), x => Number(x.amount))
-  const sadakaGiven = aed(sadaka, x => Number(x.amount_given))
-  const sadakaOwed = aed(sadaka, x => Number(x.amount_owed))
-  const sadakaPending = Math.max(0, sadakaOwed - sadakaGiven)
+  const toAed = (amount: number, cur: string) => cur === 'PKR' ? amount * pkrToAed : cur === 'AED' ? amount : 0
+
+  // ---- Period scoping ----
+  const now = new Date()
+  const periodStart = period === 'monthly'
+    ? new Date(now.getFullYear(), now.getMonth(), 1)
+    : new Date(now.getFullYear(), 0, 1)
+  const inPeriod = (dateStr?: string | null) => dateStr ? new Date(dateStr) >= periodStart : false
+
+  const periodIncome = income.filter(x => inPeriod(x.work_completed_date ?? x.created_at))
+  const periodSadakaGiven = sadaka.filter(x => Number(x.amount_given) > 0 && inPeriod(x.date_given ?? x.created_at))
+
+  const earned = aed(periodIncome, x => Number(x.amount))
+  const received = aed(periodIncome.filter(x => x.status === 'received'), x => Number(x.amount))
+  const sadakaGiven = aed(periodSadakaGiven, x => Number(x.amount_given))
+  // Pending is a "right now" number — always all-time net
+  const sadakaPending = Math.max(0, aed(sadaka, x => Number(x.amount_owed)) - aed(sadaka, x => Number(x.amount_given)))
   const givenPct = earned > 0 ? Math.round((sadakaGiven / earned) * 100) : 0
 
-  // Last 6 months earned vs sadaka given
-  const months: { month: string; key: string; earned: number; sadaka: number }[] = []
-  const now = new Date()
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push({ month: d.toLocaleDateString('en-GB', { month: 'short' }), key: `${d.getFullYear()}-${d.getMonth()}`, earned: 0, sadaka: 0 })
+  // ---- Trend buckets ----
+  const trend: { month: string; key: string; earned: number; sadaka: number }[] = []
+  if (period === 'monthly') {
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      trend.push({ month: d.toLocaleDateString('en-GB', { month: 'short' }), key: `${d.getFullYear()}-${d.getMonth()}`, earned: 0, sadaka: 0 })
+    }
+  } else {
+    for (let i = 3; i >= 0; i--) {
+      const y = now.getFullYear() - i
+      trend.push({ month: `${y}`, key: `${y}`, earned: 0, sadaka: 0 })
+    }
   }
-  const bucket = (dateStr: string) => { const d = new Date(dateStr); return `${d.getFullYear()}-${d.getMonth()}` }
+  const bucket = (dateStr: string) => {
+    const d = new Date(dateStr)
+    return period === 'monthly' ? `${d.getFullYear()}-${d.getMonth()}` : `${d.getFullYear()}`
+  }
   income.filter(x => x.currency === 'AED').forEach(x => {
-    const m = months.find(mo => mo.key === bucket(x.work_completed_date ?? x.created_at))
+    const m = trend.find(mo => mo.key === bucket(x.work_completed_date ?? x.created_at))
     if (m) m.earned += Number(x.amount)
   })
   sadaka.filter(x => x.currency === 'AED' && x.amount_given > 0).forEach(x => {
-    const m = months.find(mo => mo.key === bucket(x.date_given ?? x.created_at))
+    const m = trend.find(mo => mo.key === bucket(x.date_given ?? x.created_at))
     if (m) m.sadaka += Number(x.amount_given)
   })
 
-  // Sadaka given by location
+  // ---- Net position (loans & debts included → profit or loss?) ----
+  const repaidFor = (id: string) => repays.filter((r: any) => r.loan_id === id).reduce((s: number, r: any) => s + Number(r.amount), 0)
+  let iOweAed = 0, owedToMeAed = 0
+  loans.forEach((l: any) => {
+    const remaining = Math.max(0, Number(l.original_amount) - repaidFor(l.id))
+    const inAed = toAed(remaining, l.currency_type)   // gold/silver loans excluded from cash net
+    if (l.loan_type === 'i_owe') iOweAed += inAed
+    if (l.loan_type === 'they_owe') owedToMeAed += inAed
+  })
+  let ledgerNetAed = 0
+  ledger.forEach((e: any) => {
+    const sign = e.from_user_id === userId ? 1 : -1
+    ledgerNetAed += sign * toAed(Number(e.amount), e.currency)
+  })
+  const savingsAed = savings.reduce((t: number, s: any) =>
+    t + (s.txn_type === 'withdrawal' ? -1 : 1) * toAed(Number(s.amount), s.currency), 0)
+  const goalSavedAed = contribs.filter((c: any) => c.contributor_id === userId)
+    .reduce((s: number, c: any) => s + Number(c.amount), 0)
+
+  const assets = savingsAed + goalSavedAed + owedToMeAed + Math.max(0, ledgerNetAed)
+  const liabilities = iOweAed + Math.max(0, -ledgerNetAed)
+  const netPosition = assets - liabilities
+  const inProfit = netPosition >= 0
+
+  const stats = [
+    { label: `Earned (${period === 'monthly' ? 'this month' : 'this year'})`, value: formatCurrency(earned, 'AED', true), Icon: TrendingUp, color: 'var(--gold)' },
+    { label: 'Received', value: formatCurrency(received, 'AED', true), Icon: Wallet, color: '#10B981' },
+    { label: 'Sadaka given', value: formatCurrency(sadakaGiven, 'AED', true), Icon: HandHeart, color: '#10B981' },
+    { label: 'Sadaka pending (now)', value: formatCurrency(sadakaPending, 'AED', true), Icon: Target, color: sadakaPending > 0 ? '#F59E0B' : '#10B981' },
+  ]
+
+  // Sadaka given by location (all-time)
   const locColors: Record<string, string> = { UAE: '#C9A84C', Pakistan: '#10B981', other: '#7C6A2D' }
   const byLoc: Record<string, number> = {}
   sadaka.forEach(x => {
@@ -61,16 +134,23 @@ export default function AnalyticsPage() {
   })
   const locSegments = Object.entries(byLoc).map(([label, value]) => ({ label, value, color: locColors[label] ?? '#7C6A2D' }))
 
-  const stats = [
-    { label: 'Earned (AED)', value: formatCurrency(earned, 'AED', true), Icon: TrendingUp, color: 'var(--gold)' },
-    { label: 'Received', value: formatCurrency(received, 'AED', true), Icon: Wallet, color: '#10B981' },
-    { label: 'Sadaka given', value: formatCurrency(sadakaGiven, 'AED', true), Icon: HandHeart, color: '#10B981' },
-    { label: 'Sadaka pending', value: formatCurrency(sadakaPending, 'AED', true), Icon: Target, color: sadakaPending > 0 ? '#F59E0B' : '#10B981' },
-  ]
-
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="Analytics" subtitle="Earnings & sadaka insights" />
+      <ModuleHeader title="Analytics" subtitle="Earnings, sadaka & net position" />
+
+      {/* Monthly / Yearly toggle */}
+      <div className="flex gap-2">
+        {(['monthly', 'yearly'] as const).map(p => (
+          <button key={p} onClick={() => setPeriod(p)}
+            className="px-4 py-1.5 rounded-full text-xs font-medium capitalize transition-all"
+            style={{
+              background: period === p ? 'var(--gold)' : 'var(--surface-2)',
+              color: period === p ? '#0a0a0a' : 'var(--text-muted)',
+            }}>
+            {p}
+          </button>
+        ))}
+      </div>
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3">
@@ -85,9 +165,35 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
+      {/* Net position — are you in profit or loss overall? */}
+      <div className="card p-4" style={{ border: `1px solid ${inProfit ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Scale size={15} style={{ color: inProfit ? '#10B981' : '#EF4444' }} />
+            <h3 className="text-sm font-semibold">Net Position</h3>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+            style={{ background: inProfit ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: inProfit ? '#10B981' : '#EF4444' }}>
+            {inProfit ? 'In surplus' : 'In loss'}
+          </span>
+        </div>
+        <p className="font-display text-3xl font-semibold mb-3" style={{ color: inProfit ? '#10B981' : '#EF4444' }}>
+          {netPosition < 0 ? '-' : ''}{formatCurrency(Math.abs(netPosition), 'AED', true)}
+        </p>
+        <div className="flex flex-col gap-1.5 text-xs">
+          <div className="flex justify-between"><span style={{ color: 'var(--text-muted)' }}>Savings + goals</span><span className="text-emerald-400 font-semibold">{formatCurrency(savingsAed + goalSavedAed, 'AED', true)}</span></div>
+          <div className="flex justify-between"><span style={{ color: 'var(--text-muted)' }}>Owed to you (loans{ledgerNetAed > 0 ? ' + ledger' : ''})</span><span className="text-emerald-400 font-semibold">{formatCurrency(owedToMeAed + Math.max(0, ledgerNetAed), 'AED', true)}</span></div>
+          <div className="flex justify-between"><span style={{ color: 'var(--text-muted)' }}>You owe (loans{ledgerNetAed < 0 ? ' + ledger' : ''})</span><span className="text-red-400 font-semibold">-{formatCurrency(liabilities, 'AED', true)}</span></div>
+        </div>
+        <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
+          PKR amounts converted at {pkrToAed} · gold/silver loans not included. Liabilities here are
+          what Zakat counts as deductible debts.
+        </p>
+      </div>
+
       {/* Sadaka discipline ring */}
       <div className="card p-4">
-        <h3 className="text-sm font-semibold mb-3">Sadaka vs Earnings</h3>
+        <h3 className="text-sm font-semibold mb-3">Sadaka vs Earnings ({period === 'monthly' ? 'this month' : 'this year'})</h3>
         <Donut
           centerValue={`${givenPct}%`}
           centerLabel="of earnings"
@@ -101,16 +207,16 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
-      {/* Monthly trend */}
+      {/* Trend */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold">Last 6 Months</h3>
+          <h3 className="text-sm font-semibold">{period === 'monthly' ? 'Last 6 Months' : 'Last 4 Years'}</h3>
           <div className="flex items-center gap-3 text-[10px]">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#C9A84C' }} /> Earned</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#10B981' }} /> Sadaka</span>
           </div>
         </div>
-        <MonthlyBars data={months} />
+        <MonthlyBars data={trend} />
       </div>
 
       {/* By location */}

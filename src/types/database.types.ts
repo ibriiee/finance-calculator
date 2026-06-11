@@ -112,6 +112,7 @@ export interface ExternalLedgerEntry {
 export interface Loan {
   id: string
   owner_id: string
+  added_by_id: string | null
   counterparty_name: string
   loan_type: LoanType
   currency_type: LoanCurrencyType
@@ -139,7 +140,7 @@ export interface SharedCost {
   id: string
   created_by_id: string
   name: string
-  category: 'house' | 'vehicle' | 'gift' | 'charity' | 'investment' | 'business' | 'other'
+  category: string   // house | vehicle | gift | charity | investment | business | other | custom text
   total_amount: number
   currency: 'AED' | 'PKR'
   ibrahim_pct: number
@@ -224,6 +225,19 @@ export interface WasiyyaEntry {
   updated_at: string
 }
 
+export interface SavingsEntry {
+  id: string
+  owner_id: string
+  account_name: string
+  location: 'UAE' | 'Pakistan' | 'other'
+  currency: 'AED' | 'PKR'
+  txn_type: 'deposit' | 'withdrawal'
+  amount: number
+  entry_date: string
+  notes: string | null
+  created_at: string
+}
+
 export interface RatesCache {
   id: string
   rate_type: string
@@ -252,6 +266,7 @@ export type Database = {
       financial_goals: { Row: FinancialGoal; Insert: Partial<FinancialGoal>; Update: Partial<FinancialGoal> }
       goal_contributions: { Row: GoalContribution; Insert: Partial<GoalContribution>; Update: Partial<GoalContribution> }
       wasiyya_entries: { Row: WasiyyaEntry; Insert: Partial<WasiyyaEntry>; Update: Partial<WasiyyaEntry> }
+      savings_entries: { Row: SavingsEntry; Insert: Partial<SavingsEntry>; Update: Partial<SavingsEntry> }
       rates_cache: { Row: RatesCache; Insert: Partial<RatesCache>; Update: Partial<RatesCache> }
     }
   }

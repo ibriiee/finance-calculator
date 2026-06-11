@@ -40,8 +40,9 @@ export default function IncomePage() {
   }
 
   async function deleteItem(id: string) {
-    if (!confirm('Delete this income entry? Its linked sadaka obligation stays in the Sadaka module.')) return
-    await supabase.from('income_projects').delete().eq('id', id)
+    if (!confirm('Delete this income entry? Its not-yet-given sadaka obligation will be removed with it.')) return
+    const { error } = await supabase.from('income_projects').delete().eq('id', id)
+    if (error) { alert(`Could not delete: ${error.message}`); return }
     load()
   }
 
