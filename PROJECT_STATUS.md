@@ -57,13 +57,16 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 7. `zakat-paid.sql` — `zakat_paid`, `zakat_paid_date`, `nisab_basis`, `due_date`
 8. `sadaka-recipients.sql` — recipient directory + `recipient_id` on sadaka (Sadaka v2)
 9. `income-upgrades.sql` — `work_started_date`, `is_ongoing`; income own RLS for update/delete
-10. `sadaka-trigger-v2.sql` — **NOT YET RUN** — shared income splits sadaka 50/50 (one entry per
+10. `sadaka-trigger-v2.sql` — shared income splits sadaka 50/50 (one entry per
     brother at his own pct); editing income amount adjusts linked not-yet-given sadaka
-11. `sadaka-sync.sql` — **NOT YET RUN** — fixes income DELETE (FKs were blocking it silently);
+11. `sadaka-sync.sql` — fixes income DELETE (FKs were blocking it silently);
     deleting income removes its not-yet-given sadaka; changing sadaka % recalcs pending obligations
-12. `loans-shared.sql` — **NOT YET RUN** — `added_by_id` on loans + both brothers see all loans
+12. `loans-shared.sql` — `added_by_id` on loans + both brothers see all loans
     (RLS); needed for the "Added by X" tag and on-behalf loan entry
-13. `savings.sql` — **NOT YET RUN** — `savings_entries` table + RLS for the new Savings module
+13. `savings.sql` — `savings_entries` table + RLS for the new Savings module
+
+(`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **all 13 migrations run as of
+2026-06-11** — confirmed by Ibrahim.)
 
 ---
 
@@ -165,16 +168,15 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 
 ---
 
-## Open items / session handoff (2026-06-10)
+## Open items / session handoff (2026-06-11)
 - ✅ **Both users log in** (Ibrahim + Abu Bakar).
-- ✅ All 360-review bugs fixed and deployed (commit `3c07126`, live at `fin9-ivory.vercel.app`).
-- ✅ Migrations 1–9 run in Supabase.
+- ✅ Feedback round (9 fixes/features) + review pass deployed (commits `e59c6b2`, `b5f7797`,
+  `5b1d2fb`), live at `fin9-ivory.vercel.app`.
+- ✅ **All migrations 1–13 run in Supabase** (Ibrahim ran `RUN-ME-run-all-pending.sql`).
 
 ## Roadmap / TODO
-- [ ] **Run migrations 10–13 in Supabase SQL Editor** (all safe to re-run):
-      `sadaka-trigger-v2.sql`, `sadaka-sync.sql`, `loans-shared.sql`, `savings.sql`.
-      Until 11 runs, income delete still fails (but now shows the error); until 12, the
-      "Added by" tag won't appear; until 13, /savings shows a "run migration" banner.
+- [x] ~~Run migrations 10–13 in Supabase SQL Editor~~ — done 2026-06-11 via
+      `RUN-ME-run-all-pending.sql`.
 - [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars.
       Until then, fallback rates are used (gold AED 472/g, silver AED 5.9/g).
 - [ ] Wasiyya rethink (user unhappy with current shape — deferred).
