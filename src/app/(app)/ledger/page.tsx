@@ -85,7 +85,7 @@ export default function LedgerPage() {
                     ? `${otherUser?.display_name} owes you`
                     : `You owe ${otherUser?.display_name}`}
                 </span>
-                <span className={`text-xl font-bold ${aedBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-display text-xl font-semibold ${aedBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(Math.abs(aedBalance), 'AED')}
                 </span>
               </div>
@@ -97,7 +97,7 @@ export default function LedgerPage() {
                     ? `${otherUser?.display_name} owes you`
                     : `You owe ${otherUser?.display_name}`}
                 </span>
-                <span className={`text-xl font-bold ${pkrBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-display text-xl font-semibold ${pkrBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(Math.abs(pkrBalance), 'PKR')}
                 </span>
               </div>

@@ -121,7 +121,7 @@ export default function JointAccountPage() {
               {/* Balance */}
               <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--surface-2)' }}>
                 <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Current balance</p>
-                <p className="text-2xl font-bold" style={{ color: s.balance >= 0 ? 'var(--text-primary)' : '#EF4444' }}>
+                <p className="font-display text-2xl font-semibold" style={{ color: s.balance >= 0 ? 'var(--text-primary)' : '#EF4444' }}>
                   {formatCurrency(s.balance, acc.currency)}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>

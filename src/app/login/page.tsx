@@ -222,7 +222,7 @@ export default function LoginPage() {
           </svg>
         </div>
       </div>
-      <h1 className="text-4xl font-bold tracking-tight text-gold-gradient">Mizan</h1>
+      <h1 className="font-display text-4xl font-semibold tracking-tight text-gold-gradient">Mizan</h1>
       <p className="text-base mt-1 font-light" style={{ color: 'rgba(201,168,76,0.6)', letterSpacing: '0.1em' }}>ميزان</p>
       <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>Your Islamic Financial OS</p>
     </div>

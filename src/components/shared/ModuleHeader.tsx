@@ -23,8 +23,8 @@ export default function ModuleHeader({ title, subtitle, back = true, action, cla
           </button>
         )}
         <div>
-          <h1 className="text-lg font-bold text-[var(--text-primary)]">{title}</h1>
-          {subtitle && <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>}
+          <h1 className="font-display text-xl font-semibold text-[var(--text-primary)]">{title}</h1>
+          {subtitle && <p className="section-label mt-0.5">{subtitle}</p>}
         </div>
       </div>
       {action && <div>{action}</div>}

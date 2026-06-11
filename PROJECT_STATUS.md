@@ -74,6 +74,30 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-11** — **Responsive form modals + app-wide padding fix**. (1) New shared
+  `FormSheet` component (`src/components/shared/FormSheet.tsx`) renders every add/edit form via a
+  React **portal to `document.body`** — so the overlay is always viewport-relative and can never be
+  clipped/misaligned by an ancestor transform (the desktop bug where "New Joint Account" was cut
+  off on the left). It's responsive: bottom sheet on mobile (`items-end`, full width), **centered
+  dialog on desktop** (`sm:items-center`, max-w-md, aligned to the app column). Adds Esc-to-close
+  and body-scroll-lock. All 11 forms (Income, Sadaka, Recipient, Ledger, SettleUp, Joint Account,
+  Joint Txn, Goal, Loan, Split, Wasiyya) refactored to use it. New `.animate-sheet-in` keyframe
+  (fill-mode `both`) locks the entrance's final frame. (2) **Critical CSS fix**: the global
+  `* { padding: 0 }` reset was *unlayered*, so in Tailwind v4 it overrode every `p-*`/`px-*`/`py-*`
+  utility in the app — every input, button, and card had been rendering with **zero padding**.
+  Wrapped the reset in `@layer base` so utilities win again; proper spacing is restored everywhere.
+  Verified at mobile (375) + desktop (1349) widths: forms center correctly, no left-clipping, save
+  buttons clear the nav, no horizontal overflow on any page, zero console/server errors.
+- **2026-06-11** — **Design refresh ("book of record")**: new type pairing — Fraunces display
+  serif (page titles + all money figures, via `--font-display` / `.font-display`) with Inter for
+  UI; warm candlelit-ink palette (background `#0B0A07`, gold-tinted surfaces/borders, warmer
+  text tones) replacing flat gray-blacks; signature *manuscript rule* divider (`.divider-rule`,
+  hairline + centered ✦) used on the dashboard hero; `.section-label` small-caps utility (module
+  subtitles, section headers); cards get a subtle vertical gradient + inset hairline; BottomNav
+  is now glassy (blur) with a ✦ marker over the active tab; dashboard "This Month" rebuilt as a
+  hero card (large serif Earned figure, Received/Awaiting split). Gold reserved for meaning
+  (obligations + primary actions). Verified on localhost: all 13 pages render, forms still open
+  above nav, zero console/server errors.
 - **2026-06-11** — **Form sheets hidden behind bottom nav fixed**: all 11 bottom-sheet forms
   (Income, Sadaka, Recipient, Ledger, SettleUp, Joint Account, Joint Txn, Goal, Loan, Split,
   Wasiyya) used `z-50` — same as BottomNav, which renders later in the DOM and covered the

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate, ownershipForEmail } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, TrendingUp, HandHeart, Scale, ArrowLeftRight, Target, AlertCircle, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3 } from 'lucide-react'
+import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3 } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
 
 export default async function DashboardPage() {
@@ -121,8 +121,8 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <div>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{greeting}</p>
-          <h1 className="text-xl font-bold text-gold-gradient">{userName} ✦</h1>
+          <p className="section-label">{greeting}</p>
+          <h1 className="font-display text-2xl font-semibold text-gold-gradient mt-0.5">{userName}</h1>
         </div>
         <form action="/api/logout" method="POST">
           <button className="p-2 rounded-xl" style={{ background: 'var(--surface-2)' }}>
@@ -133,37 +133,31 @@ export default async function DashboardPage() {
 
       {/* Income summary card */}
       {enabled('income') && (
-      <div className="card p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp size={16} style={{ color: 'var(--gold)' }} />
-            <span className="text-sm font-semibold">This Month</span>
-          </div>
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <span className="section-label">This Month</span>
           <Link href="/income" className="text-xs" style={{ color: 'var(--gold)' }}>View all →</Link>
         </div>
+        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Earned</p>
+        <p className="font-display text-4xl font-semibold text-gold-gradient leading-tight">
+          {formatCurrency(totalEarned, 'AED', true)}
+        </p>
+        <div className="divider-rule my-4">✦</div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="card-inner p-3">
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Earned</p>
-            <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              {formatCurrency(totalEarned, 'AED', true)}
-            </p>
-          </div>
-          <div className="card-inner p-3">
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Received</p>
-            <p className="text-lg font-bold text-emerald-400">
+          <div>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Received</p>
+            <p className="font-display text-lg font-semibold text-emerald-400">
               {formatCurrency(totalReceived, 'AED', true)}
             </p>
           </div>
-        </div>
-        {totalEarned - totalReceived > 0 && (
-          <div className="mt-2 px-3 py-2 rounded-lg flex items-center gap-2"
-               style={{ background: 'rgba(245,158,11,0.1)' }}>
-            <AlertCircle size={12} className="text-amber-400 shrink-0" />
-            <span className="text-xs text-amber-400">
-              {formatCurrency(totalEarned - totalReceived, 'AED', true)} still pending payment
-            </span>
+          <div>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Awaiting</p>
+            <p className="font-display text-lg font-semibold"
+               style={{ color: totalEarned - totalReceived > 0 ? 'var(--amber)' : 'var(--text-muted)' }}>
+              {formatCurrency(Math.max(0, totalEarned - totalReceived), 'AED', true)}
+            </p>
           </div>
-        )}
+        </div>
       </div>
       )}
 
@@ -171,11 +165,11 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-3">
         <div className="card p-3">
           <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Savings (goals)</p>
-          <p className="text-lg font-bold text-emerald-400">{formatCurrency(totalSavingsAed, 'AED', true)}</p>
+          <p className="font-display text-lg font-semibold text-emerald-400">{formatCurrency(totalSavingsAed, 'AED', true)}</p>
         </div>
         <div className="card p-3" style={{ border: totalOwedAed > 0 ? '1px solid rgba(239,68,68,0.3)' : undefined }}>
           <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>You owe (debt)</p>
-          <p className="text-lg font-bold" style={{ color: totalOwedAed > 0 ? '#EF4444' : '#10B981' }}>
+          <p className="font-display text-lg font-semibold" style={{ color: totalOwedAed > 0 ? '#EF4444' : '#10B981' }}>
             {totalOwedAed > 0 ? formatCurrency(totalOwedAed, 'AED', true) : 'Clear'}
           </p>
           {totalOwedAed > 0 && (
@@ -207,7 +201,7 @@ export default async function DashboardPage() {
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {aedBalance > 0 ? `${otherProfile?.display_name} owes you` : `You owe ${otherProfile?.display_name}`}
                 </span>
-                <span className={`text-base font-bold ${aedBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-display text-base font-semibold ${aedBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(Math.abs(aedBalance), 'AED')}
                 </span>
               </div>
@@ -217,7 +211,7 @@ export default async function DashboardPage() {
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {pkrBalance > 0 ? `${otherProfile?.display_name} owes you` : `You owe ${otherProfile?.display_name}`}
                 </span>
-                <span className={`text-base font-bold ${pkrBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-display text-base font-semibold ${pkrBalance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(Math.abs(pkrBalance), 'PKR')}
                 </span>
               </div>
@@ -240,7 +234,7 @@ export default async function DashboardPage() {
         {sadakaOwedAed > 0 || sadakaOwedPkr > 0 ? (
           <div className="flex items-center justify-between">
             <span className="text-xs animate-pulse-gold" style={{ color: 'var(--gold)' }}>Pending charity</span>
-            <span className="text-base font-bold text-right" style={{ color: 'var(--gold)' }}>
+            <span className="font-display text-base font-semibold text-right" style={{ color: 'var(--gold)' }}>
               {sadakaOwedAed > 0 && formatCurrency(sadakaOwedAed, 'AED', true)}
               {sadakaOwedAed > 0 && sadakaOwedPkr > 0 && ' · '}
               {sadakaOwedPkr > 0 && formatCurrency(sadakaOwedPkr, 'PKR', true)}

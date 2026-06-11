@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
+import FormSheet from '@/components/shared/FormSheet'
 
 interface Props {
   onClose: () => void
@@ -56,9 +57,7 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency }
   const isDeposit = form.txn_type === 'deposit'
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
-      <div className="w-full max-w-lg mx-auto animate-slide-up rounded-t-2xl p-5 pb-8 max-h-[88vh] overflow-y-auto"
-           style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+    <FormSheet onClose={onClose}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-bold">Add Transaction</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}><X size={16} /></button>
@@ -130,7 +129,6 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency }
             {saving && <Loader2 size={15} className="animate-spin" />}{saving ? 'Saving…' : 'Add Transaction'}
           </button>
         </div>
-      </div>
-    </div>
+    </FormSheet>
   )
 }

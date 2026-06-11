@@ -36,15 +36,23 @@ export default function BottomNav() {
   const navItems = [home, ...moduleTabs, settings]
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 border-t border-l border-r pb-safe"
-         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+         style={{
+           background: 'rgba(17,15,10,0.88)',
+           backdropFilter: 'blur(16px)',
+           WebkitBackdropFilter: 'blur(16px)',
+           borderColor: 'var(--border)',
+         }}>
       <div className="flex items-center justify-around px-2 pt-2">
         {navItems.map(({ href, icon: Icon, label }) => {
           const active = path === href || path.startsWith(href + '/')
           return (
             <Link key={href} href={href}
-              className={cn('flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all',
+              className={cn('relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all',
                 active ? 'text-[var(--gold)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
               )}>
+              <span aria-hidden
+                className="absolute -top-[3px] text-[7px] leading-none transition-opacity"
+                style={{ color: 'var(--gold)', opacity: active ? 1 : 0 }}>✦</span>
               <Icon size={20} strokeWidth={active ? 2.5 : 1.5} />
               <span className="text-[10px] font-medium">{label}</span>
             </Link>

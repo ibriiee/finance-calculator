@@ -21,7 +21,7 @@ export default function AmountDisplay({ amount, currency, size = 'md', colorize 
     : 'text-[var(--text-primary)]'
 
   return (
-    <span className={cn(SIZE_CLASSES[size], color, 'font-mono tracking-tight', className)}>
+    <span className={cn(SIZE_CLASSES[size], color, 'font-display tracking-tight', className)}>
       {showSign && amount > 0 && '+'}
       {formatCurrency(amount, currency, compact)}
     </span>

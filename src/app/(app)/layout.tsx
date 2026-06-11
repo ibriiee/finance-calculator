@@ -50,7 +50,7 @@ function DesktopSides() {
           <ScaleLogo size={88} />
         </div>
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gold-gradient">Mizan</h1>
+          <h1 className="font-display text-4xl font-semibold text-gold-gradient">Mizan</h1>
           <p className="text-2xl mt-1" style={{ color: 'rgba(201,168,76,0.7)' }}>ميزان</p>
           <p className="text-sm mt-3 max-w-[220px]" style={{ color: 'var(--text-muted)' }}>
             Balance in wealth, charity, and trust — your private Islamic financial OS.
