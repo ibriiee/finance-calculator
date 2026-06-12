@@ -6,9 +6,10 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock } from 'lucide-react'
+import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock, FileText, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import SadakaForm from '@/components/sadaka/SadakaForm'
+import { exportSadakaCsv, exportSadakaPdf, givenEntries } from '@/lib/sadakaExport'
 import type { SadakaEntry } from '@/types/database.types'
 
 export default function SadakaPage() {
@@ -18,6 +19,7 @@ export default function SadakaPage() {
   const [editItem, setEditItem] = useState<SadakaEntry | null>(null)
   const [devMode, setDevMode] = useState(false)
   const [filter, setFilter] = useState<'pending' | 'given' | 'all'>('pending')
+  const [exportKey, setExportKey] = useState('all')
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
@@ -63,6 +65,21 @@ export default function SadakaPage() {
   const filtered = filter === 'all' ? entries
     : filter === 'pending' ? entries.filter(e => ['pending', 'partially_given', 'advance_given'].includes(e.status))
     : entries.filter(e => e.status === 'given')
+
+  // Export record — given sadaka, scoped to all-time or a specific month
+  const allGiven = givenEntries(entries)
+  const monthKeyOf = (e: SadakaEntry) => {
+    const d = new Date(e.date_given ?? e.created_at)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const monthLabel = (key: string) => {
+    const [y, m] = key.split('-').map(Number)
+    return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  }
+  const exportMonths = Array.from(new Set(allGiven.map(monthKeyOf))).sort().reverse()
+  const exportScope = exportKey === 'all'
+    ? { label: 'All time', entries: allGiven }
+    : { label: monthLabel(exportKey), entries: allGiven.filter(e => monthKeyOf(e) === exportKey) }
 
   if (loading) return <LoadingSpinner />
 
@@ -141,6 +158,36 @@ export default function SadakaPage() {
         </div>
         <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
       </Link>
+
+      {/* Export record — keep a CSV or printable PDF of sadaka given */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Export record</p>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {exportScope.entries.length} given {exportScope.entries.length === 1 ? 'entry' : 'entries'} · for your records
+            </p>
+          </div>
+          <select value={exportKey} onChange={e => setExportKey(e.target.value)}
+            className="text-xs rounded-lg px-2 py-1.5"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+            <option value="all">All time</option>
+            {exportMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => exportSadakaCsv(exportScope)} disabled={exportScope.entries.length === 0}
+            className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+            <FileSpreadsheet size={13} /> CSV
+          </button>
+          <button onClick={() => exportSadakaPdf(exportScope)} disabled={exportScope.entries.length === 0}
+            className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+            style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+            <FileText size={13} /> PDF record
+          </button>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2">

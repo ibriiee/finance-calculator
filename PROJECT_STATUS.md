@@ -21,9 +21,9 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 
 | Module | Route | Status | Notes |
 |--------|-------|--------|-------|
-| Dashboard | `/dashboard` | ✅ | Summary cards + quick links (icons, no emoji) |
+| Dashboard | `/dashboard` | ✅ | "This Month" hero = **in-hand (received)** with a waterfall: in hand − sadaka due − owed to people = **Yours to keep**; PKR sadaka folded into AED via `pkr_to_aed`. Summary cards + quick links |
 | Income | `/income` | ✅ | Individual. Start date, ongoing flag, edit/delete, per-entry **sadaka-paid status**. Editing does NOT re-trigger sadaka (insert-only trigger) |
-| Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution |
+| Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`) |
 | Recipients | `/recipients` | ✅ | Directory of sadaka recipients; total received, last paid, overdue→prioritise flags, **WhatsApp export**. Linked from Sadaka + selectable in SadakaForm |
 | Brother Ledger | `/ledger` | ✅ | IOU between brothers; fixed profile-read RLS hang |
 | Joint Account | `/joint` | ✅ | House account: deposits/withdrawals, balance, equal-share fairness, AED↔PKR, realtime |
@@ -83,6 +83,15 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-12** — **Feedback: in-hand clarity + sadaka record export.** (1) *Dashboard "This Month"
+  rebuilt as a waterfall* — hero is now **in hand (received)** (earned/awaiting kept as a secondary
+  split), then `In hand − Sadaka due − Owed to people (short-term, loans + brother ledger) = Yours
+  to keep`. PKR sadaka folded into the AED total via `pkr_to_aed` (with a footnote); "Yours to keep"
+  goes red when negative. Sadaka/Owed rows link to their modules. (2) *Income↔sadaka link* already
+  surfaced per-entry on `/income` ("Sadaka X/Y given" line) — left as-is. (3) *Sadaka export record*:
+  new card on `/sadaka` with a month/all-time selector and **CSV** (Excel-friendly, BOM) + **PDF
+  record** (printable keepsake via a styled print window) of sadaka actually given —
+  `src/lib/sadakaExport.ts`. Prod build clean (22 routes).
 - **2026-06-11** — **Post-deploy review pass (multi-angle code review of the feedback round)**:
   Settings backup/export/reset now includes `savings_entries`; new **Savings module toggle** in
   Settings (dashboard card falls back to goals-only when off); analytics loans query filtered to

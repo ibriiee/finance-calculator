@@ -24,6 +24,7 @@ export default async function DashboardPage() {
     { data: jointAccounts },
     { data: jointTxns },
     { data: savingsEntries },
+    { data: pkrRate },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('profiles').select('id, display_name') as any,
@@ -62,7 +63,9 @@ export default async function DashboardPage() {
     supabase.from('joint_accounts').select('id, name, currency').eq('is_active', true),
     supabase.from('joint_account_txns').select('account_id, txn_type, contributor_id, amount'),
     supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
+    supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
   ]) as any[]
+  const pkrToAed = Number(pkrRate?.rate_value) || 0.0132
   const otherProfile = (profiles as Array<{ id: string; display_name: string | null }> | null)
     ?.find(p => p.id !== user!.id)
 
@@ -117,6 +120,12 @@ export default async function DashboardPage() {
   })
   const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
   const totalOwedAed = loanDebtAed + ledgerDebtAed
+
+  // "What's actually yours" waterfall: in-hand earnings, minus sadaka due,
+  // minus short-term debts (loans you owe + what you owe your brother).
+  const sadakaDueAed = sadakaOwedAed + sadakaOwedPkr * pkrToAed
+  const inHandAed = totalReceived
+  const yoursToKeepAed = inHandAed - sadakaDueAed - totalOwedAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
 
   // Savings stash (backup money — /savings module)
@@ -174,33 +183,70 @@ export default async function DashboardPage() {
         </Link>
       ))}
 
-      {/* Income summary card */}
+      {/* This month — in-hand earnings, then what's actually yours to keep */}
       {enabled('income') && (
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <span className="section-label">This Month</span>
           <Link href="/income" className="text-xs" style={{ color: 'var(--gold)' }}>View all →</Link>
         </div>
-        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Earned</p>
+
+        {/* Hero = money actually in hand (received) */}
+        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>In hand (received)</p>
         <p className="font-display text-4xl font-semibold text-gold-gradient leading-tight">
-          {formatCurrency(totalEarned, 'AED', true)}
+          {formatCurrency(inHandAed, 'AED', true)}
         </p>
-        <div className="divider-rule my-4">✦</div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mt-3">
           <div>
-            <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Received</p>
-            <p className="font-display text-lg font-semibold text-emerald-400">
-              {formatCurrency(totalReceived, 'AED', true)}
+            <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Earned (total)</p>
+            <p className="font-display text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              {formatCurrency(totalEarned, 'AED', true)}
             </p>
           </div>
           <div>
-            <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Awaiting</p>
-            <p className="font-display text-lg font-semibold"
+            <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Awaiting</p>
+            <p className="font-display text-base font-semibold"
                style={{ color: totalEarned - totalReceived > 0 ? 'var(--amber)' : 'var(--text-muted)' }}>
               {formatCurrency(Math.max(0, totalEarned - totalReceived), 'AED', true)}
             </p>
           </div>
         </div>
+
+        <div className="divider-rule my-4">✦</div>
+
+        {/* Waterfall: in hand − sadaka − what you owe = yours to keep */}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>In hand</span>
+            <span className="font-display text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              {formatCurrency(inHandAed, 'AED', true)}
+            </span>
+          </div>
+          <Link href="/sadaka" className="flex items-center justify-between">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka due</span>
+            <span className="font-display text-sm font-semibold" style={{ color: sadakaDueAed > 0 ? 'var(--gold)' : 'var(--text-muted)' }}>
+              {sadakaDueAed > 0 ? '−' : ''}{formatCurrency(sadakaDueAed, 'AED', true)}
+            </span>
+          </Link>
+          <Link href="/loans" className="flex items-center justify-between">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Owed to people (short-term)</span>
+            <span className="font-display text-sm font-semibold" style={{ color: totalOwedAed > 0 ? '#EF4444' : 'var(--text-muted)' }}>
+              {totalOwedAed > 0 ? '−' : ''}{formatCurrency(totalOwedAed, 'AED', true)}
+            </span>
+          </Link>
+          <div className="flex items-center justify-between pt-2.5 mt-0.5" style={{ borderTop: '1px solid var(--border)' }}>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Yours to keep</span>
+            <span className="font-display text-xl font-semibold"
+                  style={{ color: yoursToKeepAed >= 0 ? 'var(--emerald)' : '#EF4444' }}>
+              {formatCurrency(yoursToKeepAed, 'AED', true)}
+            </span>
+          </div>
+        </div>
+        {sadakaOwedPkr > 0 && (
+          <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
+            Includes {formatCurrency(sadakaOwedPkr, 'PKR', true)} sadaka converted at {pkrToAed}.
+          </p>
+        )}
       </div>
       )}
 
