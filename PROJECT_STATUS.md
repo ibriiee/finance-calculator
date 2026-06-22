@@ -82,10 +82,22 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
   emojis/special chars into mojibake. Use the Edit/Write tools (UTF-8 safe).
 - FX: `rates_cache` table holds `pkr_to_aed`, `gold_aed_gram`, `silver_aed_gram`, etc.
 - Sadaka netting: pending = max(0, Σowed − Σgiven); advance = max(0, Σgiven − Σowed).
+- **Backups / disaster recovery:** `npm run backup` dumps all 18 tables (both users,
+  service_role) to git-ignored `backups/*.json`; `npm run restore -- <file>` reloads
+  into a fresh project, remapping user UUIDs by email. Full runbook (incl. what to do
+  if Supabase access is lost) in `docs/DISASTER-RECOVERY.md`. Run a backup regularly +
+  before risky changes.
 
 ---
 
 ## Changelog (newest first)
+- **2026-06-22** — **Backup + disaster-recovery tooling** (so a repeat of the outage below
+  can't lose data). Added `npm run backup` (`scripts/backup.mjs`, dumps all 18 tables for
+  both users to git-ignored `backups/*.json` with an id↔email map) and `npm run restore`
+  (`scripts/restore.mjs`, reloads into a fresh project and remaps user UUIDs by email,
+  idempotent). New `docs/DISASTER-RECOVERY.md` runbook covers prevention (2nd org owner,
+  account password, keep project active) + the full rebuild/restore steps. Backup script
+  smoke-tested against the live project.
 - **2026-06-22** — **Supabase project rebuilt (login was down: "Failed to fetch").** The original
   project `iybcesqfjfxdxsybmyob` became unreachable (NXDOMAIN — account access was lost, project
   effectively gone). Stood up a **new project `clfnismubljgmkjrxwxs`** under *ibriiee's Org* (Free),
