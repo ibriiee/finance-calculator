@@ -68,6 +68,9 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **all 13 migrations run as of
 2026-06-11** — confirmed by Ibrahim.)
 
+(`FRESH-INSTALL.sql` = **all 13 migrations concatenated in order**, for standing up a brand-new
+project in one paste. Used during the 2026-06-22 project rebuild — see Changelog.)
+
 ---
 
 ## Key technical notes
@@ -83,6 +86,14 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 ---
 
 ## Changelog (newest first)
+- **2026-06-22** — **Supabase project rebuilt (login was down: "Failed to fetch").** The original
+  project `iybcesqfjfxdxsybmyob` became unreachable (NXDOMAIN — account access was lost, project
+  effectively gone). Stood up a **new project `clfnismubljgmkjrxwxs`** under *ibriiee's Org* (Free),
+  ran the full schema via new **`supabase/FRESH-INSTALL.sql`** (all 13 migrations in order),
+  recreated the two auth users, set Auth Site URL to `fin9-ivory.vercel.app`, and updated the 3
+  Supabase env vars in Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`) + `.env.local`, then redeployed. Login verified working.
+  **Data from the old project was NOT recovered** (no DB access) — fresh start, re-enter data.
 - **2026-06-12** — **Feedback: in-hand clarity + sadaka record export.** (1) *Dashboard "This Month"
   rebuilt as a waterfall* — hero is now **in hand (received)** (earned/awaiting kept as a secondary
   split), then `In hand − Sadaka due − Owed to people (short-term, loans + brother ledger) = Yours
