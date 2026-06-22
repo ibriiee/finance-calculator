@@ -23,23 +23,28 @@ export default function SadakaPage() {
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
+  const [incomeNames, setIncomeNames] = useState<Record<string, string>>({})
   const supabase = createClient()
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: sadaka }, { data: profile }, { data: profs }] = await Promise.all([
+    const [{ data: sadaka }, { data: profile }, { data: profs }, { data: inc }] = await Promise.all([
       supabase.from('sadaka_entries').select('*')
         .or(`owner_id.eq.${user!.id},is_joint.eq.true,shared.eq.true`)
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('sadaka_pct').eq('id', user!.id).single(),
       supabase.from('profiles').select('id, display_name'),
+      supabase.from('income_projects').select('id, name'),
     ])
     setEntries(sadaka ?? [])
     setSadakaRate(profile?.sadaka_pct ?? 0.2)
     const map: Record<string, string> = {}
     ;(profs ?? []).forEach((p: any) => { map[p.id] = p.display_name ?? 'Unknown' })
     setNames(map)
+    const incMap: Record<string, string> = {}
+    ;(inc ?? []).forEach((i: any) => { incMap[i.id] = i.name })
+    setIncomeNames(incMap)
     setLoading(false)
   }
 
@@ -62,9 +67,39 @@ export default function SadakaPage() {
   const jointAed = totalsFor(joint, 'AED')
   const jointPkr = totalsFor(joint, 'PKR')
 
+  // A row with no amount_owed is a PAYMENT (money given), not an obligation.
+  const isPayment = (e: SadakaEntry) => Number(e.amount_owed) === 0 && Number(e.amount_given) > 0
+
+  // Spread payments across open obligations (oldest first, per owner+currency) so each
+  // obligation card shows how much is still due — and the cards reconcile with the
+  // header's pending total instead of contradicting it.
+  const alloc: Record<string, { owed: number; remaining: number; givenSoFar: number }> = {}
+  {
+    const groups: Record<string, SadakaEntry[]> = {}
+    for (const e of entries) {
+      const key = e.is_joint ? `joint|${e.currency}` : `${e.owner_id}|${e.currency}`
+      ;(groups[key] ??= []).push(e)
+    }
+    for (const key in groups) {
+      const g = groups[key]
+      let credit = g.filter(isPayment).reduce((s, e) => s + Number(e.amount_given), 0)
+      const obligations = g.filter(e => Number(e.amount_owed) > 0)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      for (const o of obligations) {
+        const owed = Number(o.amount_owed)
+        const ownGiven = Number(o.amount_given)           // from "Mark as Given"
+        const selfRemaining = Math.max(0, owed - ownGiven)
+        const applied = Math.min(credit, selfRemaining)
+        credit -= applied
+        alloc[o.id] = { owed, remaining: selfRemaining - applied, givenSoFar: ownGiven + applied }
+      }
+    }
+  }
+  const remainingOf = (e: SadakaEntry) => alloc[e.id]?.remaining ?? Math.max(0, Number(e.amount_owed) - Number(e.amount_given))
+
   const filtered = filter === 'all' ? entries
-    : filter === 'pending' ? entries.filter(e => ['pending', 'partially_given', 'advance_given'].includes(e.status))
-    : entries.filter(e => e.status === 'given')
+    : filter === 'pending' ? entries.filter(e => !isPayment(e) && remainingOf(e) > 0)
+    : entries.filter(e => isPayment(e) || e.status === 'given' || Number(e.amount_given) > 0)
 
   // Export record — given sadaka, scoped to all-time or a specific month
   const allGiven = givenEntries(entries)
@@ -216,8 +251,15 @@ export default function SadakaPage() {
                     {entry.is_joint && <StatusBadge status="joint" label="Joint" size="xs" />}
                   </div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {entry.recipient_name ?? (entry.source_income_id ? 'Obligation from income' : 'Pending obligation')}
+                    {isPayment(entry)
+                      ? (entry.recipient_name ?? 'Sadaka given')
+                      : (entry.source_income_id ? 'Obligation from income' : 'Pending obligation')}
                   </p>
+                  {entry.source_income_id && incomeNames[entry.source_income_id] && (
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--gold)' }}>
+                      {isPayment(entry) ? 'toward' : 'from'} {incomeNames[entry.source_income_id]}
+                    </p>
+                  )}
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {entry.recipient_type?.replace('_', ' ')}
                     {entry.location && ` · ${LOCATION_LABELS[entry.location] ?? entry.location}`}
@@ -233,21 +275,33 @@ export default function SadakaPage() {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-base font-bold" style={{ color: 'var(--gold)' }}>
-                    {formatCurrency(entry.amount_owed, entry.currency)}
-                  </p>
-                  {entry.amount_given > 0 && entry.amount_given < entry.amount_owed && (
-                    <p className="text-xs text-emerald-400">{formatCurrency(entry.amount_given, entry.currency)} given</p>
+                  {isPayment(entry) ? (
+                    <p className="text-base font-bold text-emerald-400">
+                      {formatCurrency(entry.amount_given, entry.currency)}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-base font-bold" style={{ color: remainingOf(entry) > 0 ? 'var(--gold)' : '#10B981' }}>
+                        {formatCurrency(remainingOf(entry), entry.currency)}
+                      </p>
+                      {(alloc[entry.id]?.givenSoFar ?? 0) > 0 && (
+                        <p className="text-xs text-emerald-400">
+                          {remainingOf(entry) > 0
+                            ? `${formatCurrency(alloc[entry.id].givenSoFar, entry.currency)} of ${formatCurrency(entry.amount_owed, entry.currency)} given`
+                            : 'fully given ✓'}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
 
-              {/* Progress bar for partial */}
-              {entry.amount_owed > 0 && (
+              {/* Progress bar for partially-covered obligations */}
+              {!isPayment(entry) && Number(entry.amount_owed) > 0 && (alloc[entry.id]?.givenSoFar ?? 0) > 0 && (
                 <div className="mt-2">
                   <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                     <div className="h-full rounded-full"
-                         style={{ width: `${Math.min(100, (entry.amount_given / entry.amount_owed) * 100)}%`, background: 'var(--gold)' }} />
+                         style={{ width: `${Math.min(100, ((alloc[entry.id]?.givenSoFar ?? 0) / Number(entry.amount_owed)) * 100)}%`, background: 'var(--gold)' }} />
                   </div>
                 </div>
               )}
@@ -262,8 +316,11 @@ export default function SadakaPage() {
                   {entry.status !== 'given' && (
                     <button
                       onClick={async () => {
+                        // Clear only what's still due after any payments already applied,
+                        // so we never record more given than the obligation is worth.
                         await supabase.from('sadaka_entries').update({
-                          status: 'given', amount_given: entry.amount_owed,
+                          status: 'given',
+                          amount_given: Number(entry.amount_given) + remainingOf(entry),
                           date_given: new Date().toISOString().split('T')[0],
                         }).eq('id', entry.id)
                         load()

@@ -15,11 +15,14 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const [me, setMe] = useState<{ id: string; name: string } | null>(null)
   const [other, setOther] = useState<{ id: string; name: string } | null>(null)
   const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([])
+  const [incomes, setIncomes] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({
-    amount_owed: editItem?.amount_owed ? String(editItem.amount_owed) : '',
+    // For an obligation this is the amount owed; for a given/advance payment it's the amount given.
+    amount_owed: (editItem?.amount_owed || editItem?.amount_given) ? String(editItem.amount_owed || editItem.amount_given) : '',
     currency: (editItem?.currency ?? 'AED') as Currency,
     is_advance: editItem?.is_advance ?? false,
     on_behalf: 'me' as 'me' | 'other' | 'joint',  // whose sadaka this is
+    from_income_id: editItem?.source_income_id ?? '',   // which income this sadaka is for (optional)
     recipient_id: editItem?.recipient_id ?? '', recipient_name: editItem?.recipient_name ?? '',
     recipient_type: editItem?.recipient_type ?? 'named_relative',
     location: editItem?.location ?? 'UAE', method: editItem?.method ?? 'cash', notes: editItem?.notes ?? '',
@@ -30,15 +33,20 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const [{ data: profs }, { data: recs }] = await Promise.all([
+      const [{ data: profs }, { data: recs }, { data: inc }] = await Promise.all([
         supabase.from('profiles').select('id, display_name'),
         supabase.from('sadaka_recipients').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('income_projects').select('id, name, owner_id, ownership').order('created_at', { ascending: false }),
       ])
       const mine = profs?.find((p: any) => p.id === user!.id)
       const theirs = profs?.find((p: any) => p.id !== user!.id)
       setMe({ id: user!.id, name: mine?.display_name ?? 'Me' })
       if (theirs) setOther({ id: theirs.id, name: theirs.display_name ?? 'Brother' })
       setRecipients(((recs as any) ?? []).map((r: any) => ({ id: r.id, name: r.name })))
+      // income I can attribute sadaka to: my own + anything shared
+      setIncomes(((inc as any) ?? [])
+        .filter((i: any) => i.owner_id === user!.id || i.ownership === 'shared')
+        .map((i: any) => ({ id: i.id, name: i.name })))
       // derive on_behalf for edit mode
       if (editItem) {
         const ob = editItem.is_joint ? 'joint' : (editItem.owner_id && editItem.owner_id !== user!.id ? 'other' : 'me')
@@ -54,19 +62,25 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     }
     setSaving(true); setError('')
     const amount = parseFloat(form.amount_owed)
-    // If already given (or advance), record the amount as given so totals reflect it.
-    const given = (form.status === 'given' || form.status === 'advance_given') ? amount : 0
+    // A "given"/"advance" entry is MONEY PAID, not a new obligation. Record it as a
+    // pure payment (owed 0, given = amount) so it DEDUCTS from your pending pool
+    // instead of inventing a self-cancelling obligation. A "pending" entry is a new
+    // obligation (owed = amount, nothing given yet).
+    const isPayment = form.status === 'given' || form.status === 'advance_given'
+    const owed = isPayment ? 0 : amount
+    const given = isPayment ? amount : 0
     const isJoint = form.on_behalf === 'joint'
     const ownerId = form.on_behalf === 'other' ? other!.id : me.id
     const shared = form.on_behalf !== 'me'   // brother's or joint entries are visible to both
 
     const payload: any = {
       owner_id: ownerId,
-      amount_owed: amount, amount_given: given,
+      amount_owed: owed, amount_given: given,
       currency: form.currency, status: form.status,
       is_advance: form.is_advance || form.status === 'advance_given',
       is_joint: isJoint, shared,
       joint_ibrahim_pct: 0.5,
+      source_income_id: form.from_income_id || null,   // which income this sadaka is for
       date_given: given > 0 ? new Date().toISOString().split('T')[0] : null,
       recipient_id: form.recipient_id || null,
       recipient_name: form.recipient_name || (form.recipient_id ? recipients.find(r => r.id === form.recipient_id)?.name : null) || null,
@@ -149,6 +163,27 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
               <option value="advance_given">Advance Given</option>
             </select>
           </div>
+
+          {/* What this entry does, in plain words */}
+          <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
+            {form.status === 'pending'
+              ? 'Adds a new amount you owe (raises your pending sadaka).'
+              : 'Records money you gave — this DEDUCTS from your pending sadaka.'}
+          </p>
+
+          {/* Which income this sadaka is for (optional attribution) */}
+          {incomes.length > 0 && (
+            <div>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                {form.status === 'pending' ? 'From which income (optional)' : 'Pay toward which income (optional)'}
+              </p>
+              <select value={form.from_income_id} onChange={e => F('from_income_id', e.target.value)}
+                className="w-full px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="">Not linked to a specific income</option>
+                {incomes.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* Whose sadaka is this */}
           <div>

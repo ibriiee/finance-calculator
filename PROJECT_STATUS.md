@@ -82,6 +82,12 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
   emojis/special chars into mojibake. Use the Edit/Write tools (UTF-8 safe).
 - FX: `rates_cache` table holds `pkr_to_aed`, `gold_aed_gram`, `silver_aed_gram`, etc.
 - Sadaka netting: pending = max(0, Σowed − Σgiven); advance = max(0, Σgiven − Σowed).
+  A **given/advance entry is a PAYMENT** (`amount_owed = 0`, `amount_given = X`) so it
+  deducts from the pending pool instead of inventing a self-cancelling obligation. The
+  Sadaka list FIFO-allocates payments across open obligations (per owner+currency,
+  oldest first) for display only — DB rows stay clean, so each obligation card shows
+  what's still due and the cards reconcile with the header total. `source_income_id`
+  optionally tags which income a payment/obligation relates to.
 - **Backups / disaster recovery:** `npm run backup` dumps all 18 tables (both users,
   service_role) to git-ignored `backups/*.json`; `npm run restore -- <file>` reloads
   into a fresh project, remapping user UUIDs by email. Full runbook (incl. what to do
@@ -91,6 +97,15 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-22** — **Sadaka fix: giving money now actually reduces pending.** Root cause: a
+  "Given" entry was stored as `amount_owed = amount_given = X`, inventing a self-cancelling
+  obligation — so paying AED 500 raised owed to 8,000 and left pending at 7,500 (did nothing).
+  Now a given/advance entry is a **pure payment** (`amount_owed = 0`, `amount_given = X`) →
+  pending drops by the amount paid. Added an optional **"from/toward which income"** selector
+  (`source_income_id`) on `SadakaForm`, plain-language helper text, and FIFO **display
+  allocation** on the Sadaka list so pending obligation cards shrink as payments apply (with
+  progress bar + "X of Y given") and reconcile with the header. "Mark as Given" now clears only
+  what's still due after payments (no double-count). Prod build clean (22 routes).
 - **2026-06-22** — **Backup + disaster-recovery tooling** (so a repeat of the outage below
   can't lose data). Added `npm run backup` (`scripts/backup.mjs`, dumps all 18 tables for
   both users to git-ignored `backups/*.json` with an id↔email map) and `npm run restore`
