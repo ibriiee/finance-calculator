@@ -2,7 +2,7 @@
 //   npx tsx src/lib/lifeMath.test.ts   (or node after compile)
 // ponytail: assert-based smoke test, the smallest thing that fails if the math breaks.
 import assert from 'node:assert'
-import { deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived } from './lifeMath'
+import { deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived, weekIndexOf, nextOccurrence } from './lifeMath'
 
 const dob = new Date('1990-01-01')
 const now = new Date('2026-06-28')   // ~36.5 years lived
@@ -33,5 +33,21 @@ assert.strictEqual(daysLeft(dob, years, past), 0)
 assert.strictEqual(weeksLeft(dob, years, past), 0)
 assert.strictEqual(monthsLeft(dob, years, past), 0)
 assert.strictEqual(percentLived(dob, years, past), 100)
+
+// weekIndexOf: a date 10y after birth lands ~week 521 (3652 days / 7)
+assert.strictEqual(weekIndexOf(dob, new Date('2000-01-01')), 521)
+// a milestone's week must fall inside the lived range
+assert.ok(weekIndexOf(dob, new Date('2015-06-15')) < weeksLived(dob, now))
+
+// nextOccurrence: none → the date itself
+assert.strictEqual(nextOccurrence(new Date('1990-06-15'), 'none', now).getTime(), new Date('1990-06-15').getTime())
+// yearly: 06-15 already passed on 06-28 → rolls to next year
+const y = nextOccurrence(new Date('1990-06-15'), 'yearly', now)
+assert.strictEqual(y.getFullYear(), 2027)
+assert.strictEqual(y.getMonth(), 5) // June
+// monthly: day 1 with now=06-28 → next is 07-01
+const m = nextOccurrence(new Date('2000-03-01'), 'monthly', now)
+assert.strictEqual(m.getMonth(), 6) // July
+assert.strictEqual(m.getDate(), 1)
 
 console.log('lifeMath: all assertions passed ✓')

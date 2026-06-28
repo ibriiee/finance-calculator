@@ -34,8 +34,8 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
-| Life Tracker | `/life` | ✅ | Memento mori. Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. Set DOB in Settings. No new table; no notifications/reminders (deferred). Math in `src/lib/lifeMath.ts` (+ self-check `lifeMath.test.ts`) |
-| Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, **life tracker (DOB + age)**, notifications, **test mode**, **data backup (JSON export) + reset** |
+| Life Tracker | `/life` | ✅ v2 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly) show in an **Upcoming** list. Legend on the grid. Own settings at `/life/settings`. Math in `src/lib/lifeMath.ts` (+ self-check `lifeMath.test.ts`). Push delivery for reminders = deferred (needs web-push infra) |
+| Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset**. (Life Tracker DOB/age + events moved to `/life/settings`.) |
 
 ### Locking & data rules
 - Income: once **Received**, entry is locked (no edit/delete).
@@ -66,10 +66,12 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
     (RLS); needed for the "Added by X" tag and on-behalf loan entry
 13. `savings.sql` — `savings_entries` table + RLS for the new Savings module
 14. `life-tracker.sql` — `date_of_birth` + `life_expectancy_years` (default 63) on `profiles`
-    for the Life Tracker module. **Must be run before /life works.**
+    for the Life Tracker module. **Run as of 2026-06-28** — confirmed by Ibrahim.
+15. `life-events.sql` — `life_events` table (milestones / intentions / reminders) + RLS + index.
+    **Must be run before Life events / Upcoming work.**
 
-(`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **all 13 migrations run as of
-2026-06-11** — confirmed by Ibrahim. Migration **14 (`life-tracker.sql`) still needs running**.)
+(`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–14 run as of
+2026-06-28** — confirmed by Ibrahim. Migration **15 (`life-events.sql`) still needs running**.)
 
 (`FRESH-INSTALL.sql` = **all 13 migrations concatenated in order**, for standing up a brand-new
 project in one paste. Used during the 2026-06-22 project rebuild — see Changelog.)
@@ -100,6 +102,17 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-28** — **Life room + Life events (Life Tracker v2).** Split the app into two
+  **rooms** with a Finance ⇄ Life toggle pill above the bottom nav (`BottomNav.tsx`); each room
+  owns its own nav + Settings tab, so Life no longer competes with Finance for the 3 module
+  slots. Room is sticky (persists on shared pages like Settings via `localStorage`).
+  `ModuleHeader` gained `backHref` for room-aware back. New **`/life/settings`** owns DOB + age
+  (moved out of Finance settings so saving finance prefs can't wipe life data) and full **life
+  events** CRUD. New **`life_events`** table (migration 15): `milestone` (colours its lived
+  week), `intention` (outlines a future week), `reminder` (none/monthly/yearly → **Upcoming**
+  list). Grid legend added. New math `weekIndexOf` + `nextOccurrence` (self-check extended,
+  passes). **Reminder push delivery deferred** — needs web-push/service-worker/cron, flagged
+  before adding any dep. No new deps.
 - **2026-06-28** — **New module: Life Tracker (`/life`).** Memento mori. Per-user DOB +
   life-expectancy age (default 63, age of Prophet ﷺ) added to `profiles` via migration 14
   (`life-tracker.sql` — must be run). Shows days/weeks/months left, % of life lived, and a

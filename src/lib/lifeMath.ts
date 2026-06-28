@@ -46,3 +46,32 @@ export function percentLived(dob: Date, years: number, now: Date): number {
   const lived = daysBetween(dob, now)
   return Math.min(100, Math.max(0, Math.round((lived / total) * 100)))
 }
+
+/** Which week-cell of the life grid a given date lands in (0-based). */
+export function weekIndexOf(dob: Date, date: Date): number {
+  return Math.max(0, Math.floor(daysBetween(dob, date) / DAYS_PER_WEEK))
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+export type Recurrence = 'none' | 'monthly' | 'yearly'
+
+/** Next time an event fires on/after `now`. Non-recurring → the date itself. */
+export function nextOccurrence(eventDate: Date, recurrence: Recurrence, now: Date): Date {
+  if (recurrence === 'none') return eventDate
+  const today = startOfDay(now)
+  const day = eventDate.getDate()
+  // ponytail: day-overflow (e.g. 31st in Feb) rolls into the next month — fine for nudges.
+  if (recurrence === 'yearly') {
+    const m = eventDate.getMonth()
+    let d = new Date(today.getFullYear(), m, day)
+    if (d < today) d = new Date(today.getFullYear() + 1, m, day)
+    return d
+  }
+  // monthly
+  let d = new Date(today.getFullYear(), today.getMonth(), day)
+  if (d < today) d = new Date(today.getFullYear(), today.getMonth() + 1, day)
+  return d
+}

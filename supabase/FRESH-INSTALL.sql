@@ -982,3 +982,25 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS date_of_birth date;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS life_expectancy_years int DEFAULT 63;
 UPDATE public.profiles SET life_expectancy_years = 63 WHERE life_expectancy_years IS NULL;
 
+-- ============================================================
+-- LIFE EVENTS: milestones, intentions & reminders for the Life room
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.life_events (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  label        TEXT NOT NULL,
+  event_date   DATE NOT NULL,
+  kind         TEXT NOT NULL DEFAULT 'milestone',   -- milestone | intention | reminder
+  color        TEXT NOT NULL DEFAULT '#C9A84C',
+  recurrence   TEXT NOT NULL DEFAULT 'none',         -- none | monthly | yearly
+  notes        TEXT,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.life_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "life_events_own" ON public.life_events;
+CREATE POLICY "life_events_own" ON public.life_events FOR ALL USING (auth.uid() = owner_id);
+
+CREATE INDEX IF NOT EXISTS life_events_owner_idx ON public.life_events (owner_id, event_date);
+

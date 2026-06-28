@@ -10,6 +10,20 @@ export type LoanCurrencyType = 'AED' | 'PKR' | 'USD' | 'gold_grams' | 'silver_gr
 export type LoanStatus = 'outstanding' | 'partial' | 'cleared'
 export type GoalType = 'individual' | 'joint'
 export type WasiyyaCategory = 'asset' | 'debt' | 'instruction' | 'password' | 'contact' | 'message'
+export type LifeEventKind = 'milestone' | 'intention' | 'reminder'
+export type LifeRecurrence = 'none' | 'monthly' | 'yearly'
+
+export interface LifeEvent {
+  id: string
+  owner_id: string
+  label: string
+  event_date: string
+  kind: LifeEventKind
+  color: string
+  recurrence: LifeRecurrence
+  notes: string | null
+  created_at: string
+}
 
 export interface Profile {
   id: string
