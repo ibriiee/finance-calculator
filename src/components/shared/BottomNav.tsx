@@ -41,10 +41,18 @@ function lifeHrefs() {
   return [ROOMS.life.home.href, ...ROOMS.life.tabs.map(t => t.href)]
 }
 
+function matchRoom(path: string): RoomKey | null {
+  if (lifeHrefs().some(h => path === h || path.startsWith(h + '/'))) return 'life'
+  const fin = [ROOMS.finance.home.href, ...ROOMS.finance.tabs.map(t => t.href)]
+  if (fin.some(h => path === h || path.startsWith(h + '/'))) return 'finance'
+  return null // shared page (e.g. /settings) — keep current room
+}
+
 export default function BottomNav() {
   const path = usePathname()
   const router = useRouter()
   const [modules, setModules] = useState<Record<string, boolean> | null>(null)
+  const [activeRoom, setActiveRoom] = useState<RoomKey>('finance')
 
   useEffect(() => {
     const supabase = createClient()
@@ -55,8 +63,19 @@ export default function BottomNav() {
     })
   }, [])
 
-  const activeRoom: RoomKey = lifeHrefs().some(h => path === h || path.startsWith(h + '/'))
-    ? 'life' : 'finance'
+  // Sticky room: routes decide it; shared pages (Settings) keep the last room.
+  // Persist so a direct load of /settings restores the room you were in.
+  useEffect(() => {
+    const r = matchRoom(path)
+    if (r) {
+      setActiveRoom(r)
+      try { localStorage.setItem('mizan_room', r) } catch {}
+    } else {
+      const stored = (() => { try { return localStorage.getItem('mizan_room') } catch { return null } })()
+      if (stored === 'life' || stored === 'finance') setActiveRoom(stored)
+    }
+  }, [path])
+
   const room = ROOMS[activeRoom]
 
   // Home (first) + up to 3 enabled module tabs + Settings (last) = max 5.
