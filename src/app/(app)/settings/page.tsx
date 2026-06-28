@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { User, Percent, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2 } from 'lucide-react'
+import { User, Percent, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2, Hourglass } from 'lucide-react'
 import type { Profile } from '@/types/database.types'
 
 const MODULES: { key: string; label: string }[] = [
@@ -18,6 +18,7 @@ const MODULES: { key: string; label: string }[] = [
   { key: 'wasiyya', label: 'Wasiyya' },
   { key: 'zakat', label: 'Zakat' },
   { key: 'joint_account', label: 'Joint Bank Account' },
+  { key: 'life', label: 'Life Tracker' },
 ]
 const DEFAULT_MODULES = Object.fromEntries(MODULES.map(m => [m.key, true]))
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     display_name: '', sadaka_pct: 20, hawl_start_date: '',
     default_currency: 'AED', nisab_basis: 'silver',
+    date_of_birth: '', life_expectancy_years: 63,
     enabled_modules: DEFAULT_MODULES as Record<string, boolean>,
   })
   const supabase = createClient()
@@ -63,6 +65,8 @@ export default function SettingsPage() {
         hawl_start_date: data.hawl_start_date ?? '',
         default_currency: (data as any).default_currency ?? 'AED',
         nisab_basis: (data as any).nisab_basis ?? 'silver',
+        date_of_birth: (data as any).date_of_birth ?? '',
+        life_expectancy_years: (data as any).life_expectancy_years ?? 63,
         enabled_modules: { ...DEFAULT_MODULES, ...((data as any).enabled_modules ?? {}) },
       })
     }
@@ -82,6 +86,8 @@ export default function SettingsPage() {
       hawl_start_date: form.hawl_start_date || null,
       default_currency: form.default_currency,
       nisab_basis: form.nisab_basis,
+      date_of_birth: form.date_of_birth || null,
+      life_expectancy_years: form.life_expectancy_years || 63,
       enabled_modules: form.enabled_modules,
     }).eq('id', user!.id)
     setSaving(false)
@@ -284,6 +290,28 @@ export default function SettingsPage() {
             className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             Zakat is due after 354 days (1 lunar year) above nisab
+          </p>
+        </div>
+      )
+    },
+    {
+      title: 'Life Tracker',
+      icon: Hourglass,
+      content: (
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of birth</label>
+            <input type="date" value={form.date_of_birth} onChange={e => F('date_of_birth', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Life expectancy (age)</label>
+            <input type="number" min={1} max={120} value={form.life_expectancy_years}
+              onChange={e => F('life_expectancy_years', parseInt(e.target.value) || 63)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Default 63 — the age of the Prophet ﷺ. Used only to visualise the life that remains. Only Allah knows the true term.
           </p>
         </div>
       )

@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate, ownershipForEmail } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3 } from 'lucide-react'
+import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3, Hourglass } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
+import { daysLeft } from '@/lib/lifeMath'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -150,6 +151,11 @@ export default async function DashboardPage() {
   // Respect Settings → Modules toggles (default: enabled)
   const enabledModules: Record<string, boolean> = (profile as any)?.enabled_modules ?? {}
   const enabled = (key: string) => enabledModules[key] !== false
+
+  // Life Tracker — days remaining to projected term (only if DOB set)
+  const lifeDob = (profile as any)?.date_of_birth as string | null
+  const lifeYears = (profile as any)?.life_expectancy_years ?? 63
+  const lifeDaysLeft = lifeDob ? daysLeft(new Date(lifeDob), lifeYears, new Date()) : null
 
   const userName = profile?.display_name ?? 'Ibrahim'
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'
@@ -428,6 +434,19 @@ export default async function DashboardPage() {
             })}
           </div>
         </div>
+      )}
+
+      {/* Life Tracker — memento mori */}
+      {enabled('life') && lifeDaysLeft !== null && (
+        <Link href="/life" className="card p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Hourglass size={16} style={{ color: 'var(--gold)' }} />
+            <span className="text-sm font-semibold">Life Tracker</span>
+          </div>
+          <span className="font-display text-base font-semibold" style={{ color: 'var(--gold)' }}>
+            ≈ {lifeDaysLeft.toLocaleString()} days left →
+          </span>
+        </Link>
       )}
 
       {/* Analytics banner */}

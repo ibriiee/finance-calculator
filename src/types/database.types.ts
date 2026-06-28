@@ -18,6 +18,8 @@ export interface Profile {
   sadaka_pct: number          // 0.20 = 20%
   default_currency: Currency
   hawl_start_date: string | null
+  date_of_birth: string | null
+  life_expectancy_years: number | null
   notify_income_received: boolean
   notify_ledger_update: boolean
   notify_sadaka_due: boolean

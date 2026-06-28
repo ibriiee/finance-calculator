@@ -975,3 +975,10 @@ CREATE POLICY "savings_own" ON public.savings_entries
 
 CREATE INDEX IF NOT EXISTS idx_savings_owner ON public.savings_entries(owner_id);
 
+-- ============================================================
+-- LIFE TRACKER (memento mori): DOB + life-expectancy age on profiles
+-- ============================================================
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS date_of_birth date;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS life_expectancy_years int DEFAULT 63;
+UPDATE public.profiles SET life_expectancy_years = 63 WHERE life_expectancy_years IS NULL;
+

@@ -34,7 +34,8 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
-| Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset** |
+| Life Tracker | `/life` | ✅ | Memento mori. Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. Set DOB in Settings. No new table; no notifications/reminders (deferred). Math in `src/lib/lifeMath.ts` (+ self-check `lifeMath.test.ts`) |
+| Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, **life tracker (DOB + age)**, notifications, **test mode**, **data backup (JSON export) + reset** |
 
 ### Locking & data rules
 - Income: once **Received**, entry is locked (no edit/delete).
@@ -64,9 +65,11 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 12. `loans-shared.sql` — `added_by_id` on loans + both brothers see all loans
     (RLS); needed for the "Added by X" tag and on-behalf loan entry
 13. `savings.sql` — `savings_entries` table + RLS for the new Savings module
+14. `life-tracker.sql` — `date_of_birth` + `life_expectancy_years` (default 63) on `profiles`
+    for the Life Tracker module. **Must be run before /life works.**
 
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **all 13 migrations run as of
-2026-06-11** — confirmed by Ibrahim.)
+2026-06-11** — confirmed by Ibrahim. Migration **14 (`life-tracker.sql`) still needs running**.)
 
 (`FRESH-INSTALL.sql` = **all 13 migrations concatenated in order**, for standing up a brand-new
 project in one paste. Used during the 2026-06-22 project rebuild — see Changelog.)
@@ -97,6 +100,13 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-28** — **New module: Life Tracker (`/life`).** Memento mori. Per-user DOB +
+  life-expectancy age (default 63, age of Prophet ﷺ) added to `profiles` via migration 14
+  (`life-tracker.sql` — must be run). Shows days/weeks/months left, % of life lived, and a
+  "life in weeks" grid. DOB + age set in Settings; gated by `enabled_modules.life`; dashboard
+  shows "≈ N days left" card. Date math isolated in `src/lib/lifeMath.ts` with a runnable
+  self-check (`lifeMath.test.ts`, passes). No new table, no notifications/reminders (deferred —
+  would need push infra). No new deps. Reused EmptyState/ModuleHeader/LoadingSpinner.
 - **2026-06-22** — **Sadaka fix: giving money now actually reduces pending.** Root cause: a
   "Given" entry was stored as `amount_owed = amount_given = X`, inventing a self-cancelling
   obligation — so paying AED 500 raised owed to 8,000 and left pending at 7,500 (did nothing).
