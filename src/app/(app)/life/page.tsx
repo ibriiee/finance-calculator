@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Hourglass, Settings, Bell, X } from 'lucide-react'
+import { Hourglass, Settings, Bell, X, CalendarDays } from 'lucide-react'
 import {
   deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived,
   weekIndexOf, nextOccurrence, weekStartDate, ageAtWeek, weekOfYear,
@@ -32,6 +32,7 @@ export default function LifePage() {
   const [view, setView] = useState<View>('all')
   const [selected, setSelected] = useState<number | null>(null)
   const [yearExpanded, setYearExpanded] = useState(false)
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const [showIslamic, setShowIslamic] = useState(false)
 
   useEffect(() => { setShowIslamic(localStorage.getItem('mizan_islamic_dates') !== '0') }, [])
@@ -103,6 +104,20 @@ export default function LifePage() {
   const total = totalWeeks(years)
   const remainingCells = Math.max(0, total - lived)
 
+  // Islamic holidays (if toggled) + Hijri-recurring events, as dated markers in a range.
+  function eventsBetween(start: Date, end: Date): { date: Date; label: string; color: string }[] {
+    const out: { date: Date; label: string; color: string }[] = []
+    if (showIslamic) out.push(...islamicHolidaysBetween(start, end))
+    for (const ev of events.filter(e => e.recurrence === 'hijri_yearly')) {
+      const h = toHijri(new Date(ev.event_date))
+      for (let yy = toHijri(start).y; yy <= toHijri(end).y; yy++) {
+        const d = fromHijri(yy, h.m, h.day)
+        if (d >= start && d <= end) out.push({ date: d, label: ev.label, color: ev.color })
+      }
+    }
+    return out.sort((a, b) => a.date.getTime() - b.date.getTime())
+  }
+
   // Hijri today + Hijri age (no dep — Intl does the Islamic calendar).
   const hijriToday = new Intl.DateTimeFormat('en-US-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }).format(now)
   const hijriAge = Math.floor(((now.getTime() - dobDate.getTime()) / MS_DAY) / 354.367)
@@ -140,7 +155,8 @@ export default function LifePage() {
 
     if (view === 'decades') {
       if (!isLived) return { background: 'var(--border)' }
-      return { background: DECADE_COLORS[ageAtWeek(i) % DECADE_COLORS.length] }
+      // One solid colour per 10-year band (matches the legend), not per year.
+      return { background: DECADE_COLORS[Math.floor(ageAtWeek(i) / 10) % DECADE_COLORS.length] }
     }
 
     // 'all' — events overlay, then Islamic markers
@@ -194,14 +210,15 @@ export default function LifePage() {
         </p>
       </div>
 
-      {/* This year */}
+      {/* This year — year strip (glance) that expands into a real month calendar */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-2">
           <button onClick={() => setYearExpanded(e => !e)}
             className="flex items-center gap-1.5 text-sm font-semibold"
             style={{ color: 'var(--text-primary)' }}>
+            <CalendarDays size={15} style={{ color: 'var(--gold)' }} />
             {now.getFullYear()}
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{yearExpanded ? '▲' : '▼'}</span>
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{yearExpanded ? 'calendar ▲' : 'calendar ▼'}</span>
           </button>
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{yearWeek} / 52 weeks</span>
         </div>
@@ -212,30 +229,59 @@ export default function LifePage() {
                 style={{ background: i < yearWeek ? 'var(--gold)' : 'var(--border)' }} />
             ))}
           </div>
-        ) : (
-          <div className="flex flex-col gap-2 mt-1">
-            {Array.from({ length: 12 }, (_, m) => {
-              const monthStart = new Date(now.getFullYear(), m, 1)
-              const monthEnd = new Date(now.getFullYear(), m + 1, 0)
-              const yearStart = new Date(now.getFullYear(), 0, 1)
-              const toWeek = (d: Date) => Math.floor((d.getTime() - yearStart.getTime()) / (7 * MS_DAY))
-              const wStart = toWeek(monthStart)
-              const wEnd = Math.min(51, toWeek(monthEnd))
-              const monthName = monthStart.toLocaleString('default', { month: 'short' })
-              return (
-                <div key={m} className="flex items-center gap-2">
-                  <span className="text-[11px] w-7 shrink-0 text-right" style={{ color: 'var(--text-muted)' }}>{monthName}</span>
-                  <div className="flex gap-[3px] flex-1">
-                    {Array.from({ length: wEnd - wStart + 1 }, (_, w) => wStart + w).map(w => (
-                      <div key={w} className="flex-1 h-3.5 rounded-[2px]"
-                        style={{ background: w < yearWeek ? 'var(--gold)' : 'var(--border)' }} />
-                    ))}
-                  </div>
+        ) : (() => {
+          // Real month calendar: navigable, today highlighted, Islamic dates marked.
+          const y = calMonth.getFullYear(), m = calMonth.getMonth()
+          const first = new Date(y, m, 1)
+          const daysInMonth = new Date(y, m + 1, 0).getDate()
+          const lead = (first.getDay() + 6) % 7   // Mon-first offset
+          const monthMarks = eventsBetween(first, new Date(y, m, daysInMonth))
+          const markByDay = new Map<number, { label: string; color: string }>()
+          for (const mk of monthMarks) markByDay.set(mk.date.getDate(), mk)
+          return (
+            <div className="mt-1">
+              <div className="flex items-center justify-between mb-2">
+                <button onClick={() => setCalMonth(new Date(y, m - 1, 1))} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>◀</button>
+                <span className="text-sm font-semibold">{first.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+                <button onClick={() => setCalMonth(new Date(y, m + 1, 1))} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>▶</button>
+              </div>
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {['M','T','W','T','F','S','S'].map((d, i) => (
+                  <span key={i} className="text-center text-[10px]" style={{ color: 'var(--text-muted)' }}>{d}</span>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: lead }).map((_, i) => <div key={`b${i}`} />)}
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                  const date = new Date(y, m, day)
+                  const isToday = date.toDateString() === now.toDateString()
+                  const mk = markByDay.get(day)
+                  return (
+                    <div key={day} title={mk?.label} className="aspect-square flex items-center justify-center rounded-lg text-[11px] relative"
+                      style={{
+                        background: isToday ? 'var(--gold)' : 'var(--surface-2)',
+                        color: isToday ? '#0a0a0a' : date < now ? 'var(--text-muted)' : 'var(--text-secondary)',
+                        boxShadow: mk ? `inset 0 0 0 1.5px ${mk.color}` : undefined,
+                      }}>
+                      {day}
+                      {mk && <span className="absolute bottom-0.5 w-1 h-1 rounded-full" style={{ background: mk.color }} />}
+                    </div>
+                  )
+                })}
+              </div>
+              {monthMarks.length > 0 && (
+                <div className="flex flex-col gap-1 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                  {monthMarks.map((mk, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: mk.color }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{mk.date.getDate()} {first.toLocaleString('default', { month: 'short' })} · {mk.label}</span>
+                    </div>
+                  ))}
                 </div>
-              )
-            })}
-          </div>
-        )}
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Upcoming */}
