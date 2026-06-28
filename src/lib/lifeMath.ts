@@ -52,6 +52,22 @@ export function weekIndexOf(dob: Date, date: Date): number {
   return Math.max(0, Math.floor(daysBetween(dob, date) / DAYS_PER_WEEK))
 }
 
+/** Calendar date a given week-cell starts on. */
+export function weekStartDate(dob: Date, weekIndex: number): Date {
+  return new Date(dob.getTime() + weekIndex * DAYS_PER_WEEK * MS_PER_DAY)
+}
+
+/** Whole years of age at the start of a given week-cell. */
+export function ageAtWeek(weekIndex: number): number {
+  return Math.floor((weekIndex * DAYS_PER_WEEK) / 365.25)
+}
+
+/** Week number within the current calendar year (1-based). */
+export function weekOfYear(now: Date): number {
+  const start = new Date(now.getFullYear(), 0, 1)
+  return Math.floor(daysBetween(start, now) / DAYS_PER_WEEK) + 1
+}
+
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }

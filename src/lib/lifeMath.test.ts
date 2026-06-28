@@ -2,7 +2,7 @@
 //   npx tsx src/lib/lifeMath.test.ts   (or node after compile)
 // ponytail: assert-based smoke test, the smallest thing that fails if the math breaks.
 import assert from 'node:assert'
-import { deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived, weekIndexOf, nextOccurrence } from './lifeMath'
+import { deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived, weekIndexOf, nextOccurrence, weekStartDate, ageAtWeek, weekOfYear } from './lifeMath'
 
 const dob = new Date('1990-01-01')
 const now = new Date('2026-06-28')   // ~36.5 years lived
@@ -49,5 +49,16 @@ assert.strictEqual(y.getMonth(), 5) // June
 const m = nextOccurrence(new Date('2000-03-01'), 'monthly', now)
 assert.strictEqual(m.getMonth(), 6) // July
 assert.strictEqual(m.getDate(), 1)
+
+// weekStartDate: week 0 is the dob itself; week 52 is ~1 year later
+assert.strictEqual(weekStartDate(dob, 0).getTime(), dob.getTime())
+assert.strictEqual(weekStartDate(dob, 52).getFullYear(), 1990)  // 364 days in → still 1990-12-31
+// ageAtWeek: week 52 → age 0 (364 days), week 53 → age 1 (371 days)
+assert.strictEqual(ageAtWeek(52), 0)
+assert.strictEqual(ageAtWeek(53), 1)
+assert.strictEqual(ageAtWeek(521), 9)  // ~10y mark sits in age 9 until 365.25d ticks
+// weekOfYear: 2026-06-28 is roughly week 26 of the year
+const woy = weekOfYear(now)
+assert.ok(woy >= 25 && woy <= 27, `weekOfYear unexpected: ${woy}`)
 
 console.log('lifeMath: all assertions passed ✓')

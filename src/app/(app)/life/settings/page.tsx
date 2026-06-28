@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Hourglass, Loader2, Plus, Trash2, CalendarHeart } from 'lucide-react'
+import { Hourglass, Loader2, Plus, Trash2, CalendarHeart, Pencil, Check } from 'lucide-react'
 import type { LifeEvent, LifeEventKind, LifeRecurrence } from '@/types/database.types'
 
 const KINDS: { key: LifeEventKind; label: string; hint: string }[] = [
@@ -25,9 +25,17 @@ export default function LifeSettingsPage() {
 
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const blank = { label: '', event_date: '', kind: 'milestone' as LifeEventKind, color: SWATCHES[0], recurrence: 'none' as LifeRecurrence, notes: '' }
   const [form, setForm] = useState(blank)
   const F = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+
+  function startEdit(ev: LifeEvent) {
+    setEditingId(ev.id)
+    setForm({ label: ev.label, event_date: ev.event_date, kind: ev.kind, color: ev.color, recurrence: ev.recurrence, notes: ev.notes ?? '' })
+    if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+  }
+  function cancelEdit() { setEditingId(null); setForm(blank) }
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -54,20 +62,25 @@ export default function LifeSettingsPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  async function addEvent() {
+  async function saveEvent() {
     if (!form.label.trim() || !form.event_date) return
     setAdding(true)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('life_events').insert({
-      owner_id: user!.id,
+    const payload = {
       label: form.label.trim(),
       event_date: form.event_date,
       kind: form.kind,
       color: form.color,
       recurrence: form.recurrence,
       notes: form.notes.trim() || null,
-    })
+    }
+    if (editingId) {
+      await supabase.from('life_events').update(payload).eq('id', editingId)
+    } else {
+      await supabase.from('life_events').insert({ owner_id: user!.id, ...payload })
+    }
     setForm(blank)
+    setEditingId(null)
     await load()
     setAdding(false)
   }
@@ -133,9 +146,14 @@ export default function LifeSettingsPage() {
                     </p>
                   </div>
                 </div>
-                <button onClick={() => deleteEvent(ev.id)} aria-label="Delete" className="p-1.5 rounded-lg shrink-0" style={{ color: '#EF4444' }}>
-                  <Trash2 size={15} />
-                </button>
+                <div className="flex items-center shrink-0">
+                  <button onClick={() => startEdit(ev)} aria-label="Edit" className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                    <Pencil size={15} />
+                  </button>
+                  <button onClick={() => deleteEvent(ev.id)} aria-label="Delete" className="p-1.5 rounded-lg" style={{ color: '#EF4444' }}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -193,12 +211,20 @@ export default function LifeSettingsPage() {
             </div>
           </div>
 
-          <button onClick={addEvent} disabled={adding || !form.label.trim() || !form.event_date}
-            className="w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
-            {adding ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-            Add event
-          </button>
+          <div className="flex gap-2">
+            <button onClick={saveEvent} disabled={adding || !form.label.trim() || !form.event_date}
+              className="flex-1 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              {adding ? <Loader2 size={15} className="animate-spin" /> : editingId ? <Check size={15} /> : <Plus size={15} />}
+              {editingId ? 'Save changes' : 'Add event'}
+            </button>
+            {editingId && (
+              <button onClick={cancelEdit} className="px-4 py-2.5 rounded-xl font-semibold text-sm"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -5,9 +5,22 @@ import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Hourglass, Settings, Bell } from 'lucide-react'
-import { deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived, weekIndexOf, nextOccurrence } from '@/lib/lifeMath'
+import { Hourglass, Settings, Bell, X } from 'lucide-react'
+import {
+  deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived,
+  weekIndexOf, nextOccurrence, weekStartDate, ageAtWeek, weekOfYear,
+} from '@/lib/lifeMath'
 import type { LifeEvent } from '@/types/database.types'
+
+type View = 'all' | 'plain' | 'decades'
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'all', label: 'Events' },
+  { key: 'plain', label: 'Plain' },
+  { key: 'decades', label: 'Decades' },
+]
+// Subtle per-decade palette for the "Decades" view (index = age / 10).
+const DECADE_COLORS = ['#C9A84C', '#D4A017', '#10B981', '#3B82F6', '#A855F7', '#EC4899', '#EF4444', '#14B8A6', '#F59E0B', '#8B5CF6', '#06B6D4', '#84CC16']
+const MS_DAY = 86_400_000
 
 export default function LifePage() {
   const supabase = createClient()
@@ -15,6 +28,8 @@ export default function LifePage() {
   const [dob, setDob] = useState<string | null>(null)
   const [years, setYears] = useState(63)
   const [events, setEvents] = useState<LifeEvent[]>([])
+  const [view, setView] = useState<View>('all')
+  const [selected, setSelected] = useState<number | null>(null)
 
   useEffect(() => {
     (async () => {
@@ -59,14 +74,20 @@ export default function LifePage() {
   const total = totalWeeks(years)
   const remainingCells = Math.max(0, total - lived)
 
-  // Map each event to its week-cell so the grid can colour it. Last write wins.
+  // Hijri today + Hijri age (no dep — Intl does the Islamic calendar).
+  const hijriToday = new Intl.DateTimeFormat('en-US-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }).format(now)
+  const hijriAge = Math.floor(((now.getTime() - dobDate.getTime()) / MS_DAY) / 354.367)
+
+  // This calendar year progress
+  const yearWeek = Math.min(52, weekOfYear(now))
+
+  // Map each event to its week-cell. Last write wins.
   const eventByWeek = new Map<number, LifeEvent>()
   for (const ev of events) {
     const wi = weekIndexOf(dobDate, new Date(ev.event_date))
     if (wi < total) eventByWeek.set(wi, ev)
   }
 
-  // Upcoming: reminders + future intentions, soonest first.
   const upcoming = events
     .filter(e => e.kind === 'reminder' || e.kind === 'intention')
     .map(e => ({ ev: e, next: nextOccurrence(new Date(e.event_date), e.recurrence, now) }))
@@ -79,8 +100,31 @@ export default function LifePage() {
     { label: 'Weeks left', value: wLeft },
     { label: 'Months left', value: mLeft },
   ]
+  const daysAway = (d: Date) => Math.round((d.getTime() - now.getTime()) / MS_DAY)
 
-  const daysAway = (d: Date) => Math.round((d.getTime() - now.getTime()) / 86_400_000)
+  function cellStyle(i: number): React.CSSProperties {
+    const isLived = i < lived
+    const isNow = i === lived
+    if (isNow) return { background: 'var(--gold)', outline: '1.5px solid var(--text-primary)', outlineOffset: '0px' }
+
+    if (view === 'plain') return { background: isLived ? 'var(--gold)' : 'var(--border)' }
+
+    if (view === 'decades') {
+      if (!isLived) return { background: 'var(--border)' }
+      return { background: DECADE_COLORS[ageAtWeek(i) % DECADE_COLORS.length] }
+    }
+
+    // 'all' — events overlay
+    const ev = eventByWeek.get(i)
+    if (ev) return isLived ? { background: ev.color } : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${ev.color}` }
+    return { background: isLived ? 'var(--gold)' : 'var(--border)' }
+  }
+
+  // Selected-week detail
+  const sel = selected
+  const selStart = sel !== null ? weekStartDate(dobDate, sel) : null
+  const selEnd = selStart ? new Date(selStart.getTime() + 6 * MS_DAY) : null
+  const selEvent = sel !== null ? eventByWeek.get(sel) : undefined
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
@@ -92,34 +136,48 @@ export default function LifePage() {
           </Link>
         } />
 
-      {/* Micro view — counters */}
+      {/* Counters */}
       <div className="grid grid-cols-3 gap-3">
         {counters.map(c => (
           <div key={c.label} className="card p-3 text-center">
-            <p className="font-display text-2xl font-semibold text-gold-gradient leading-tight">
-              {c.value.toLocaleString()}
-            </p>
+            <p className="font-display text-2xl font-semibold text-gold-gradient leading-tight">{c.value.toLocaleString()}</p>
             <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{c.label}</p>
           </div>
         ))}
       </div>
 
-      {/* % lived progress */}
+      {/* % lived + Hijri */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Life lived</span>
           <span className="text-sm font-bold" style={{ color: 'var(--gold)' }}>{pct}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-          <div className="h-full rounded-full animate-fill"
-            style={{ width: `${pct}%`, background: 'var(--gold)' }} />
+          <div className="h-full rounded-full animate-fill" style={{ width: `${pct}%`, background: 'var(--gold)' }} />
         </div>
         <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
           Born {dobDate.toLocaleDateString()} · projected {death.toLocaleDateString()} (age {years}). Only Allah knows the true term.
         </p>
+        <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+          Today: {hijriToday} · ~{hijriAge} Hijri years lived
+        </p>
       </div>
 
-      {/* Upcoming — reminders & intentions */}
+      {/* This year */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-semibold">{now.getFullYear()}</span>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{yearWeek} / 52 weeks</span>
+        </div>
+        <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(26, minmax(0, 1fr))' }}>
+          {Array.from({ length: 52 }).map((_, i) => (
+            <div key={i} className="aspect-square rounded-[1px]"
+              style={{ background: i < yearWeek ? 'var(--gold)' : 'var(--border)' }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Upcoming */}
       {upcoming.length > 0 && (
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -148,39 +206,82 @@ export default function LifePage() {
         </div>
       )}
 
-      {/* Macro view — life in weeks grid */}
+      {/* Life in weeks — interactive grid */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold">Your life in weeks</span>
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{lived.toLocaleString()} / {total.toLocaleString()}</span>
         </div>
+
+        {/* View switcher */}
+        <div className="flex gap-1 p-1 rounded-xl mb-3" style={{ background: 'var(--surface-2)' }}>
+          {VIEWS.map(v => (
+            <button key={v.key} onClick={() => setView(v.key)}
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={view === v.key
+                ? { background: 'var(--gold)', color: 'var(--background)' }
+                : { color: 'var(--text-muted)' }}>{v.label}</button>
+          ))}
+        </div>
+
         <div className="grid gap-[2px]" style={{ gridTemplateColumns: 'repeat(52, minmax(0, 1fr))' }}>
           {Array.from({ length: total }).map((_, i) => {
-            const ev = eventByWeek.get(i)
-            const isLived = i < lived
-            let style: React.CSSProperties = { background: isLived ? 'var(--gold)' : 'var(--border)' }
-            if (ev) {
-              style = isLived
-                ? { background: ev.color }
-                : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${ev.color}` }
-            }
-            return <div key={i} className="aspect-square rounded-[1px]" style={style} title={ev?.label} />
+            const ev = view === 'all' ? eventByWeek.get(i) : undefined
+            return (
+              <button key={i} onClick={() => setSelected(s => s === i ? null : i)}
+                className="aspect-square rounded-[1px] cursor-pointer"
+                style={{ ...cellStyle(i), ...(selected === i ? { outline: '1.5px solid var(--text-primary)', outlineOffset: '0px' } : {}) }}
+                title={ev?.label ?? `Week ${i + 1} · age ${ageAtWeek(i)}`} />
+            )
           })}
         </div>
+
+        {/* Selected week detail */}
+        {sel !== null && selStart && selEnd && (
+          <div className="mt-3 p-3 rounded-xl relative" style={{ background: 'var(--surface-2)' }}>
+            <button onClick={() => setSelected(null)} aria-label="Close" className="absolute top-2 right-2 p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+              <X size={14} />
+            </button>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              Week {sel + 1} · age {ageAtWeek(sel)}
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {selStart.toLocaleDateString()} – {selEnd.toLocaleDateString()}
+            </p>
+            {selEvent ? (
+              <div className="mt-2 flex items-start gap-2">
+                <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
+                <div className="min-w-0">
+                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selEvent.label}</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {selEvent.kind}{selEvent.recurrence !== 'none' ? ` · ${selEvent.recurrence}` : ''}
+                  </p>
+                  {selEvent.notes && <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{selEvent.notes}</p>}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                No event this week. <Link href="/life/settings" style={{ color: 'var(--gold)' }}>Add one →</Link>
+              </p>
+            )}
+          </div>
+        )}
+
         <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
-          Each square is one week. {remainingCells.toLocaleString()} squares remain — spend them well.
+          Each square is one week — tap any to see its dates. {remainingCells.toLocaleString()} remain.
         </p>
 
-        {/* Legend */}
-        {events.length > 0 && (
+        {/* Legend (clickable → jumps to that week) */}
+        {view === 'all' && events.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
             {events.map(ev => (
-              <div key={ev.id} className="flex items-center gap-1.5">
+              <button key={ev.id} onClick={() => setSelected(weekIndexOf(dobDate, new Date(ev.event_date)))}
+                className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: ev.color }} />
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                   {ev.label} <span style={{ color: 'var(--text-secondary)' }}>{new Date(ev.event_date).getFullYear()}</span>
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         )}

@@ -34,7 +34,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
-| Life Tracker | `/life` | ✅ v2 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly) show in an **Upcoming** list. Legend on the grid. Own settings at `/life/settings`. Math in `src/lib/lifeMath.ts` (+ self-check `lifeMath.test.ts`). Push delivery for reminders = deferred (needs web-push infra) |
+| Life Tracker | `/life` | ✅ v3 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly) show in an **Upcoming** list. **Interactive grid** (tap cell → week dates/age + event detail), **3 views** (Events/Plain/Decades), **you-are-here** pulse, **this-year** row, **Hijri** today+age, clickable legend, event **edit**. Own settings at `/life/settings`. Math in `src/lib/lifeMath.ts` (+ self-check). Reminder push delivery deferred (prefer .ics — see Roadmap) |
 | Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset**. (Life Tracker DOB/age + events moved to `/life/settings`.) |
 
 ### Locking & data rules
@@ -102,6 +102,13 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-28** — **Life Tracker v3 — interactive grid + views.** Grid cells are now tappable
+  (→ detail panel: week dates, age, and the event there if any). Three **views** (Events / Plain /
+  Decades — decade-coloured lived weeks). **You-are-here** pulse on the current week. **This-year**
+  52-week row. **Hijri** today + Hijri years lived (via `Intl`, no dep). **Event editing** in
+  `/life/settings` (was add/delete only). Legend entries clickable → jump to that week. New math
+  `weekStartDate` / `ageAtWeek` / `weekOfYear` (self-check extended, passes). No new deps. Deferred
+  upgrades logged under Roadmap (deeper zoom, .ics calendar sync, push, MS To Do).
 - **2026-06-28** — **Life room + Life events (Life Tracker v2).** Split the app into two
   **rooms** with a Finance ⇄ Life toggle pill above the bottom nav (`BottomNav.tsx`); each room
   owns its own nav + Settings tab, so Life no longer competes with Finance for the 3 module
@@ -251,3 +258,21 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
       Until then, fallback rates are used (gold AED 472/g, silver AED 5.9/g).
 - [ ] Wasiyya rethink (user unhappy with current shape — deferred).
 - [ ] Real push/email notifications via Supabase Edge Functions (toggles removed until implemented).
+
+### Life Tracker — planned upgrades (not built)
+Done so far: rooms, life events (milestone/intention/reminder), colored weeks grid with
+legend, **interactive cells** (tap → week dates/age + event detail), **3 views** (Events /
+Plain / Decades), **you-are-here** pulse, **this-year** 52-week row, **Hijri** today + age,
+**event edit**, clickable legend (jumps to week).
+- [ ] **Deeper zoom** — tap a year/decade to expand into a month or day-level grid for that span
+      (current detail panel shows the week's date range only).
+- [ ] **Per-year / per-month view modes** beyond the whole-life grid.
+- [ ] **Calendar sync (.ics export / subscription feed)** — generate an iCal feed the phone's
+      own calendar (Samsung/Google) subscribes to; the phone fires the notifications. **Free, no
+      push infra, no dep.** Preferred over web-push. Two-way sync (write back from Samsung) is NOT
+      possible via .ics — would need Google/Microsoft Graph OAuth (heavy, a dep, a decision).
+- [ ] **Web-push notifications** (service worker + Vercel cron + web-push lib) — only if .ics
+      proves insufficient. Adds a dependency — flag before building.
+- [ ] **Microsoft To Do / external task app** integration — Graph API OAuth; separate decision.
+- [ ] Age/season **bands** shading + decade gridlines as a refinement of Decades view.
+- [ ] Notes/dua richer surface; bucket-list / before-death intentions; shared events (RLS rework).
