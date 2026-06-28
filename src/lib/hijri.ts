@@ -81,20 +81,5 @@ export function hijriLabel(d: Date): string {
     day: 'numeric', month: 'long', year: 'numeric',
   }).format(d)
 }
-
-// ── self-check: `npx tsx src/lib/hijri.ts` ───────────────────────────────────
-// ponytail: one round-trip + one known date; enough to catch a broken refinement.
-if (typeof require !== 'undefined' && require.main === module) {
-  const assert = (c: boolean, m: string) => { if (!c) throw new Error('FAIL: ' + m) }
-  // Round-trip: Gregorian → Hijri → Gregorian lands the same calendar day.
-  for (const iso of ['2026-06-28', '2000-01-01', '1990-12-31', '2030-03-15']) {
-    const g = new Date(iso + 'T00:00:00Z')
-    const h = toHijri(g)
-    const back = fromHijri(h.y, h.m, h.day)
-    assert(back.toISOString().slice(0, 10) === iso, `round-trip ${iso} → ${back.toISOString()}`)
-  }
-  // Holiday enumeration is non-empty and ordered within a year span.
-  const hits = islamicHolidaysBetween(new Date('2026-01-01'), new Date('2027-12-31'))
-  assert(hits.length >= 8, `expected ≥8 holidays over 2y, got ${hits.length}`)
-  console.log('hijri.ts OK —', hits.length, 'holidays 2026-2027')
-}
+// Self-check lives in hijri.test.ts (kept out of this file so it never ships to
+// the browser bundle — top-level `module`/`require` refs crash an ESM import).

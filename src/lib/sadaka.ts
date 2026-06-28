@@ -39,25 +39,5 @@ export function isIncomeSettled(out: Map<string, IncomeOutstanding>, incomeId: s
   return owed > 0 && remaining === 0
 }
 
-// ── self-check: `npx tsx src/lib/sadaka.ts` ──────────────────────────────────
-if (typeof require !== 'undefined' && require.main === module) {
-  const assert = (c: boolean, m: string) => { if (!c) throw new Error('FAIL: ' + m) }
-  const E = (p: Partial<SadakaEntry>): SadakaEntry => ({
-    id: '', owner_id: '', source_income_id: null, amount_owed: 0, amount_given: 0,
-    currency: 'AED', status: 'pending', is_advance: false, is_joint: false,
-    joint_ibrahim_pct: 0.5, date_given: null, recipient_name: null, recipient_type: null,
-    location: null, method: null, notes: null, created_at: '', updated_at: '', ...p,
-  } as SadakaEntry)
-  // Sneaker Con owes 3750, paid 4000 → settled, remaining 0, 250 overpay is advance elsewhere.
-  const out = incomeOutstanding([
-    E({ source_income_id: 'snk', amount_owed: 3750 }),
-    E({ source_income_id: 'snk', amount_given: 4000 }),
-    E({ source_income_id: 'shop', amount_owed: 1000 }),     // still open
-  ])
-  assert(remainingForIncome(out, 'snk') === 0, 'snk should be cleared')
-  assert(isIncomeSettled(out, 'snk') === true, 'snk chapter closed')
-  assert(remainingForIncome(out, 'shop') === 1000, 'shop still owes 1000')
-  assert(isIncomeSettled(out, 'shop') === false, 'shop still open')
-  assert(isIncomeSettled(out, 'unknown') === false, 'no-obligation income stays open')
-  console.log('sadaka.ts OK')
-}
+// Self-check lives in sadaka.test.ts (kept out of this file so it never ships to
+// the browser bundle — top-level `module`/`require` refs crash an ESM import).
