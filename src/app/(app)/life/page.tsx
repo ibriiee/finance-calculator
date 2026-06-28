@@ -366,7 +366,10 @@ export default function LifePage() {
             <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
               Week {sel + 1} · age {ageAtWeek(sel)}
             </p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              {selStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – {selEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
               {hijriLabel(selStart)} – {hijriLabel(selEnd)} (Hijri)
             </p>
             {/* 7-day row */}
