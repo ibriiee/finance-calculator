@@ -22,19 +22,19 @@ const ROOMS = {
       { href: '/joint',  icon: Landmark,       label: 'Joint',  key: 'joint_account' },
       { href: '/goals',  icon: Target,         label: 'Goals',  key: 'goals' },
     ] as Tab[],
+    settings: { href: '/settings', icon: Settings, label: 'Settings', key: null } as Tab,
   },
   life: {
     label: 'Life',
     icon: Hourglass,
     home: { href: '/life', icon: Hourglass, label: 'Life', key: null } as Tab,
     tabs: [] as Tab[], // future life modules go here
+    settings: { href: '/life/settings', icon: Settings, label: 'Settings', key: null } as Tab,
   },
 } as const
 
 const ROOM_KEYS = ['finance', 'life'] as const
 type RoomKey = (typeof ROOM_KEYS)[number]
-
-const SETTINGS: Tab = { href: '/settings', icon: Settings, label: 'Settings', key: null }
 
 // Which room a path belongs to (Settings is shared — stays in current room visually).
 function lifeHrefs() {
@@ -80,7 +80,7 @@ export default function BottomNav() {
 
   // Home (first) + up to 3 enabled module tabs + Settings (last) = max 5.
   const moduleTabs = room.tabs.filter(t => t.key === null || modules?.[t.key] !== false).slice(0, 3)
-  const navItems: Tab[] = [room.home, ...moduleTabs, SETTINGS]
+  const navItems: Tab[] = [room.home, ...moduleTabs, room.settings]
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 border-t border-l border-r pb-safe"

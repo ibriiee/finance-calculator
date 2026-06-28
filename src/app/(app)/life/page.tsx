@@ -30,11 +30,11 @@ export default function LifePage() {
   if (!dob) {
     return (
       <div className="flex flex-col gap-4 p-4 animate-slide-up">
-        <ModuleHeader title="Life Tracker" subtitle="Remember death — live with intention" />
+        <ModuleHeader title="Life Tracker" subtitle="Remember death — live with intention" back={false} />
         <EmptyState icon={Hourglass} title="Set your date of birth"
-          description="Add your birth date in Settings to see how much of this life remains, in shaa Allah."
+          description="Add your birth date in Life Settings to see how much of this life remains, in shaa Allah."
           action={
-            <Link href="/settings" className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
+            <Link href="/life/settings" className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
               style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
               <Settings size={14} /> Open Settings
             </Link>
@@ -62,7 +62,13 @@ export default function LifePage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
-      <ModuleHeader title="Life Tracker" subtitle="Remember death — live with intention" />
+      <ModuleHeader title="Life Tracker" subtitle="Remember death — live with intention" back={false}
+        action={
+          <Link href="/life/settings" aria-label="Life settings"
+            className="p-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors">
+            <Settings size={18} style={{ color: 'var(--text-secondary)' }} />
+          </Link>
+        } />
 
       {/* Micro view — counters */}
       <div className="grid grid-cols-3 gap-3">
