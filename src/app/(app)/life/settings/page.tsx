@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Hourglass, Loader2, Plus, Trash2, CalendarHeart, Pencil, Check } from 'lucide-react'
+import { Hourglass, Loader2, Plus, Trash2, CalendarHeart, Pencil, Check, ChevronDown } from 'lucide-react'
 import type { LifeEvent, LifeEventKind, LifeRecurrence } from '@/types/database.types'
 
 const KINDS: { key: LifeEventKind; label: string; hint: string }[] = [
@@ -23,6 +23,8 @@ export default function LifeSettingsPage() {
   const [dob, setDob] = useState('')
   const [years, setYears] = useState(63)
 
+  const [open, setOpen] = useState<Set<string>>(new Set(['Life Tracker']))
+  const toggle = (t: string) => setOpen(s => { const n = new Set(s); n.has(t) ? n.delete(t) : n.add(t); return n })
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -99,38 +101,48 @@ export default function LifeSettingsPage() {
 
       {/* Life span */}
       <div className="card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Hourglass size={15} style={{ color: 'var(--gold)' }} />
-          <h3 className="text-sm font-semibold">Life Tracker</h3>
-        </div>
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of birth</label>
-            <input type="date" value={dob} onChange={e => setDob(e.target.value)} className={inputCls} style={inputStyle} />
+        <button className="flex items-center justify-between w-full" onClick={() => toggle('Life Tracker')}>
+          <div className="flex items-center gap-2">
+            <Hourglass size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Life Tracker</h3>
           </div>
-          <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Life expectancy (age)</label>
-            <input type="number" min={1} max={120} value={years}
-              onChange={e => setYears(parseInt(e.target.value) || 63)} className={inputCls} style={inputStyle} />
+          <ChevronDown size={15} style={{ color: 'var(--text-muted)', transform: open.has('Life Tracker') ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
+        {open.has('Life Tracker') && (
+          <div className="flex flex-col gap-3 mt-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Date of birth</label>
+              <input type="date" value={dob} onChange={e => setDob(e.target.value)} className={inputCls} style={inputStyle} />
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Life expectancy (age)</label>
+              <input type="number" min={1} max={120} value={years}
+                onChange={e => setYears(parseInt(e.target.value) || 63)} className={inputCls} style={inputStyle} />
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Default 63 — the age of the Prophet ﷺ. Used only to visualise the life that remains. Only Allah knows the true term.
+            </p>
+            <button onClick={saveProfile} disabled={saving}
+              className="w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+              style={{ background: saved ? '#10B981' : 'var(--gold)', color: '#0a0a0a', transition: 'background 0.3s' }}>
+              {saving && <Loader2 size={15} className="animate-spin" />}
+              {saved ? 'Saved!' : saving ? 'Saving…' : 'Save'}
+            </button>
           </div>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Default 63 — the age of the Prophet ﷺ. Used only to visualise the life that remains. Only Allah knows the true term.
-          </p>
-          <button onClick={saveProfile} disabled={saving}
-            className="w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-            style={{ background: saved ? '#10B981' : 'var(--gold)', color: '#0a0a0a', transition: 'background 0.3s' }}>
-            {saving && <Loader2 size={15} className="animate-spin" />}
-            {saved ? 'Saved!' : saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Life events */}
       <div className="card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <CalendarHeart size={15} style={{ color: 'var(--gold)' }} />
-          <h3 className="text-sm font-semibold">Life Events</h3>
-        </div>
+        <button className="flex items-center justify-between w-full" onClick={() => toggle('Life Events')}>
+          <div className="flex items-center gap-2">
+            <CalendarHeart size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Life Events</h3>
+            {events.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{events.length}</span>}
+          </div>
+          <ChevronDown size={15} style={{ color: 'var(--text-muted)', transform: open.has('Life Events') ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
+        {open.has('Life Events') && <div className="mt-3">
 
         {/* existing events */}
         {events.length > 0 && (
@@ -184,17 +196,25 @@ export default function LifeSettingsPage() {
           {form.kind === 'reminder' && (
             <div>
               <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Repeat</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['none', 'monthly', 'yearly'] as LifeRecurrence[]).map(r => (
-                  <button key={r} type="button" onClick={() => F('recurrence', r)}
-                    className="py-2 rounded-xl text-xs font-medium capitalize"
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { val: 'none', label: 'None' },
+                  { val: 'monthly', label: 'Monthly' },
+                  { val: 'yearly', label: 'Yearly' },
+                  { val: 'hijri_yearly', label: 'Hijri yearly (Zakat)' },
+                ] as { val: LifeRecurrence; label: string }[]).map(r => (
+                  <button key={r.val} type="button" onClick={() => F('recurrence', r.val)}
+                    className="py-2 rounded-xl text-xs font-medium"
                     style={{
-                      background: form.recurrence === r ? 'var(--gold-dim)' : 'var(--surface-2)',
-                      border: `1px solid ${form.recurrence === r ? 'var(--gold)' : 'var(--border)'}`,
-                      color: form.recurrence === r ? 'var(--gold)' : 'var(--text-muted)',
-                    }}>{r}</button>
+                      background: form.recurrence === r.val ? 'var(--gold-dim)' : 'var(--surface-2)',
+                      border: `1px solid ${form.recurrence === r.val ? 'var(--gold)' : 'var(--border)'}`,
+                      color: form.recurrence === r.val ? 'var(--gold)' : 'var(--text-muted)',
+                    }}>{r.label}</button>
                 ))}
               </div>
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                Hijri yearly tracks the lunar calendar — set your (or your wife's) Zakat date once and it re-marks every Islamic year.
+              </p>
             </div>
           )}
 
@@ -226,6 +246,7 @@ export default function LifeSettingsPage() {
             )}
           </div>
         </div>
+        </div>}
       </div>
     </div>
   )

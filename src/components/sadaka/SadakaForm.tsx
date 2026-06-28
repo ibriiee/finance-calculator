@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
-import type { Currency } from '@/types/database.types'
+import { incomeOutstanding, isIncomeSettled, remainingForIncome } from '@/lib/sadaka'
+import type { Currency, SadakaEntry } from '@/types/database.types'
 
 interface Props { onClose: () => void; onSaved: () => void; editItem?: any }
 
@@ -16,6 +17,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const [other, setOther] = useState<{ id: string; name: string } | null>(null)
   const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([])
   const [incomes, setIncomes] = useState<{ id: string; name: string }[]>([])
+  const [outstanding, setOutstanding] = useState<ReturnType<typeof incomeOutstanding>>(new Map())
   const [form, setForm] = useState({
     // For an obligation this is the amount owed; for a given/advance payment it's the amount given.
     amount_owed: (editItem?.amount_owed || editItem?.amount_given) ? String(editItem.amount_owed || editItem.amount_given) : '',
@@ -33,11 +35,13 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const [{ data: profs }, { data: recs }, { data: inc }] = await Promise.all([
+      const [{ data: profs }, { data: recs }, { data: inc }, { data: sad }] = await Promise.all([
         supabase.from('profiles').select('id, display_name'),
         supabase.from('sadaka_recipients').select('id, name').eq('is_active', true).order('name'),
         supabase.from('income_projects').select('id, name, owner_id, ownership').order('created_at', { ascending: false }),
+        supabase.from('sadaka_entries').select('*').or(`owner_id.eq.${user!.id},is_joint.eq.true,shared.eq.true`),
       ])
+      setOutstanding(incomeOutstanding((sad as SadakaEntry[]) ?? []))
       const mine = profs?.find((p: any) => p.id === user!.id)
       const theirs = profs?.find((p: any) => p.id !== user!.id)
       setMe({ id: user!.id, name: mine?.display_name ?? 'Me' })
@@ -171,19 +175,40 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
               : 'Records money you gave — this DEDUCTS from your pending sadaka.'}
           </p>
 
-          {/* Which income this sadaka is for (optional attribution) */}
-          {incomes.length > 0 && (
-            <div>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                {form.status === 'pending' ? 'From which income (optional)' : 'Pay toward which income (optional)'}
-              </p>
-              <select value={form.from_income_id} onChange={e => F('from_income_id', e.target.value)}
-                className="w-full px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-                <option value="">Not linked to a specific income</option>
-                {incomes.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-              </select>
-            </div>
-          )}
+          {/* Which income this sadaka is for (optional attribution).
+              For a payment, only offer incomes whose sadaka chapter is still open —
+              a fully-given stream shouldn't be a pay-toward target again. */}
+          {(() => {
+            const isPayment = form.status === 'given' || form.status === 'advance_given'
+            const selectable = incomes.filter(i =>
+              !isPayment                                    // new obligation: any income
+              || i.id === form.from_income_id               // keep current selection visible
+              || !isIncomeSettled(outstanding, i.id))       // payment: hide closed chapters
+            if (incomes.length === 0) return null
+            const linkedRemaining = form.from_income_id
+              ? remainingForIncome(outstanding, form.from_income_id) : 0
+            const overpay = isPayment && form.from_income_id && parseFloat(form.amount_owed || '0') > linkedRemaining
+            return (
+              <div>
+                <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  {isPayment ? 'Pay toward which income (optional)' : 'From which income (optional)'}
+                </p>
+                <select value={form.from_income_id} onChange={e => F('from_income_id', e.target.value)}
+                  className="w-full px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                  <option value="">Not linked to a specific income</option>
+                  {selectable.map(i => {
+                    const rem = remainingForIncome(outstanding, i.id)
+                    return <option key={i.id} value={i.id}>{i.name}{isPayment && rem > 0 ? ` — ${rem} ${form.currency} due` : ''}</option>
+                  })}
+                </select>
+                {overpay && (
+                  <p className="text-[11px] mt-1.5" style={{ color: 'var(--gold)' }}>
+                    This clears {linkedRemaining} {form.currency} on this income; the extra {(parseFloat(form.amount_owed) - linkedRemaining).toLocaleString()} {form.currency} carries forward as advance credit.
+                  </p>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Whose sadaka is this */}
           <div>

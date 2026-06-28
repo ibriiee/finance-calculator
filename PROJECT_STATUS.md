@@ -23,7 +23,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 |--------|-------|--------|-------|
 | Dashboard | `/dashboard` | ✅ | "This Month" hero = **in-hand (received)** with a waterfall: in hand − sadaka due − owed to people = **Yours to keep**; PKR sadaka folded into AED via `pkr_to_aed`. Summary cards + quick links |
 | Income | `/income` | ✅ | Individual. Start date, ongoing flag, edit/delete, per-entry **sadaka-paid status**. Editing does NOT re-trigger sadaka (insert-only trigger) |
-| Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`) |
+| Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`). **Smart income linking** (`src/lib/sadaka.ts`): the "pay toward which income" picker hides streams whose sadaka chapter is fully given (settled), shows "X due" per open stream, and warns when a payment overpays a linked stream (excess → advance) |
 | Recipients | `/recipients` | ✅ | Directory of sadaka recipients; total received, last paid, overdue→prioritise flags, **WhatsApp export**. Linked from Sadaka + selectable in SadakaForm |
 | Brother Ledger | `/ledger` | ✅ | IOU between brothers; fixed profile-read RLS hang |
 | Joint Account | `/joint` | ✅ | House account: deposits/withdrawals, balance, equal-share fairness, AED↔PKR, realtime |
@@ -34,8 +34,8 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
-| Life Tracker | `/life` | ✅ v3 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly) show in an **Upcoming** list. **Interactive grid** (tap cell → week dates/age + event detail), **3 views** (Events/Plain/Decades), **you-are-here** pulse, **this-year** row, **Hijri** today+age, clickable legend, event **edit**. Own settings at `/life/settings`. Math in `src/lib/lifeMath.ts` (+ self-check). Reminder push delivery deferred (prefer .ics — see Roadmap) |
-| Settings | `/settings` | ✅ | Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset**. (Life Tracker DOB/age + events moved to `/life/settings`.) |
+| Life Tracker | `/life` | ✅ v4 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life; **bottom tab icons hidden in Life** — only the room pill + top Settings, for a full-screen grid). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly/**hijri_yearly**) show in an **Upcoming** list. **Interactive grid** (tap cell → week dates + **Hijri range** + age + 7-day row + event/marker detail), **3 views** (Events/Plain/Decades + **Decades legend**), **you-are-here** pulse, **this-year** row that **expands to a month-by-month calendar**, **Hijri** today+age, clickable legend, event **edit**. **Islamic dates overlay** (toggle): preset holidays (Ramadan / Eid al-Fitr / Eid al-Adha / Islamic New Year / Ashura) + any `hijri_yearly` event (e.g. a Zakat date) marked on every lunar anniversary across the lifespan. Hijri math in `src/lib/hijri.ts` (Intl-based, no dep, +self-check); life math in `src/lib/lifeMath.ts` (+self-check). Reminder push delivery deferred (prefer .ics — see Roadmap) |
+| Settings | `/settings` | ✅ | All sections **collapsible** (chevron; Profile open by default). Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset**. (Life Tracker DOB/age + events moved to `/life/settings`, also collapsible.) |
 
 ### Locking & data rules
 - Income: once **Received**, entry is locked (no edit/delete).
@@ -102,6 +102,21 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-28** — **Life Tracker v4 (Hijri + UX) & Sadaka smart linking.** *Life:* (1) **Islamic
+  calendar** — new `src/lib/hijri.ts` (Hijri↔Gregorian via `Intl` Umm al-Qura, **no dep**,
+  self-check passes) powers an **Islamic-dates overlay** toggle on the grid: preset holidays
+  (Ramadan, Eid al-Fitr, Eid al-Adha, Islamic New Year, Ashura) + a new **`hijri_yearly`**
+  recurrence so a **Zakat date** (yours or your wife's) re-marks on every lunar anniversary across
+  the whole lifespan. Recurrence is a plain TEXT column → **no migration needed**. (2) Week-detail
+  panel now shows the **Hijri date range** + a **7-day row** (today highlighted). (3) **Decades view
+  legend** (age bands ↔ colours). (4) **This-year** card **expands** to a month-by-month calendar.
+  (5) **Bottom tab icons hidden in the Life room** (room pill + top Settings only). *Settings:* all
+  cards (Finance + Life) are now **collapsible** (chevron, one open by default) — less scatter.
+  *Sadaka:* new `src/lib/sadaka.ts` (per-income outstanding, self-check passes) — the "pay toward
+  which income" picker **hides fully-given (settled) streams** (closed chapter), shows **"X due"**
+  per open stream, and **warns on overpay** (e.g. 4000 toward a 3750 obligation → clears it, 250
+  carries as advance). No new deps. Strict `tsc` clean on all touched files (repo's pre-existing
+  untyped-client `never` noise unchanged; build uses `ignoreBuildErrors`).
 - **2026-06-28** — **Life Tracker v3 — interactive grid + views.** Grid cells are now tappable
   (→ detail panel: week dates, age, and the event there if any). Three **views** (Events / Plain /
   Decades — decade-coloured lived weeks). **You-are-here** pulse on the current week. **This-year**
@@ -260,13 +275,20 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 - [ ] Real push/email notifications via Supabase Edge Functions (toggles removed until implemented).
 
 ### Life Tracker — planned upgrades (not built)
-Done so far: rooms, life events (milestone/intention/reminder), colored weeks grid with
-legend, **interactive cells** (tap → week dates/age + event detail), **3 views** (Events /
-Plain / Decades), **you-are-here** pulse, **this-year** 52-week row, **Hijri** today + age,
-**event edit**, clickable legend (jumps to week).
-- [ ] **Deeper zoom** — tap a year/decade to expand into a month or day-level grid for that span
-      (current detail panel shows the week's date range only).
-- [ ] **Per-year / per-month view modes** beyond the whole-life grid.
+Done so far: rooms, life events (milestone/intention/reminder/**hijri_yearly**), colored weeks
+grid with legend, **interactive cells** (tap → week dates + **Hijri range** + age + 7-day row +
+event/marker detail), **3 views** (Events / Plain / Decades + **legend**), **you-are-here** pulse,
+**this-year** row (**expands to month grid**), **Hijri** today + age, **Islamic-dates overlay**
+(holidays + Zakat lunar anniversaries), **event edit**, clickable legend (jumps to week),
+**Life-room chrome cleanup** (bottom tabs hidden).
+- [x] ~~Decades legend~~ — done (age-band swatches under the grid).
+- [x] ~~This-year deeper zoom~~ — done (year card expands to a month-by-month calendar).
+- [x] ~~Islamic calendar / Zakat date highlighting~~ — done (`hijri.ts`, overlay toggle,
+      `hijri_yearly` recurrence).
+- [ ] **Deeper grid zoom** — tap a year/decade in the *life* grid to expand into a day-level grid
+      for that span (the this-year card already does month-level).
+- [ ] **Wife as a second person** — current data model is 2 brothers; a true per-wife Zakat/profile
+      needs a relationships rework. For now add her Zakat as a second `hijri_yearly` event.
 - [ ] **Calendar sync (.ics export / subscription feed)** — generate an iCal feed the phone's
       own calendar (Samsung/Google) subscribes to; the phone fires the notifications. **Free, no
       push infra, no dep.** Preferred over web-push. Two-way sync (write back from Samsung) is NOT

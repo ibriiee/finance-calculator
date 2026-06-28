@@ -2,6 +2,8 @@
 // Pure functions, no React — so they're unit-testable (see lifeMath.test.ts).
 // All "left" values clamp at 0 once you pass the projected death date.
 
+import { nextHijriOccurrence } from './hijri'
+
 const MS_PER_DAY = 86_400_000
 const DAYS_PER_WEEK = 7
 const AVG_DAYS_PER_MONTH = 365.25 / 12   // 30.4375 — calendar-average, good enough
@@ -72,11 +74,12 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
-export type Recurrence = 'none' | 'monthly' | 'yearly'
+export type Recurrence = 'none' | 'monthly' | 'yearly' | 'hijri_yearly'
 
 /** Next time an event fires on/after `now`. Non-recurring → the date itself. */
 export function nextOccurrence(eventDate: Date, recurrence: Recurrence, now: Date): Date {
   if (recurrence === 'none') return eventDate
+  if (recurrence === 'hijri_yearly') return nextHijriOccurrence(eventDate, now)
   const today = startOfDay(now)
   const day = eventDate.getDate()
   // ponytail: day-overflow (e.g. 31st in Feb) rolls into the next month — fine for nudges.

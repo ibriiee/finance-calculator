@@ -11,7 +11,7 @@ export type LoanStatus = 'outstanding' | 'partial' | 'cleared'
 export type GoalType = 'individual' | 'joint'
 export type WasiyyaCategory = 'asset' | 'debt' | 'instruction' | 'password' | 'contact' | 'message'
 export type LifeEventKind = 'milestone' | 'intention' | 'reminder'
-export type LifeRecurrence = 'none' | 'monthly' | 'yearly'
+export type LifeRecurrence = 'none' | 'monthly' | 'yearly' | 'hijri_yearly'
 
 export interface LifeEvent {
   id: string

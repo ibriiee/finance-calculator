@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
@@ -10,6 +10,7 @@ import {
   deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived,
   weekIndexOf, nextOccurrence, weekStartDate, ageAtWeek, weekOfYear,
 } from '@/lib/lifeMath'
+import { islamicHolidaysBetween, toHijri, fromHijri, hijriLabel, ISLAMIC_HOLIDAYS } from '@/lib/hijri'
 import type { LifeEvent } from '@/types/database.types'
 
 type View = 'all' | 'plain' | 'decades'
@@ -30,6 +31,34 @@ export default function LifePage() {
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [view, setView] = useState<View>('all')
   const [selected, setSelected] = useState<number | null>(null)
+  const [yearExpanded, setYearExpanded] = useState(false)
+  const [showIslamic, setShowIslamic] = useState(false)
+
+  useEffect(() => { setShowIslamic(localStorage.getItem('mizan_islamic_dates') !== '0') }, [])
+
+  // Islamic markers across the whole lifespan: preset holidays (toggle) + any
+  // Hijri-recurring events (e.g. a Zakat date) repeated on every lunar anniversary.
+  // Memoised — enumerating ~60 Hijri years hits Intl a few thousand times.
+  const markersByWeek = useMemo(() => {
+    const m = new Map<number, { label: string; color: string }[]>()
+    if (!dob) return m
+    const dobD = new Date(dob)
+    const death = deathDate(dobD, years)
+    const total = totalWeeks(years)
+    const push = (date: Date, label: string, color: string) => {
+      const wi = weekIndexOf(dobD, date)
+      if (wi < 0 || wi >= total) return
+      const arr = m.get(wi) ?? []
+      arr.push({ label, color }); m.set(wi, arr)
+    }
+    if (showIslamic) for (const h of islamicHolidaysBetween(dobD, death)) push(h.date, h.label, h.color)
+    for (const ev of events.filter(e => e.recurrence === 'hijri_yearly')) {
+      const h = toHijri(new Date(ev.event_date))
+      for (let y = toHijri(dobD).y; y <= toHijri(death).y; y++) push(fromHijri(y, h.m, h.day), ev.label, ev.color)
+    }
+    return m
+  }, [dob, years, events, showIslamic])
+  function toggleIslamic(v: boolean) { setShowIslamic(v); localStorage.setItem('mizan_islamic_dates', v ? '1' : '0') }
 
   useEffect(() => {
     (async () => {
@@ -114,9 +143,11 @@ export default function LifePage() {
       return { background: DECADE_COLORS[ageAtWeek(i) % DECADE_COLORS.length] }
     }
 
-    // 'all' — events overlay
+    // 'all' — events overlay, then Islamic markers
     const ev = eventByWeek.get(i)
     if (ev) return isLived ? { background: ev.color } : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${ev.color}` }
+    const mk = markersByWeek.get(i)?.[0]
+    if (mk) return { background: isLived ? mk.color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${mk.color}` }
     return { background: isLived ? 'var(--gold)' : 'var(--border)' }
   }
 
@@ -166,15 +197,45 @@ export default function LifePage() {
       {/* This year */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold">{now.getFullYear()}</span>
+          <button onClick={() => setYearExpanded(e => !e)}
+            className="flex items-center gap-1.5 text-sm font-semibold"
+            style={{ color: 'var(--text-primary)' }}>
+            {now.getFullYear()}
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{yearExpanded ? '▲' : '▼'}</span>
+          </button>
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{yearWeek} / 52 weeks</span>
         </div>
-        <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(26, minmax(0, 1fr))' }}>
-          {Array.from({ length: 52 }).map((_, i) => (
-            <div key={i} className="aspect-square rounded-[1px]"
-              style={{ background: i < yearWeek ? 'var(--gold)' : 'var(--border)' }} />
-          ))}
-        </div>
+        {!yearExpanded ? (
+          <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(26, minmax(0, 1fr))' }}>
+            {Array.from({ length: 52 }).map((_, i) => (
+              <div key={i} className="aspect-square rounded-[1px]"
+                style={{ background: i < yearWeek ? 'var(--gold)' : 'var(--border)' }} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 mt-1">
+            {Array.from({ length: 12 }, (_, m) => {
+              const monthStart = new Date(now.getFullYear(), m, 1)
+              const monthEnd = new Date(now.getFullYear(), m + 1, 0)
+              const yearStart = new Date(now.getFullYear(), 0, 1)
+              const toWeek = (d: Date) => Math.floor((d.getTime() - yearStart.getTime()) / (7 * MS_DAY))
+              const wStart = toWeek(monthStart)
+              const wEnd = Math.min(51, toWeek(monthEnd))
+              const monthName = monthStart.toLocaleString('default', { month: 'short' })
+              return (
+                <div key={m} className="flex items-center gap-2">
+                  <span className="text-[11px] w-7 shrink-0 text-right" style={{ color: 'var(--text-muted)' }}>{monthName}</span>
+                  <div className="flex gap-[3px] flex-1">
+                    {Array.from({ length: wEnd - wStart + 1 }, (_, w) => wStart + w).map(w => (
+                      <div key={w} className="flex-1 h-3.5 rounded-[2px]"
+                        style={{ background: w < yearWeek ? 'var(--gold)' : 'var(--border)' }} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Upcoming */}
@@ -193,7 +254,9 @@ export default function LifePage() {
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ev.color }} />
                     <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{ev.label}</span>
                     {ev.recurrence !== 'none' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{ev.recurrence}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                        {ev.recurrence === 'hijri_yearly' ? 'Hijri' : ev.recurrence}
+                      </span>
                     )}
                   </div>
                   <span className="text-[11px] shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
@@ -224,6 +287,18 @@ export default function LifePage() {
           ))}
         </div>
 
+        {/* Islamic dates toggle */}
+        {view === 'all' && (
+          <label className="flex items-center justify-between mb-3 cursor-pointer">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Highlight Islamic dates (Ramadan, Eids, Muharram, Ashura)</span>
+            <div className="relative">
+              <input type="checkbox" className="sr-only peer" checked={showIslamic} onChange={e => toggleIslamic(e.target.checked)} />
+              <div className="w-9 h-5 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
+                style={{ background: showIslamic ? 'var(--gold)' : 'var(--border)' }} />
+            </div>
+          </label>
+        )}
+
         <div className="grid gap-[2px]" style={{ gridTemplateColumns: 'repeat(52, minmax(0, 1fr))' }}>
           {Array.from({ length: total }).map((_, i) => {
             const ev = view === 'all' ? eventByWeek.get(i) : undefined
@@ -246,8 +321,26 @@ export default function LifePage() {
               Week {sel + 1} · age {ageAtWeek(sel)}
             </p>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {selStart.toLocaleDateString()} – {selEnd.toLocaleDateString()}
+              {hijriLabel(selStart)} – {hijriLabel(selEnd)} (Hijri)
             </p>
+            {/* 7-day row */}
+            <div className="flex gap-1 mt-2">
+              {['M','T','W','T','F','S','S'].map((d, i) => {
+                const day = new Date(selStart.getTime() + i * MS_DAY)
+                const isToday = day.toDateString() === now.toDateString()
+                const isPast = day < now
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                    <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{d}</span>
+                    <span className="text-[11px] w-6 h-6 flex items-center justify-center rounded-full font-medium"
+                      style={{
+                        background: isToday ? 'var(--gold)' : 'transparent',
+                        color: isToday ? '#0a0a0a' : isPast ? 'var(--text-secondary)' : 'var(--text-muted)',
+                      }}>{day.getDate()}</span>
+                  </div>
+                )
+              })}
+            </div>
             {selEvent ? (
               <div className="mt-2 flex items-start gap-2">
                 <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
@@ -258,6 +351,15 @@ export default function LifePage() {
                   </p>
                   {selEvent.notes && <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{selEvent.notes}</p>}
                 </div>
+              </div>
+            ) : markersByWeek.get(sel)?.length ? (
+              <div className="mt-2 flex flex-col gap-1">
+                {markersByWeek.get(sel)!.map((mk, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: mk.color }} />
+                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mk.label}</p>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
@@ -270,6 +372,30 @@ export default function LifePage() {
         <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
           Each square is one week — tap any to see its dates. {remainingCells.toLocaleString()} remain.
         </p>
+
+        {/* Decades legend */}
+        {view === 'decades' && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+            {DECADE_COLORS.slice(0, Math.ceil(years / 10)).map((color, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} />
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Age {i * 10}–{i * 10 + 9}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Islamic dates legend */}
+        {view === 'all' && showIslamic && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+            {ISLAMIC_HOLIDAYS.map(h => (
+              <div key={h.label} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: h.color }} />
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{h.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Legend (clickable → jumps to that week) */}
         {view === 'all' && events.length > 0 && (

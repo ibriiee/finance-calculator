@@ -116,23 +116,26 @@ export default function BottomNav() {
         </div>
       </div>
 
-      <div className="flex items-center justify-around px-2 pt-2">
-        {navItems.map(({ href, icon: Icon, label }) => {
-          const active = path === href || path.startsWith(href + '/')
-          return (
-            <Link key={href} href={href}
-              className={cn('relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all',
-                active ? 'text-[var(--gold)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-              )}>
-              <span aria-hidden
-                className="absolute -top-[3px] text-[7px] leading-none transition-opacity"
-                style={{ color: 'var(--gold)', opacity: active ? 1 : 0 }}>✦</span>
-              <Icon size={20} strokeWidth={active ? 2.5 : 1.5} />
-              <span className="text-[10px] font-medium">{label}</span>
-            </Link>
-          )
-        })}
-      </div>
+      {activeRoom !== 'life' && (
+        <div className="flex items-center justify-around px-2 pt-2">
+          {navItems.map(({ href, icon: Icon, label }) => {
+            const active = path === href || path.startsWith(href + '/')
+            return (
+              <Link key={href} href={href}
+                className={cn('relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all',
+                  active ? 'text-[var(--gold)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                )}>
+                <span aria-hidden
+                  className="absolute -top-[3px] text-[7px] leading-none transition-opacity"
+                  style={{ color: 'var(--gold)', opacity: active ? 1 : 0 }}>✦</span>
+                <Icon size={20} strokeWidth={active ? 2.5 : 1.5} />
+                <span className="text-[10px] font-medium">{label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+      {activeRoom === 'life' && <div className="h-3" />}
     </nav>
   )
 }
