@@ -13,6 +13,9 @@ import type { IncomeProject } from '@/types/database.types'
 export default function IncomePage() {
   const [items, setItems] = useState<IncomeProject[]>([])
   const [sadakaByIncome, setSadakaByIncome] = useState<Record<string, { owed: number; given: number }>>({})
+  // Individual sadaka payments per income — so the breakdown shows WHERE it went,
+  // even after the payment cards disappear from the Sadaka tab (once fully given).
+  const [paymentsByIncome, setPaymentsByIncome] = useState<Record<string, { name: string; amount: number; date: string | null; currency: string }[]>>({})
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<IncomeProject | null>(null)
@@ -42,6 +45,19 @@ export default function IncomePage() {
       map[s.source_income_id] = m
     })
     setSadakaByIncome(map)
+    // Collect each income's actual sadaka payments (recipient + amount + date).
+    const pmap: Record<string, { name: string; amount: number; date: string | null; currency: string }[]> = {}
+    ;(sadaka ?? []).forEach((s: any) => {
+      if (!s.source_income_id || Number(s.amount_owed) !== 0 || Number(s.amount_given) <= 0) return  // payments only
+      ;(pmap[s.source_income_id] ??= []).push({
+        name: s.recipient_name ?? 'Sadaka given',
+        amount: Number(s.amount_given),
+        date: s.date_given ?? s.created_at ?? null,
+        currency: s.currency,
+      })
+    })
+    Object.values(pmap).forEach(list => list.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')))
+    setPaymentsByIncome(pmap)
     setLoading(false)
   }
 
@@ -221,6 +237,24 @@ export default function IncomePage() {
                             <span>{formatCurrency(sadakaPending, item.currency, true)}</span>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Where the sadaka actually went — survives even after the
+                        payment cards disappear from the Sadaka tab once fully given. */}
+                    {(paymentsByIncome[item.id]?.length ?? 0) > 0 && (
+                      <div className="border-t pt-1.5 mt-1 flex flex-col gap-1" style={{ borderColor: 'var(--border)' }}>
+                        <p className="text-[11px] mb-0.5 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                          <HandHeart size={10} /> Given to
+                        </p>
+                        {paymentsByIncome[item.id].map((p, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span style={{ color: 'var(--text-secondary)' }}>
+                              {p.name}{p.date ? ` · ${shortDate(p.date)}` : ''}
+                            </span>
+                            <span className="text-emerald-400">{formatCurrency(p.amount, p.currency, true)}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
