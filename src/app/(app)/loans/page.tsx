@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
-import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
@@ -124,14 +123,14 @@ export default function LoansPage() {
       setRepaying(false)
     }
 
+    const borderColor = loan.status === 'cleared' ? '#10B981' : isOverdue ? '#EF4444' : 'var(--gold)'
+    const typeLabel = loan.loan_type === 'i_owe' ? (mine ? 'I Owe' : `${names[loan.owner_id] ?? 'They'} Owes`) : loan.loan_type === 'they_owe' ? 'They Owe' : 'Joint'
     return (
-      <div className="card p-4">
+      <div className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1 mr-3">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <StatusBadge status={loan.loan_type === 'i_owe' ? 'outstanding' : 'given'}
-                label={loan.loan_type === 'i_owe' ? (mine ? 'I Owe' : `${names[loan.owner_id] ?? 'They'} Owes`) : loan.loan_type === 'they_owe' ? 'They Owe' : 'Joint'} size="xs" />
-              <StatusBadge status={loan.status} size="xs" />
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{typeLabel}</span>
             </div>
             <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{loan.counterparty_name}</p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import { incomeOutstanding, isIncomeSettled, remainingForIncome } from '@/lib/sadaka'
 import { validateAmount } from '@/lib/utils'
@@ -21,6 +21,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const DRAFT_KEY = 'mizan_sadaka_draft'
   const [outstanding, setOutstanding] = useState<ReturnType<typeof incomeOutstanding>>(new Map())
   const [secondaryIncomeId, setSecondaryIncomeId] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const defaultForm = {
     amount_owed: (editItem?.amount_owed || editItem?.amount_given) ? String(editItem.amount_owed || editItem.amount_given) : '',
@@ -149,6 +150,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
+          {/* ── PRIMARY FIELDS ── */}
           <div className="grid grid-cols-3 gap-2">
             <select value={form.currency} onChange={e => F('currency', e.target.value)}
               className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
@@ -158,6 +160,19 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
             <input placeholder="Amount" type="number" value={form.amount_owed} onChange={e => F('amount_owed', e.target.value)}
               className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
+
+          <select value={form.status} onChange={e => F('status', e.target.value)}
+            className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            <option value="pending">Pending (obligation)</option>
+            <option value="given">Already Given</option>
+            <option value="advance_given">Advance Given</option>
+          </select>
+
+          <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
+            {form.status === 'pending'
+              ? 'Adds a new amount you owe (raises your pending sadaka).'
+              : 'Records money you gave — this DEDUCTS from your pending sadaka.'}
+          </p>
 
           {recipients.length > 0 && (
             <select value={form.recipient_id} onChange={e => F('recipient_id', e.target.value)}
@@ -172,151 +187,139 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
               className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <select value={form.recipient_type} onChange={e => F('recipient_type', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="named_relative">Named relative</option>
-              <option value="anonymous_needy">Anonymous needy</option>
-              <option value="masjid">Masjid</option>
-              <option value="gift">Gift</option>
-              <option value="other">Other</option>
-            </select>
-            <select value={form.location} onChange={e => F('location', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="UAE">UAE</option>
-              <option value="Pakistan">Pakistan</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
+          {/* ── ADVANCED TOGGLE ── */}
+          <button type="button" onClick={() => setShowAdvanced(v => !v)}
+            className="flex items-center gap-1.5 text-xs py-1" style={{ color: 'var(--text-muted)' }}>
+            {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            Advanced {showAdvanced ? '▲' : '▾'}
+          </button>
 
-          <div className="grid grid-cols-2 gap-2">
-            <select value={form.method} onChange={e => F('method', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="cash">Cash</option>
-              <option value="gift">Gift</option>
-              <option value="food">Food</option>
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="other">Other</option>
-            </select>
-            <select value={form.status} onChange={e => F('status', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="pending">Pending</option>
-              <option value="given">Already Given</option>
-              <option value="advance_given">Advance Given</option>
-            </select>
-          </div>
-
-          {/* What this entry does, in plain words */}
-          <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
-            {form.status === 'pending'
-              ? 'Adds a new amount you owe (raises your pending sadaka).'
-              : 'Records money you gave — this DEDUCTS from your pending sadaka.'}
-          </p>
-
-          {/* Which income this sadaka is for (optional attribution).
-              For a payment, only offer incomes whose sadaka chapter is still open —
-              a fully-given stream shouldn't be a pay-toward target again. */}
-          {(() => {
-            const isPayment = form.status === 'given' || form.status === 'advance_given'
-            const selectable = incomes.filter(i =>
-              !isPayment
-              || i.id === form.from_income_id
-              || !isIncomeSettled(outstanding, i.id))
-            if (incomes.length === 0) return null
-            const linkedRemaining = form.from_income_id
-              ? remainingForIncome(outstanding, form.from_income_id) : 0
-            const amount = parseFloat(form.amount_owed || '0')
-            const overpayAmount = isPayment && form.from_income_id && amount > linkedRemaining && linkedRemaining > 0
-              ? amount - linkedRemaining : 0
-            // incomes available for the secondary split (excludes primary + already settled)
-            const secondaryOptions = selectable.filter(i => i.id !== form.from_income_id && !isIncomeSettled(outstanding, i.id))
-            return (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {isPayment ? 'Pay toward which income (optional)' : 'From which income (optional)'}
-                </p>
-                <select value={form.from_income_id} onChange={e => { F('from_income_id', e.target.value); setSecondaryIncomeId('') }}
-                  className="w-full px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-                  <option value="">Not linked to a specific income</option>
-                  {selectable.map(i => {
-                    const rem = remainingForIncome(outstanding, i.id)
-                    return <option key={i.id} value={i.id}>{i.name}{isPayment && rem > 0 ? ` — ${rem} ${form.currency} due` : ''}</option>
-                  })}
+          {showAdvanced && (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <select value={form.recipient_type} onChange={e => F('recipient_type', e.target.value)}
+                  className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                  <option value="named_relative">Named relative</option>
+                  <option value="anonymous_needy">Anonymous needy</option>
+                  <option value="masjid">Masjid</option>
+                  <option value="gift">Gift</option>
+                  <option value="other">Other</option>
                 </select>
+                <select value={form.location} onChange={e => F('location', e.target.value)}
+                  className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                  <option value="UAE">UAE</option>
+                  <option value="Pakistan">Pakistan</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
 
-                {overpayAmount > 0 && (
-                  <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)' }}>
-                    <p className="text-[11px] font-medium" style={{ color: 'var(--gold)' }}>
-                      ✓ Clears {linkedRemaining.toLocaleString()} {form.currency} on this income
+              <select value={form.method} onChange={e => F('method', e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="cash">Cash</option>
+                <option value="gift">Gift</option>
+                <option value="food">Food</option>
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="other">Other</option>
+              </select>
+
+              {/* Income linking */}
+              {(() => {
+                const isPayment = form.status === 'given' || form.status === 'advance_given'
+                const selectable = incomes.filter(i =>
+                  !isPayment || i.id === form.from_income_id || !isIncomeSettled(outstanding, i.id))
+                if (incomes.length === 0) return null
+                const linkedRemaining = form.from_income_id ? remainingForIncome(outstanding, form.from_income_id) : 0
+                const amount = parseFloat(form.amount_owed || '0')
+                const overpayAmount = isPayment && form.from_income_id && amount > linkedRemaining && linkedRemaining > 0
+                  ? amount - linkedRemaining : 0
+                const secondaryOptions = selectable.filter(i => i.id !== form.from_income_id && !isIncomeSettled(outstanding, i.id))
+                return (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {isPayment ? 'Pay toward which income (optional)' : 'From which income (optional)'}
                     </p>
-                    {secondaryOptions.length > 0 ? (
-                      <>
-                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          Remaining {overpayAmount.toLocaleString()} {form.currency} — route to:
+                    <select value={form.from_income_id} onChange={e => { F('from_income_id', e.target.value); setSecondaryIncomeId('') }}
+                      className="w-full px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                      <option value="">Not linked to a specific income</option>
+                      {selectable.map(i => {
+                        const rem = remainingForIncome(outstanding, i.id)
+                        return <option key={i.id} value={i.id}>{i.name}{isPayment && rem > 0 ? ` — ${rem} ${form.currency} due` : ''}</option>
+                      })}
+                    </select>
+                    {overpayAmount > 0 && (
+                      <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)' }}>
+                        <p className="text-[11px] font-medium" style={{ color: 'var(--gold)' }}>
+                          ✓ Clears {linkedRemaining.toLocaleString()} {form.currency} on this income
                         </p>
-                        <select value={secondaryIncomeId} onChange={e => setSecondaryIncomeId(e.target.value)}
-                          className="w-full px-3 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-                          <option value="">Leave as advance credit</option>
-                          {secondaryOptions.map(i => {
-                            const rem = remainingForIncome(outstanding, i.id)
-                            return <option key={i.id} value={i.id}>{i.name} — {rem} {form.currency} due</option>
-                          })}
-                        </select>
-                        {secondaryIncomeId && (
+                        {secondaryOptions.length > 0 ? (
+                          <>
+                            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                              Remaining {overpayAmount.toLocaleString()} {form.currency} — route to:
+                            </p>
+                            <select value={secondaryIncomeId} onChange={e => setSecondaryIncomeId(e.target.value)}
+                              className="w-full px-3 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                              <option value="">Leave as advance credit</option>
+                              {secondaryOptions.map(i => {
+                                const rem = remainingForIncome(outstanding, i.id)
+                                return <option key={i.id} value={i.id}>{i.name} — {rem} {form.currency} due</option>
+                              })}
+                            </select>
+                            {secondaryIncomeId && (
+                              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                                Split: {linkedRemaining.toLocaleString()} → {incomes.find(i => i.id === form.from_income_id)?.name} · {overpayAmount.toLocaleString()} → {incomes.find(i => i.id === secondaryIncomeId)?.name}
+                              </p>
+                            )}
+                          </>
+                        ) : (
                           <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                            Split: {linkedRemaining.toLocaleString()} → {incomes.find(i => i.id === form.from_income_id)?.name} · {overpayAmount.toLocaleString()} → {incomes.find(i => i.id === secondaryIncomeId)?.name}
+                            Extra {overpayAmount.toLocaleString()} {form.currency} carries forward as advance credit.
                           </p>
                         )}
-                      </>
-                    ) : (
+                      </div>
+                    )}
+                    {isPayment && !form.from_income_id && form.status === 'advance_given' && (
                       <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        Extra {overpayAmount.toLocaleString()} {form.currency} carries forward as advance credit.
+                        Builds advance credit — auto-offsets your next income obligation.
                       </p>
                     )}
                   </div>
-                )}
+                )
+              })()}
 
-                {isPayment && !form.from_income_id && form.status === 'advance_given' && (
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    Builds advance credit — auto-offsets your next income obligation.
+              {/* Whose sadaka */}
+              <div>
+                <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Whose sadaka</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: 'me', label: me?.name ?? 'Me' },
+                    { val: 'other', label: other?.name ?? 'Brother' },
+                    { val: 'joint', label: 'Joint' },
+                  ].map(opt => (
+                    <button key={opt.val} type="button" onClick={() => F('on_behalf', opt.val)}
+                      className="py-2.5 px-2 rounded-xl text-xs font-medium truncate"
+                      style={{
+                        background: form.on_behalf === opt.val ? 'var(--gold-dim)' : 'var(--surface-2)',
+                        border: `1px solid ${form.on_behalf === opt.val ? 'var(--gold)' : 'var(--border)'}`,
+                        color: form.on_behalf === opt.val ? 'var(--gold)' : 'var(--text-muted)',
+                      }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {form.on_behalf === 'other' && (
+                  <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Logged on {other?.name}'s behalf — both of you can see and manage it.
                   </p>
                 )}
               </div>
-            )
-          })()}
 
-          {/* Whose sadaka is this */}
-          <div>
-            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Whose sadaka</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { val: 'me', label: me?.name ?? 'Me' },
-                { val: 'other', label: other?.name ?? 'Brother' },
-                { val: 'joint', label: 'Joint' },
-              ].map(opt => (
-                <button key={opt.val} type="button" onClick={() => F('on_behalf', opt.val)}
-                  className="py-2.5 px-2 rounded-xl text-xs font-medium truncate"
-                  style={{
-                    background: form.on_behalf === opt.val ? 'var(--gold-dim)' : 'var(--surface-2)',
-                    border: `1px solid ${form.on_behalf === opt.val ? 'var(--gold)' : 'var(--border)'}`,
-                    color: form.on_behalf === opt.val ? 'var(--gold)' : 'var(--text-muted)',
-                  }}>
-                  {opt.label}
-                </button>
-              ))}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.is_advance} onChange={e => F('is_advance', e.target.checked)}
+                  className="w-4 h-4 rounded accent-[var(--gold)]" />
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Advance (given before income)</span>
+              </label>
             </div>
-            {form.on_behalf === 'other' && (
-              <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                Logged on {other?.name}'s behalf — both of you can see and manage it.
-              </p>
-            )}
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.is_advance} onChange={e => F('is_advance', e.target.checked)}
-              className="w-4 h-4 rounded accent-[var(--gold)]" />
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Advance (given before income)</span>
-          </label>
+          )}
 
           {error && (
             <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>

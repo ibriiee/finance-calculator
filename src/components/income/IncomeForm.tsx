@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ownershipForEmail, validateAmount } from '@/lib/utils'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import type { Currency, IncomeType, Ownership } from '@/types/database.types'
 
@@ -12,6 +12,7 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const isEdit = !!editItem
   const DRAFT_KEY = 'mizan_income_draft'
   const defaultForm = {
@@ -117,34 +118,45 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
               className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work started</label>
-              <input type="date" value={form.work_started_date} onChange={e => F('work_started_date', e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          {/* ── ADVANCED TOGGLE ── */}
+          <button type="button" onClick={() => setShowAdvanced(v => !v)}
+            className="flex items-center gap-1.5 text-xs py-1" style={{ color: 'var(--text-muted)' }}>
+            {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            Advanced {showAdvanced ? '▲' : '▾'}
+          </button>
+
+          {showAdvanced && (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work started</label>
+                  <input type="date" value={form.work_started_date} onChange={e => F('work_started_date', e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work completed</label>
+                  <input type="date" value={form.work_completed_date} disabled={form.is_ongoing}
+                    onChange={e => F('work_completed_date', e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm disabled:opacity-40" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.is_ongoing} onChange={e => F('is_ongoing', e.target.checked)}
+                  className="w-4 h-4 rounded accent-[var(--gold)]" />
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Work is still ongoing (no completion date yet)</span>
+              </label>
+
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Expected payment</label>
+                <input type="date" value={form.expected_payment_date} onChange={e => F('expected_payment_date', e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              </div>
+
+              <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
+                className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
             </div>
-            <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Work completed</label>
-              <input type="date" value={form.work_completed_date} disabled={form.is_ongoing}
-                onChange={e => F('work_completed_date', e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm disabled:opacity-40" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.is_ongoing} onChange={e => F('is_ongoing', e.target.checked)}
-              className="w-4 h-4 rounded accent-[var(--gold)]" />
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Work is still ongoing (no completion date yet)</span>
-          </label>
-
-          <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Expected payment</label>
-            <input type="date" value={form.expected_payment_date} onChange={e => F('expected_payment_date', e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-          </div>
-
-          <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
-            className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          )}
 
           {error && <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>⚠ {error}</div>}
 

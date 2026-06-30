@@ -197,7 +197,7 @@ export default async function DashboardPage() {
         </Link>
       ))}
 
-      {/* This month — in-hand earnings, then what's actually yours to keep */}
+      {/* This month — Yours to Keep as hero, waterfall in collapsible */}
       {enabled('income') && (
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
@@ -205,16 +205,17 @@ export default async function DashboardPage() {
           <Link href="/income" className="text-xs" style={{ color: 'var(--gold)' }}>View all →</Link>
         </div>
 
-        {/* Hero = money actually in hand (received) */}
-        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>In hand (received)</p>
-        <p className="font-display text-4xl font-semibold text-gold-gradient leading-tight">
-          {formatCurrency(inHandAed, 'AED', true)}
+        {/* Hero = yours to keep */}
+        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Yours to keep</p>
+        <p className="font-display text-4xl font-semibold leading-tight"
+           style={{ color: yoursToKeepAed >= 0 ? 'var(--emerald)' : '#EF4444' }}>
+          {formatCurrency(yoursToKeepAed, 'AED', true)}
         </p>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div>
-            <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Earned (total)</p>
+            <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>In hand</p>
             <p className="font-display text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              {formatCurrency(totalEarned, 'AED', true)}
+              {formatCurrency(inHandAed, 'AED', true)}
             </p>
           </div>
           <div>
@@ -226,41 +227,45 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="divider-rule my-4">✦</div>
-
-        {/* Waterfall: in hand − sadaka − what you owe = yours to keep */}
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>In hand</span>
-            <span className="font-display text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              {formatCurrency(inHandAed, 'AED', true)}
-            </span>
+        {/* Collapsible waterfall */}
+        <details className="mt-4">
+          <summary className="text-xs cursor-pointer select-none list-none flex items-center gap-1"
+                   style={{ color: 'var(--text-muted)' }}>
+            <span>How is this calculated ▾</span>
+          </summary>
+          <div className="flex flex-col gap-2.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>In hand (received)</span>
+              <span className="font-display text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                {formatCurrency(inHandAed, 'AED', true)}
+              </span>
+            </div>
+            <Link href="/sadaka" className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka due</span>
+              <span className="font-display text-sm font-semibold" style={{ color: sadakaDueAed > 0 ? 'var(--gold)' : 'var(--text-muted)' }}>
+                {sadakaDueAed > 0 ? '−' : ''}{formatCurrency(sadakaDueAed, 'AED', true)}
+              </span>
+            </Link>
+            <Link href="/loans" className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Owed to people</span>
+              <span className="font-display text-sm font-semibold" style={{ color: totalOwedAed > 0 ? '#EF4444' : 'var(--text-muted)' }}>
+                {totalOwedAed > 0 ? '−' : ''}{formatCurrency(totalOwedAed, 'AED', true)}
+              </span>
+            </Link>
+            <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>= Yours to keep</span>
+              <span className="font-display text-sm font-semibold"
+                    style={{ color: yoursToKeepAed >= 0 ? 'var(--emerald)' : '#EF4444' }}>
+                {formatCurrency(yoursToKeepAed, 'AED', true)}
+              </span>
+            </div>
+            {sadakaOwedPkr > 0 && (
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Includes {formatCurrency(sadakaOwedPkr, 'PKR', true)} sadaka converted at {pkrToAed}.
+              </p>
+            )}
           </div>
-          <Link href="/sadaka" className="flex items-center justify-between">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka due</span>
-            <span className="font-display text-sm font-semibold" style={{ color: sadakaDueAed > 0 ? 'var(--gold)' : 'var(--text-muted)' }}>
-              {sadakaDueAed > 0 ? '−' : ''}{formatCurrency(sadakaDueAed, 'AED', true)}
-            </span>
-          </Link>
-          <Link href="/loans" className="flex items-center justify-between">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Owed to people (short-term)</span>
-            <span className="font-display text-sm font-semibold" style={{ color: totalOwedAed > 0 ? '#EF4444' : 'var(--text-muted)' }}>
-              {totalOwedAed > 0 ? '−' : ''}{formatCurrency(totalOwedAed, 'AED', true)}
-            </span>
-          </Link>
-          <div className="flex items-center justify-between pt-2.5 mt-0.5" style={{ borderTop: '1px solid var(--border)' }}>
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Yours to keep</span>
-            <span className="font-display text-xl font-semibold"
-                  style={{ color: yoursToKeepAed >= 0 ? 'var(--emerald)' : '#EF4444' }}>
-              {formatCurrency(yoursToKeepAed, 'AED', true)}
-            </span>
-          </div>
-        </div>
-        {sadakaOwedPkr > 0 && (
-          <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
-            Includes {formatCurrency(sadakaOwedPkr, 'PKR', true)} sadaka converted at {pkrToAed}.
-          </p>
-        )}
+        </details>
       </div>
       )}
 

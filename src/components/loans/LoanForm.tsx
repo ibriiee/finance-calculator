@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import { validateAmount } from '@/lib/utils'
 import type { LoanType, LoanCurrencyType } from '@/types/database.types'
@@ -12,6 +12,7 @@ export default function LoanForm({ onClose, onSaved }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [me, setMe] = useState('')
   const [people, setPeople] = useState<{ id: string; name: string }[]>([])
   const [ownerId, setOwnerId] = useState('')
@@ -114,27 +115,38 @@ export default function LoanForm({ onClose, onSaved }: Props) {
               className="px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
 
-          {isGold && (
-            <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(201,168,76,0.1)', color: 'var(--gold)' }}>
-              ℹ Gold/silver loans: return same grams at today's price (Qard Hasan rule)
+          {/* ── ADVANCED TOGGLE ── */}
+          <button type="button" onClick={() => setShowAdvanced(v => !v)}
+            className="flex items-center gap-1.5 text-xs py-1" style={{ color: 'var(--text-muted)' }}>
+            {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            Advanced {showAdvanced ? '▲' : '▾'}
+          </button>
+
+          {showAdvanced && (
+            <div className="flex flex-col gap-3">
+              {isGold && (
+                <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(201,168,76,0.1)', color: 'var(--gold)' }}>
+                  ℹ Gold/silver loans: return same grams at today's price (Qard Hasan rule)
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Date taken</label>
+                  <input type="date" value={form.date_taken} onChange={e => F('date_taken', e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Due date (opt.)</label>
+                  <input type="date" value={form.due_date} onChange={e => F('due_date', e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+              </div>
+
+              <input placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
             </div>
           )}
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Date taken</label>
-              <input type="date" value={form.date_taken} onChange={e => F('date_taken', e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-            </div>
-            <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Due date (opt.)</label>
-              <input type="date" value={form.due_date} onChange={e => F('due_date', e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-            </div>
-          </div>
-
-          <input placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
 
           {error && <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>⚠ {error}</div>}
 

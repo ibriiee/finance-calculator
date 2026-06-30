@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate, getLagDays, getLagColor } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
-import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock } from 'lucide-react'
@@ -122,23 +121,21 @@ export default function IncomePage() {
             const sad = sadakaByIncome[item.id]
             const sadakaPaid = sad ? sad.given >= sad.owed && sad.owed > 0 : false
 
+            const borderColor = item.status === 'received' ? '#10B981' : isOverdue ? '#EF4444' : 'var(--gold)'
             return (
-              <div key={item.id} className="card p-4">
+              <div key={item.id} className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 mr-3">
                     <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
                     <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--text-muted)' }}>
                       {item.type.replace('_', ' ')} · {item.ownership === 'shared' ? 'Shared' : item.ownership === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
+                      {ongoing && <span className="ml-1" style={{ color: 'var(--text-muted)' }}>· Ongoing</span>}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-base font-bold" style={{ color: 'var(--gold)' }}>
                       {formatCurrency(item.amount, item.currency)}
                     </span>
-                    <div className="flex items-center gap-1">
-                      {ongoing && <StatusBadge status="pending" label="Ongoing" size="xs" />}
-                      <StatusBadge status={item.status} size="xs" />
-                    </div>
                   </div>
                 </div>
 
