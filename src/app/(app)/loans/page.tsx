@@ -7,7 +7,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, CreditCard, UserRound, ArrowLeftRight } from 'lucide-react'
+import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import LoanForm from '@/components/loans/LoanForm'
 import type { Loan } from '@/types/database.types'
 
@@ -93,11 +93,37 @@ export default function LoansPage() {
   }
 
   function LoanCard({ loan, mine }: { loan: Loan; mine: boolean }) {
+    const [showRepay, setShowRepay] = useState(false)
+    const [repayAmount, setRepayAmount] = useState('')
+    const [repayDate, setRepayDate] = useState(new Date().toISOString().split('T')[0])
+    const [repaying, setRepaying] = useState(false)
     const isOverdue = loan.due_date && new Date(loan.due_date) < new Date() && loan.status !== 'cleared'
     const isGold = ['gold_grams', 'silver_grams'].includes(loan.currency_type)
     const addedBy = (loan as any).added_by_id as string | null
     const addedByOther = addedBy && addedBy !== userId
     const canEdit = loan.owner_id === userId || addedBy === userId
+    const repaid = repaidFor(loan.id)
+    const original = Number(loan.original_amount)
+    const remaining = Math.max(0, original - repaid)
+    const repaidPct = original > 0 ? Math.min(100, Math.round((repaid / original) * 100)) : 0
+
+    async function logRepayment() {
+      const amt = parseFloat(repayAmount)
+      if (!amt || amt <= 0) return
+      setRepaying(true)
+      const { error } = await supabase.from('loan_repayments').insert({
+        loan_id: loan.id, amount: amt,
+        repayment_date: repayDate, notes: null,
+      } as any)
+      if (!error) {
+        const newRepaid = repaid + amt
+        const newStatus = newRepaid >= original ? 'cleared' : 'partial'
+        await supabase.from('loans').update({ status: newStatus }).eq('id', loan.id)
+        setRepayAmount(''); setShowRepay(false); load()
+      }
+      setRepaying(false)
+    }
+
     return (
       <div className="card p-4">
         <div className="flex items-start justify-between mb-2">
@@ -121,32 +147,58 @@ export default function LoansPage() {
           </div>
           <div className="text-right">
             <p className="text-base font-bold" style={{ color: isGold ? 'var(--gold)' : 'var(--text-primary)' }}>
-              {getReturnDisplay(loan)}
+              {remaining > 0 ? formatCurrency(remaining, loan.currency_type) : getReturnDisplay(loan)}
             </p>
             {isGold && <p className="text-xs text-amber-400">Today's value (Qard rule)</p>}
-            {repaidFor(loan.id) > 0 && (
-              <p className="text-xs text-emerald-400">repaid {formatCurrency(repaidFor(loan.id), loan.currency_type, true)}</p>
-            )}
+            {repaid > 0 && <p className="text-xs text-emerald-400">{repaidPct}% repaid</p>}
           </div>
         </div>
+
+        {/* Repayment progress bar */}
+        {!isGold && repaid > 0 && (
+          <div className="mt-2 mb-1">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${repaidPct}%`, background: repaidPct === 100 ? '#10B981' : 'var(--gold)' }} />
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+              {formatCurrency(repaid, loan.currency_type, true)} of {formatCurrency(original, loan.currency_type, true)} repaid
+            </p>
+          </div>
+        )}
+
         {isOverdue && (
           <div className="mt-2 px-3 py-1.5 rounded-lg text-xs text-red-400" style={{ background: 'rgba(239,68,68,0.1)' }}>
             ⚠ Overdue
           </div>
         )}
-        {loan.notes && (
-          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{loan.notes}</p>
-        )}
+        {loan.notes && <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{loan.notes}</p>}
+
         {loan.status !== 'cleared' && canEdit && (
-          <button onClick={async () => {
-            if (!confirm('Mark this loan as cleared (fully repaid)?')) return
-            const { error } = await supabase.from('loans').update({ status: 'cleared' }).eq('id', loan.id)
-            if (error) { alert(`Could not update: ${error.message}`); return }
-            load()
-          }} className="mt-3 w-full py-2 rounded-lg text-xs font-semibold"
-             style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-            ✓ Mark Cleared
-          </button>
+          <div className="mt-3 flex flex-col gap-2">
+            <button onClick={() => setShowRepay(s => !s)}
+              className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+              {showRepay ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              Log Repayment
+            </button>
+
+            {showRepay && (
+              <div className="flex flex-col gap-2 p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" placeholder="Amount" value={repayAmount} onChange={e => setRepayAmount(e.target.value)}
+                    className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                  <input type="date" value={repayDate} onChange={e => setRepayDate(e.target.value)}
+                    className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                </div>
+                <button onClick={logRepayment} disabled={repaying || !repayAmount}
+                  className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+                  style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+                  {repaying && <Loader2 size={12} className="animate-spin" />}
+                  Save Repayment
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     )

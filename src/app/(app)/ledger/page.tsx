@@ -5,7 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, ArrowLeftRight, ArrowUpRight, ArrowDownLeft, CheckCircle2 } from 'lucide-react'
+import { Plus, ArrowLeftRight, ArrowUpRight, ArrowDownLeft, CheckCircle2, RotateCcw } from 'lucide-react'
 import LedgerForm from '@/components/ledger/LedgerForm'
 import SettleUpModal from '@/components/ledger/SettleUpModal'
 import type { BrotherLedgerEntry, Profile } from '@/types/database.types'
@@ -151,13 +151,35 @@ export default function LedgerPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-1">
                     <p className={`text-base font-bold ${isPayer ? 'text-red-400' : 'text-emerald-400'}`}>
                       {isPayer ? '-' : '+'}{formatCurrency(entry.amount, entry.currency)}
                     </p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       {isPayer ? `you → ${otherUser?.display_name}` : `${otherUser?.display_name} → you`}
                     </p>
+                    {!entry.is_settled && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm('Reverse this entry? Creates an equal opposite transaction.')) return
+                          await supabase.from('brother_ledger').insert({
+                            from_user_id: entry.to_user_id,
+                            to_user_id: entry.from_user_id,
+                            amount: entry.amount,
+                            currency: entry.currency,
+                            category: entry.category,
+                            description: `↩ Reversed: ${entry.description}`,
+                            transaction_date: new Date().toISOString().split('T')[0],
+                            source_type: 'manual',
+                            is_settled: false,
+                          } as any)
+                          load()
+                        }}
+                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg"
+                        style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                        <RotateCcw size={10} /> Reverse
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

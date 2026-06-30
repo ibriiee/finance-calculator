@@ -18,21 +18,40 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const [other, setOther] = useState<{ id: string; name: string } | null>(null)
   const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([])
   const [incomes, setIncomes] = useState<{ id: string; name: string }[]>([])
+  const DRAFT_KEY = 'mizan_sadaka_draft'
   const [outstanding, setOutstanding] = useState<ReturnType<typeof incomeOutstanding>>(new Map())
   const [secondaryIncomeId, setSecondaryIncomeId] = useState('')
-  const [form, setForm] = useState({
-    // For an obligation this is the amount owed; for a given/advance payment it's the amount given.
+
+  const defaultForm = {
     amount_owed: (editItem?.amount_owed || editItem?.amount_given) ? String(editItem.amount_owed || editItem.amount_given) : '',
     currency: (editItem?.currency ?? 'AED') as Currency,
     is_advance: editItem?.is_advance ?? false,
-    on_behalf: 'me' as 'me' | 'other' | 'joint',  // whose sadaka this is
-    from_income_id: editItem?.source_income_id ?? '',   // which income this sadaka is for (optional)
+    on_behalf: 'me' as 'me' | 'other' | 'joint',
+    from_income_id: editItem?.source_income_id ?? '',
     recipient_id: editItem?.recipient_id ?? '', recipient_name: editItem?.recipient_name ?? '',
     recipient_type: editItem?.recipient_type ?? 'named_relative',
     location: editItem?.location ?? 'UAE', method: editItem?.method ?? 'cash', notes: editItem?.notes ?? '',
     status: editItem?.status ?? 'pending',
+  }
+
+  const [form, setForm] = useState(() => {
+    // Only restore draft for new entries, not edits
+    if (!editItem && typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY)
+        if (saved) return { ...defaultForm, ...JSON.parse(saved) }
+      } catch {}
+    }
+    return defaultForm
   })
-  const F = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }))
+
+  const F = (f: string, v: any) => setForm(p => {
+    const next = { ...p, [f]: v }
+    if (!editItem) {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(next)) } catch {}
+    }
+    return next
+  })
 
   useEffect(() => {
     (async () => {
@@ -118,6 +137,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     }
     setSaving(false)
     if (err) { setError(err.message); return }
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
     onSaved(); onClose()
   }
 

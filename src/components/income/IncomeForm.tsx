@@ -13,7 +13,8 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const isEdit = !!editItem
-  const [form, setForm] = useState({
+  const DRAFT_KEY = 'mizan_income_draft'
+  const defaultForm = {
     name: editItem?.name ?? '',
     type: (editItem?.type ?? 'gig') as IncomeType,
     currency: (editItem?.currency ?? 'AED') as Currency,
@@ -24,6 +25,12 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
     ownership: (editItem?.ownership ?? 'ibrahim') as Ownership,
     is_ongoing: editItem?.is_ongoing ?? false,
     notes: editItem?.notes ?? '',
+  }
+  const [form, setForm] = useState(() => {
+    if (!editItem && typeof window !== 'undefined') {
+      try { const s = localStorage.getItem(DRAFT_KEY); if (s) return { ...defaultForm, ...JSON.parse(s) } } catch {}
+    }
+    return defaultForm
   })
 
   // New entries default to the logged-in user's ownership, not a fixed name
@@ -60,10 +67,15 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
     }
     setSaving(false)
     if (err) { setError(err.message); return }
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
     onSaved(); onClose()
   }
 
-  const F = (field: string, val: any) => setForm(p => ({ ...p, [field]: val }))
+  const F = (field: string, val: any) => setForm(p => {
+    const next = { ...p, [field]: val }
+    if (!isEdit) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(next)) } catch {} }
+    return next
+  })
 
   return (
     <FormSheet onClose={onClose}>

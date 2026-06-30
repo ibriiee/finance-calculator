@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
@@ -17,6 +18,9 @@ const inputStyle = { background: 'var(--surface-2)', border: '1px solid var(--bo
 
 export default function LifeSettingsPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const autoEditId = searchParams.get('edit')
+  const editTriggered = useRef(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -47,8 +51,14 @@ export default function LifeSettingsPage() {
     ])
     setDob((prof as any)?.date_of_birth ?? '')
     setYears((prof as any)?.life_expectancy_years ?? 63)
-    setEvents((evs as LifeEvent[]) ?? [])
+    const evList = (evs as LifeEvent[]) ?? []
+    setEvents(evList)
     setLoading(false)
+    // Auto-open edit form if navigated from grid with ?edit=<id>
+    if (autoEditId && !editTriggered.current) {
+      const target = evList.find(e => e.id === autoEditId)
+      if (target) { editTriggered.current = true; startEdit(target) }
+    }
   }
   useEffect(() => { load() }, [])
 

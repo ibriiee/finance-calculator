@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Hourglass, Settings, Bell, X, CalendarDays } from 'lucide-react'
+import { Hourglass, Settings, Bell, X, CalendarDays, Pencil } from 'lucide-react'
 import {
   deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived,
   weekIndexOf, nextOccurrence, weekStartDate, ageAtWeek, weekOfYear,
@@ -397,15 +397,21 @@ export default function LifePage() {
               })}
             </div>
             {selEvent ? (
-              <div className="mt-2 flex items-start gap-2">
-                <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
-                <div className="min-w-0">
-                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selEvent.label}</p>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {selEvent.kind}{selEvent.recurrence !== 'none' ? ` · ${selEvent.recurrence}` : ''}
-                  </p>
-                  {selEvent.notes && <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{selEvent.notes}</p>}
+              <div className="mt-2 flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
+                  <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
+                  <div className="min-w-0">
+                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selEvent.label}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      {selEvent.kind}{selEvent.recurrence !== 'none' ? ` · ${selEvent.recurrence}` : ''}
+                    </p>
+                    {selEvent.notes && <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{selEvent.notes}</p>}
+                  </div>
                 </div>
+                <Link href={`/life/settings?edit=${selEvent.id}`} className="p-1.5 rounded-lg shrink-0"
+                  style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                  <Pencil size={12} />
+                </Link>
               </div>
             ) : markersByWeek.get(sel)?.length ? (
               <div className="mt-2 flex flex-col gap-1">
