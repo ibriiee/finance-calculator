@@ -28,7 +28,9 @@ function totalsByCurrency(entries: SadakaEntry[]): Record<string, number> {
 
 function csvCell(value: string | number): string {
   const s = String(value ?? '')
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  // Prefix formula-injection characters so Excel/Sheets don't execute them
+  const safe = /^[=+@\-]/.test(s) ? "'" + s : s
+  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 export function exportSadakaCsv(scope: ExportScope) {

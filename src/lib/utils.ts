@@ -75,6 +75,15 @@ export function calcMonthsRemaining(targetDate: string): number {
   return Math.max(0, (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth())
 }
 
+/** Returns an error string if invalid, null if OK. Max 10 million to catch fat-finger entries. */
+export function validateAmount(raw: string): string | null {
+  const n = parseFloat(raw)
+  if (!raw || isNaN(n)) return 'Enter a valid number'
+  if (n <= 0) return 'Amount must be greater than 0'
+  if (n > 10_000_000) return 'Amount seems too large — check and re-enter'
+  return null
+}
+
 export function shortDate(date: string): string {
   return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
 }

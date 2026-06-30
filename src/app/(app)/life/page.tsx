@@ -32,7 +32,13 @@ export default function LifePage() {
   const [view, setView] = useState<View>('all')
   const [selected, setSelected] = useState<number | null>(null)
   const [yearExpanded, setYearExpanded] = useState(false)
-  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
+  const [calMonth, setCalMonth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('mizan_life_cal_month')
+      if (saved) { const d = new Date(saved); if (!isNaN(d.getTime())) return d }
+    }
+    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
   const [showIslamic, setShowIslamic] = useState(false)
 
   useEffect(() => { setShowIslamic(localStorage.getItem('mizan_islamic_dates') !== '0') }, [])
@@ -241,9 +247,9 @@ export default function LifePage() {
           return (
             <div className="mt-1">
               <div className="flex items-center justify-between mb-2">
-                <button onClick={() => setCalMonth(new Date(y, m - 1, 1))} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>◀</button>
+                <button onClick={() => { const d = new Date(y, m - 1, 1); setCalMonth(d); localStorage.setItem('mizan_life_cal_month', d.toISOString()) }} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>◀</button>
                 <span className="text-sm font-semibold">{first.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                <button onClick={() => setCalMonth(new Date(y, m + 1, 1))} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>▶</button>
+                <button onClick={() => { const d = new Date(y, m + 1, 1); setCalMonth(d); localStorage.setItem('mizan_life_cal_month', d.toISOString()) }} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>▶</button>
               </div>
               <div className="grid grid-cols-7 gap-1 mb-1">
                 {['M','T','W','T','F','S','S'].map((d, i) => (

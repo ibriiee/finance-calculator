@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import { incomeOutstanding, isIncomeSettled, remainingForIncome } from '@/lib/sadaka'
+import { validateAmount } from '@/lib/utils'
 import type { Currency, SadakaEntry } from '@/types/database.types'
 
 interface Props { onClose: () => void; onSaved: () => void; editItem?: any }
@@ -18,6 +19,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([])
   const [incomes, setIncomes] = useState<{ id: string; name: string }[]>([])
   const [outstanding, setOutstanding] = useState<ReturnType<typeof incomeOutstanding>>(new Map())
+  const [secondaryIncomeId, setSecondaryIncomeId] = useState('')
   const [form, setForm] = useState({
     // For an obligation this is the amount owed; for a given/advance payment it's the amount given.
     amount_owed: (editItem?.amount_owed || editItem?.amount_given) ? String(editItem.amount_owed || editItem.amount_given) : '',
@@ -60,7 +62,9 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   }, [])
 
   async function save() {
-    if (!form.amount_owed || !me) return
+    if (!me) return
+    const amtErr = validateAmount(form.amount_owed)
+    if (amtErr) { setError(amtErr); return }
     if (form.on_behalf === 'other' && !other) {
       setError('Your brother\'s profile isn\'t loaded yet.'); return
     }
@@ -92,9 +96,23 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
       location: form.location as any, method: form.method as any,
       notes: form.notes || null,
     }
+    // Smart split: if paying more than one income owes, route the overflow to a second income
+    const linkedRemaining = form.from_income_id ? remainingForIncome(outstanding, form.from_income_id) : 0
+    const isOverpay = isPayment && form.from_income_id && amount > linkedRemaining && linkedRemaining > 0
+    const canSplit = isOverpay && secondaryIncomeId
+
     let err
     if (isEdit) {
       ;({ error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id))
+    } else if (canSplit) {
+      // Two entries: primary clears its income exactly, secondary gets the rest
+      const secondaryAmount = amount - linkedRemaining
+      const base = { ...payload, added_by_id: me.id, amount_owed: 0 }
+      const [r1, r2] = await Promise.all([
+        supabase.from('sadaka_entries').insert({ ...base, amount_given: linkedRemaining, source_income_id: form.from_income_id }),
+        supabase.from('sadaka_entries').insert({ ...base, amount_given: secondaryAmount, source_income_id: secondaryIncomeId }),
+      ])
+      err = r1.error ?? r2.error
     } else {
       ;({ error: err } = await supabase.from('sadaka_entries').insert({ ...payload, added_by_id: me.id }))
     }
@@ -181,19 +199,23 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
           {(() => {
             const isPayment = form.status === 'given' || form.status === 'advance_given'
             const selectable = incomes.filter(i =>
-              !isPayment                                    // new obligation: any income
-              || i.id === form.from_income_id               // keep current selection visible
-              || !isIncomeSettled(outstanding, i.id))       // payment: hide closed chapters
+              !isPayment
+              || i.id === form.from_income_id
+              || !isIncomeSettled(outstanding, i.id))
             if (incomes.length === 0) return null
             const linkedRemaining = form.from_income_id
               ? remainingForIncome(outstanding, form.from_income_id) : 0
-            const overpay = isPayment && form.from_income_id && parseFloat(form.amount_owed || '0') > linkedRemaining
+            const amount = parseFloat(form.amount_owed || '0')
+            const overpayAmount = isPayment && form.from_income_id && amount > linkedRemaining && linkedRemaining > 0
+              ? amount - linkedRemaining : 0
+            // incomes available for the secondary split (excludes primary + already settled)
+            const secondaryOptions = selectable.filter(i => i.id !== form.from_income_id && !isIncomeSettled(outstanding, i.id))
             return (
-              <div>
-                <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {isPayment ? 'Pay toward which income (optional)' : 'From which income (optional)'}
                 </p>
-                <select value={form.from_income_id} onChange={e => F('from_income_id', e.target.value)}
+                <select value={form.from_income_id} onChange={e => { F('from_income_id', e.target.value); setSecondaryIncomeId('') }}
                   className="w-full px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
                   <option value="">Not linked to a specific income</option>
                   {selectable.map(i => {
@@ -201,9 +223,42 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
                     return <option key={i.id} value={i.id}>{i.name}{isPayment && rem > 0 ? ` — ${rem} ${form.currency} due` : ''}</option>
                   })}
                 </select>
-                {overpay && (
-                  <p className="text-[11px] mt-1.5" style={{ color: 'var(--gold)' }}>
-                    This clears {linkedRemaining} {form.currency} on this income; the extra {(parseFloat(form.amount_owed) - linkedRemaining).toLocaleString()} {form.currency} carries forward as advance credit.
+
+                {overpayAmount > 0 && (
+                  <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)' }}>
+                    <p className="text-[11px] font-medium" style={{ color: 'var(--gold)' }}>
+                      ✓ Clears {linkedRemaining.toLocaleString()} {form.currency} on this income
+                    </p>
+                    {secondaryOptions.length > 0 ? (
+                      <>
+                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          Remaining {overpayAmount.toLocaleString()} {form.currency} — route to:
+                        </p>
+                        <select value={secondaryIncomeId} onChange={e => setSecondaryIncomeId(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-lg text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                          <option value="">Leave as advance credit</option>
+                          {secondaryOptions.map(i => {
+                            const rem = remainingForIncome(outstanding, i.id)
+                            return <option key={i.id} value={i.id}>{i.name} — {rem} {form.currency} due</option>
+                          })}
+                        </select>
+                        {secondaryIncomeId && (
+                          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                            Split: {linkedRemaining.toLocaleString()} → {incomes.find(i => i.id === form.from_income_id)?.name} · {overpayAmount.toLocaleString()} → {incomes.find(i => i.id === secondaryIncomeId)?.name}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        Extra {overpayAmount.toLocaleString()} {form.currency} carries forward as advance credit.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {isPayment && !form.from_income_id && form.status === 'advance_given' && (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    Builds advance credit — auto-offsets your next income obligation.
                   </p>
                 )}
               </div>

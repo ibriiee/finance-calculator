@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2, Landmark } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
+import { validateAmount } from '@/lib/utils'
 
 interface Props { onClose: () => void; onSaved: () => void }
 interface JointAccount { id: string; name: string; currency: string }
@@ -30,7 +31,9 @@ export default function SplitForm({ onClose, onSaved }: Props) {
   const matchingAccounts = jointAccounts.filter(a => a.currency === form.currency)
 
   async function save() {
-    if (!form.name || !form.total_amount) return
+    if (!form.name.trim()) { setError('Name is required'); return }
+    const amtErr = validateAmount(form.total_amount)
+    if (amtErr) { setError(amtErr); return }
     if (customCategory && !form.custom_category.trim()) { setError('Type your custom category'); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()

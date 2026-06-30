@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
+import { validateAmount } from '@/lib/utils'
 import type { LoanType, LoanCurrencyType } from '@/types/database.types'
 
 interface Props { onClose: () => void; onSaved: () => void }
@@ -32,7 +33,10 @@ export default function LoanForm({ onClose, onSaved }: Props) {
   }, [])
 
   async function save() {
-    if (!form.counterparty_name || !form.original_amount || !me) return
+    if (!form.counterparty_name.trim()) { setError('Name is required'); return }
+    const amtErr = validateAmount(form.original_amount)
+    if (amtErr) { setError(amtErr); return }
+    if (!me) return
     setSaving(true); setError('')
     const row = {
       owner_id: ownerId || me, counterparty_name: form.counterparty_name,

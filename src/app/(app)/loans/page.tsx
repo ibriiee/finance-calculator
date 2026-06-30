@@ -112,10 +112,10 @@ export default function LoansPage() {
               Taken {shortDate(loan.date_taken)}
               {loan.due_date && ` · Due ${shortDate(loan.due_date)}`}
             </p>
-            {addedByOther && (
+            {addedBy && (
               <p className="text-[11px] mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
-                style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                <UserRound size={10} /> Added by {names[addedBy!] ?? 'your brother'}
+                style={{ background: addedByOther ? 'var(--gold-dim)' : 'var(--surface-2)', color: addedByOther ? 'var(--gold)' : 'var(--text-muted)' }}>
+                <UserRound size={10} /> Added by {addedBy === userId ? 'you' : (names[addedBy] ?? 'your brother')}
               </p>
             )}
           </div>

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
+import { validateAmount } from '@/lib/utils'
 import type { Profile } from '@/types/database.types'
 
 interface Props { onClose: () => void; onSaved: () => void; userId: string; otherUser?: Profile }
@@ -22,7 +23,9 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
   const F = (f: string, v: string) => setForm(p => ({ ...p, [f]: v }))
 
   async function save() {
-    if (!form.amount || !form.description) return
+    const amtErr = validateAmount(form.amount)
+    if (amtErr) { setError(amtErr); return }
+    if (!form.description.trim()) { setError('Description is required'); return }
     if (!otherUser?.id) {
       setError('Your brother\'s profile isn\'t loaded yet. Make sure both accounts exist, then reopen this page.')
       return

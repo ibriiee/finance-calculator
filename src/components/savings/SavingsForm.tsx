@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
+import { validateAmount } from '@/lib/utils'
 
 interface Props {
   onClose: () => void
@@ -27,7 +28,9 @@ export default function SavingsForm({ onClose, onSaved, defaults }: Props) {
   const F = (f: string, v: string) => setForm(p => ({ ...p, [f]: v }))
 
   async function save() {
-    if (!form.account_name || !form.amount) return
+    if (!form.account_name.trim()) { setError('Account name is required'); return }
+    const amtErr = validateAmount(form.amount)
+    if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
     const { error: err } = await supabase.from('savings_entries').insert({

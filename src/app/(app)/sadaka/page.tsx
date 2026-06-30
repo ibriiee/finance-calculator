@@ -246,18 +246,21 @@ export default function SadakaPage() {
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 mr-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <StatusBadge status={entry.status} size="xs" />
+                    {/* hide Pending badge when already in the Pending tab — it's redundant */}
+                    {!(filter === 'pending' && entry.status === 'pending') && <StatusBadge status={entry.status} size="xs" />}
                     {entry.is_advance && <StatusBadge status="advance_given" label="Advance" size="xs" />}
                     {entry.is_joint && <StatusBadge status="joint" label="Joint" size="xs" />}
                   </div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {isPayment(entry)
-                      ? (entry.recipient_name ?? 'Sadaka given')
-                      : (entry.source_income_id ? 'Obligation from income' : 'Pending obligation')}
+                    {entry.source_income_id && incomeNames[entry.source_income_id]
+                      ? incomeNames[entry.source_income_id]
+                      : isPayment(entry)
+                        ? (entry.recipient_name ?? 'Sadaka given')
+                        : 'Sadaka obligation'}
                   </p>
                   {entry.source_income_id && incomeNames[entry.source_income_id] && (
-                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--gold)' }}>
-                      {isPayment(entry) ? 'toward' : 'from'} {incomeNames[entry.source_income_id]}
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {isPayment(entry) ? 'Paid toward' : 'Obligation from'} this income
                     </p>
                   )}
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -266,8 +269,8 @@ export default function SadakaPage() {
                     {entry.method && ` · ${METHOD_LABELS[entry.method] ?? entry.method}`}
                     {entry.date_given && ` · ${shortDate(entry.date_given)}`}
                   </p>
-                  {entry.added_by_id && (entry.shared || entry.is_joint || entry.owner_id !== userId) && (
-                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                  {entry.added_by_id && (
+                    <p className="text-[11px] mt-1" style={{ color: entry.added_by_id !== userId ? 'var(--gold)' : 'var(--text-muted)' }}>
                       {entry.owner_id !== userId && entry.owner_id ? `For ${names[entry.owner_id] ?? 'brother'} · ` : ''}
                       Added by {entry.added_by_id === userId ? 'you' : (names[entry.added_by_id] ?? 'brother')}
                       {' · '}{shortDate(entry.created_at)}

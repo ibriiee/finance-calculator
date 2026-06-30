@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ownershipForEmail } from '@/lib/utils'
+import { ownershipForEmail, validateAmount } from '@/lib/utils'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import type { Currency, IncomeType, Ownership } from '@/types/database.types'
@@ -36,7 +36,9 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
   }, [])
 
   async function save() {
-    if (!form.name || !form.amount) return
+    if (!form.name.trim()) { setError('Project name is required'); return }
+    const amtErr = validateAmount(form.amount)
+    if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
