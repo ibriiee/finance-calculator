@@ -5,15 +5,8 @@ Not forgotten — parked until needed or prioritised.
 
 ---
 
-## DATABASE — Run these in Supabase SQL Editor when load increases
-
-```sql
--- Missing indexes on hot query columns
-CREATE INDEX IF NOT EXISTS idx_sadaka_income_date   ON sadaka_entries(source_income_id, date_given);
-CREATE INDEX IF NOT EXISTS idx_repay_loan           ON loan_repayments(loan_id);
-CREATE INDEX IF NOT EXISTS idx_ledger_settled_date  ON brother_ledger(is_settled, transaction_date);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_rates_type    ON rates_cache(rate_type);
-```
+## DATABASE
+- [x] ~~Performance indexes~~ — **Done 2026-06-30** (`supabase/performance-indexes.sql`, run in Supabase)
 
 ---
 
@@ -63,19 +56,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_rates_type    ON rates_cache(rate_type);
 
 ## UX IMPROVEMENTS
 
-- [ ] **Offline form persistence** — save form state to localStorage on every field
-      change, restore on mount, clear on successful save. Protects against losing
-      a long entry on flaky mobile connection.
-- [ ] **Life room: quick-edit event from grid** — tapping a coloured week cell should
-      offer "Edit event" inline, not require navigating to Life Settings.
-- [ ] **Brother ledger: Reverse entry** — "Reverse" button on any ledger entry creates
-      an equal opposite entry automatically, instead of manually adding a counter-entry.
-- [ ] **Loan partial repayment progress bar** — show `repaid / original` as a
-      progress bar on each loan card (repays are already fetched, just not visualised).
+- [x] ~~Offline form persistence~~ — **Done 2026-06-30** (SadakaForm + IncomeForm, `localStorage` draft)
+- [x] ~~Life room: quick-edit event from grid~~ — **Done 2026-06-30** (pencil → `/life/settings?edit=<id>`)
+- [x] ~~Brother ledger: Reverse entry~~ — **Done 2026-06-30** (Reverse button on each unsettled entry)
+- [x] ~~Loan partial repayment progress bar~~ — **Done 2026-06-30** (progress bar + inline Log Repayment form, auto-sets partial/cleared)
+- [x] ~~Stale rates warning banner~~ — **Done 2026-06-30** (Dashboard banner when rates_cache >24h old)
 - [ ] **Pagination on long lists** — Income, Sadaka, Loans, Recipients all do SELECT *.
-      Add `.limit(50)` + "Load more" when each module has 50+ entries.
-- [ ] **Stale rates warning banner** — when PKR/AED rate is older than 24h, show a
-      small banner on Dashboard: "Exchange rates may be stale — refresh in Settings."
+      Add `.limit(50)` + "Load more" when each module has 50+ entries. Low priority until 100+ entries exist.
+
+## UI REDESIGN — Next session priority
+
+Three targeted changes that fix 80% of the UX feel (no data changes, CSS/layout only):
+
+- [ ] **Left-border status system** — Replace status badges on all list cards with a
+      3px coloured left border: gold = pending/obligation, green = done/given, red = overdue.
+      Instant scannability without reading every badge. Apply to: Sadaka, Income, Loans, Ledger.
+- [ ] **Collapsible "Advanced" in forms** — Show 3 primary fields first (Amount, Status/Type,
+      Recipient). All secondary fields (income linking, on-behalf, advance flag, location,
+      method, notes) collapse under an "Advanced ▾" toggle. Reduces overwhelm on mobile.
+      Apply to: SadakaForm, IncomeForm, LoanForm.
+- [ ] **Dashboard hero flip** — Move "Yours to Keep" to the TOP as the large number.
+      Make the waterfall deductions a collapsible "How is this calculated ▾" below it.
+      Currently the most important number is at the bottom after 4 lines of deductions.
 
 ---
 

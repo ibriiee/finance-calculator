@@ -70,8 +70,9 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 15. `life-events.sql` — `life_events` table (milestones / intentions / reminders) + RLS + index.
     **Must be run before Life events / Upcoming work.**
 
-(`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–14 run as of
-2026-06-28** — confirmed by Ibrahim. Migration **15 (`life-events.sql`) still needs running**.)
+16. `performance-indexes.sql` — 4 performance indexes: `idx_sadaka_income_date`, `idx_repay_loan`, `idx_ledger_settled_date`, `idx_rates_type (UNIQUE)`. **Run 2026-06-30** — confirmed by Ibrahim.
+
+(`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–16 all run as of 2026-06-30** — confirmed by Ibrahim.)
 
 (`FRESH-INSTALL.sql` = **all 13 migrations concatenated in order**, for standing up a brand-new
 project in one paste. Used during the 2026-06-22 project rebuild — see Changelog.)
@@ -102,6 +103,7 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-30** — **Security hardening + UX upgrades (batch).** *Security:* (1) CSV injection fix in `sadakaExport.ts` — formula chars (`=+-@`) prefixed with `'` before CSV write. (2) `validateAmount()` shared helper in `utils.ts` (> 0, ≤ 10M, not NaN) — applied to **6 forms**: Sadaka, Income, Loan, Ledger, Savings, Splits. (3) Supabase DB indexes: `performance-indexes.sql` added and run — `idx_sadaka_income_date`, `idx_repay_loan`, `idx_ledger_settled_date`, `idx_rates_type`. *UX — quick wins:* (4) Dashboard stale PKR rates banner when `rates_cache.updated_at` > 24h old. (5) Loans: repayment **progress bar** + **inline "Log Repayment"** form — auto-sets status to `partial` or `cleared` based on total repaid. (6) Ledger: **Reverse Entry** button creates equal-opposite transaction. (7) Offline **draft persistence** for SadakaForm + IncomeForm via `localStorage` (survives signal loss on mobile). (8) "Added by" label now shows on **every** sadaka + loan entry, not just shared ones. *Sadaka UX:* (9) **Smart overflow split** — paying 4000 toward a 3750-due income shows a secondary picker to route the extra 250 to another open income or leave as advance. (10) Income name shown as card **title** (was buried as sub-label). *Life room:* (11) **Quick-edit from grid** — pencil icon in week detail panel → `/life/settings?edit=<id>` auto-opens edit form. (12) Calendar month persists in `localStorage` across visits. *Deferred:* `LAUNCH.md` created with all deferred upgrades (family mode, AI, encrypted Wasiyya, 2FA, audit trail, i18n, App Store).
 - **2026-06-28** — **Life Tracker v4 (Hijri + UX) & Sadaka smart linking.** *Life:* (1) **Islamic
   calendar** — new `src/lib/hijri.ts` (Hijri↔Gregorian via `Intl` Umm al-Qura, **no dep**,
   self-check passes) powers an **Islamic-dates overlay** toggle on the grid: preset holidays
