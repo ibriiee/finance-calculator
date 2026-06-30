@@ -123,7 +123,8 @@ export default function LoansPage() {
       setRepaying(false)
     }
 
-    const borderColor = loan.status === 'cleared' ? '#10B981' : isOverdue ? '#EF4444' : 'var(--gold)'
+    // green = cleared, red = still outstanding (needs action)
+    const borderColor = loan.status === 'cleared' ? '#10B981' : '#EF4444'
     const typeLabel = loan.loan_type === 'i_owe' ? (mine ? 'I Owe' : `${names[loan.owner_id] ?? 'They'} Owes`) : loan.loan_type === 'they_owe' ? 'They Owe' : 'Joint'
     return (
       <div className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>

@@ -145,7 +145,8 @@ export default function IncomePage() {
             const sadakaPending = sad ? Math.max(0, sad.owed - sad.given) : 0
             const netAmount = item.amount - (sad?.owed ?? 0)
             const expanded = expandedIds.has(item.id)
-            const borderColor = received ? '#10B981' : isOverdue ? '#EF4444' : 'var(--gold)'
+            // green = received, red = not yet received (needs action)
+            const borderColor = received ? '#10B981' : '#EF4444'
 
             return (
               <div key={item.id} className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>

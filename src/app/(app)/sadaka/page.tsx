@@ -207,7 +207,8 @@ export default function SadakaPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map(entry => {
-            const borderColor = (isPayment(entry) || remainingOf(entry) === 0) ? '#10B981' : 'var(--gold)'
+            // green = given/cleared, red = still owed (needs action)
+            const borderColor = (isPayment(entry) || remainingOf(entry) === 0) ? '#10B981' : '#EF4444'
             const a = alloc[entry.id]
             const isObligation = !isPayment(entry) && Number(entry.amount_owed) > 0
             const hasBreakdown = isObligation && a && (Number(entry.amount_given) > 0 || a.payments.length > 0)

@@ -134,7 +134,8 @@ export default function LedgerPage() {
           {displayed.map(entry => {
             const isPayer = entry.from_user_id === userId
             const otherName = isPayer ? otherUser?.display_name : myProfile?.display_name
-            const borderColor = entry.is_settled ? '#10B981' : isPayer ? '#10B981' : 'var(--gold)'
+            // green = settled or they owe you, red = you owe (needs action)
+            const borderColor = entry.is_settled ? '#10B981' : isPayer ? '#10B981' : '#EF4444'
             return (
               <div key={entry.id} className={`card p-4 ${entry.is_settled ? 'opacity-50' : ''}`} style={{ borderLeft: `3px solid ${borderColor}` }}>
                 <div className="flex items-start justify-between">
