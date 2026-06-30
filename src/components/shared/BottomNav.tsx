@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Briefcase, HandHeart, ArrowLeftRight, Landmark, Target, Settings, Hourglass, Wallet } from 'lucide-react'
+import { LayoutDashboard, Briefcase, HandHeart, ArrowLeftRight, Landmark, Target, Settings, Hourglass, Wallet, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -16,11 +16,12 @@ const ROOMS = {
     icon: Wallet,
     home: { href: '/dashboard', icon: LayoutDashboard, label: 'Home', key: null } as Tab,
     tabs: [
-      { href: '/income', icon: Briefcase,     label: 'Income', key: 'income' },
-      { href: '/sadaka', icon: HandHeart,      label: 'Sadaka', key: 'sadaka' },
-      { href: '/ledger', icon: ArrowLeftRight, label: 'Ledger', key: 'ledger' },
-      { href: '/joint',  icon: Landmark,       label: 'Joint',  key: 'joint_account' },
-      { href: '/goals',  icon: Target,         label: 'Goals',  key: 'goals' },
+      { href: '/income',   icon: Briefcase,     label: 'Income',   key: 'income' },
+      { href: '/expenses', icon: Receipt,       label: 'Expenses', key: 'expenses' },
+      { href: '/sadaka',   icon: HandHeart,      label: 'Sadaka',   key: 'sadaka' },
+      { href: '/ledger',   icon: ArrowLeftRight, label: 'Ledger',   key: 'ledger' },
+      { href: '/joint',    icon: Landmark,       label: 'Joint',    key: 'joint_account' },
+      { href: '/goals',    icon: Target,         label: 'Goals',    key: 'goals' },
     ] as Tab[],
     settings: { href: '/settings', icon: Settings, label: 'Settings', key: null } as Tab,
   },

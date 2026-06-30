@@ -9,11 +9,11 @@ import type { Profile, Currency } from '@/types/database.types'
 
 const MODULES: { key: string; label: string }[] = [
   { key: 'income', label: 'Income & Projects' },
+  { key: 'expenses', label: 'Expenses' },
   { key: 'sadaka', label: 'Sadaka' },
   { key: 'ledger', label: 'Brother Ledger' },
   { key: 'goals', label: 'Goals' },
   { key: 'loans', label: 'Loans' },
-  { key: 'splits', label: 'Shared Splits' },
   { key: 'savings', label: 'Savings' },
   { key: 'wasiyya', label: 'Wasiyya' },
   { key: 'zakat', label: 'Zakat' },
@@ -108,7 +108,7 @@ export default function SettingsPage() {
     'income_projects', 'sadaka_entries', 'sadaka_recipients', 'brother_ledger',
     'ledger_settlements', 'external_ledger', 'loans', 'loan_repayments',
     'shared_costs', 'zakat_snapshots', 'financial_goals', 'goal_contributions',
-    'wasiyya_entries', 'joint_accounts', 'joint_account_txns', 'savings_entries',
+    'wasiyya_entries', 'joint_accounts', 'joint_account_txns', 'savings_entries', 'expenses',
   ]
 
   async function exportData() {

@@ -12,6 +12,7 @@ export type GoalType = 'individual' | 'joint'
 export type WasiyyaCategory = 'asset' | 'debt' | 'instruction' | 'password' | 'contact' | 'message'
 export type LifeEventKind = 'milestone' | 'intention' | 'reminder'
 export type LifeRecurrence = 'none' | 'monthly' | 'yearly' | 'hijri_yearly'
+export type ExpenseCategory = 'rent' | 'utilities' | 'petrol' | 'food_out' | 'groceries' | 'vape' | 'sent_home' | 'health' | 'gift' | 'subscription' | 'business' | 'other'
 
 export interface LifeEvent {
   id: string
@@ -230,6 +231,22 @@ export interface JointAccount {
   created_at: string
 }
 
+export interface Expense {
+  id: string
+  owner_id: string
+  description: string
+  category: string          // ExpenseCategory or custom text
+  amount: number            // total paid out of pocket
+  currency: 'AED' | 'PKR'
+  expense_date: string
+  is_shared: boolean
+  my_pct: number            // owner's share (1.0 = all mine)
+  ledger_entry_id: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface JointAccountTxn {
   id: string
   account_id: string
@@ -341,6 +358,7 @@ export type Database = {
       joint_accounts: Tbl<JointAccount>
       joint_account_txns: Tbl<JointAccountTxn>
       life_events: Tbl<LifeEvent>
+      expenses: Tbl<Expense>
     }
   }
 }

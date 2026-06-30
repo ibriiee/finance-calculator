@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate, ownershipForEmail } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Scissors, ScrollText, Landmark, BarChart3, Hourglass } from 'lucide-react'
+import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Receipt, ScrollText, Landmark, BarChart3, Hourglass } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { daysLeft } from '@/lib/lifeMath'
 
@@ -25,6 +25,7 @@ export default async function DashboardPage() {
     { data: jointAccounts },
     { data: jointTxns },
     { data: savingsEntries },
+    { data: expensesData },
     { data: pkrRate },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
@@ -66,6 +67,10 @@ export default async function DashboardPage() {
     supabase.from('joint_accounts').select('id, name, currency').eq('is_active', true),
     supabase.from('joint_account_txns').select('account_id, txn_type, contributor_id, amount'),
     supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
+    supabase.from('expenses')
+      .select('amount, currency, my_pct, expense_date')
+      .eq('owner_id', user!.id)
+      .gte('expense_date', monthStart.toISOString().split('T')[0]),
     supabase.from('rates_cache').select('rate_value, updated_at').eq('rate_type', 'pkr_to_aed').single(),
   ]) as any[]
   const pkrToAed = Number(pkrRate?.rate_value) || 0.0132
@@ -81,7 +86,7 @@ export default async function DashboardPage() {
   const totalEarned = myIncome.filter((i: any) => i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
   const totalReceived = myIncome.filter((i: any) => i.status === 'received' && i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
 
-  // All-time pending sadaka (for the "Sadaka" card lower down — total charity owed).
+  // All-time pending sadaka (still owed) — for the "Sadaka" card + a reminder line.
   const sadakaPending = (cur: string) => {
     const list = (sadakaEntries ?? []).filter((e: any) => e.currency === cur)
     const owed = list.reduce((s: number, e: any) => s + Number(e.amount_owed), 0)
@@ -91,24 +96,18 @@ export default async function DashboardPage() {
   const sadakaOwedAed = sadakaPending('AED')
   const sadakaOwedPkr = sadakaPending('PKR')
 
-  // Scope sadaka to THIS MONTH's received income so it nets against "in hand"
-  // consistently (the old all-time-vs-this-month mismatch caused wrong totals).
-  // Sadaka prepaid on not-yet-received income stays out — it's an advance asset,
-  // counted when that income arrives.
-  const receivedIds = new Set(
-    (myIncome as any[]).filter(i => i.status === 'received').map(i => i.id)
-  )
-  const scopedSadaka = (sadakaEntries ?? []).filter(
-    (e: any) => e.source_income_id && receivedIds.has(e.source_income_id)
-  )
-  const scopedBy = (cur: string) => {
-    const l = scopedSadaka.filter((e: any) => e.currency === cur)
-    const owed = l.reduce((s: number, e: any) => s + Number(e.amount_owed), 0)
-    const given = l.reduce((s: number, e: any) => s + Number(e.amount_given), 0)
-    return { given, due: Math.max(0, owed - given) }
-  }
-  const aedScoped = scopedBy('AED'), pkrScoped = scopedBy('PKR')
-  const sadakaGivenAed = aedScoped.given + pkrScoped.given * pkrToAed
+  // Cash model: sadaka actually PAID OUT (cash gone, incl. advances). This leaves
+  // "yours to keep" because it already left your pocket.
+  const sumGiven = (cur: string) => (sadakaEntries ?? [])
+    .filter((e: any) => e.currency === cur)
+    .reduce((s: number, e: any) => s + Number(e.amount_given), 0)
+  const sadakaGivenAed = sumGiven('AED') + sumGiven('PKR') * pkrToAed
+
+  // Expenses this month (your share — shared expenses only cost you my_pct).
+  const expenseShare = (cur: string) => (expensesData ?? [])
+    .filter((e: any) => e.currency === cur)
+    .reduce((s: number, e: any) => s + Number(e.amount) * Number(e.my_pct ?? 1), 0)
+  const expensesAed = expenseShare('AED') + expenseShare('PKR') * pkrToAed
 
   // Brother ledger balance
   let aedBalance = 0, pkrBalance = 0
@@ -143,12 +142,10 @@ export default async function DashboardPage() {
   const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
   const totalOwedAed = loanDebtAed + ledgerDebtAed
 
-  // "What's actually yours" waterfall: in-hand earnings, minus sadaka already
-  // given (cash gone), minus sadaka still due (owed), minus short-term debts.
-  // All scoped to this month's received income so the numbers reconcile.
-  const sadakaDueAed = aedScoped.due + pkrScoped.due * pkrToAed
+  // Real cash on hand = received − sadaka actually paid − expenses (your share)
+  // − short-term debts you owe. Money you physically have left to spend.
   const inHandAed = totalReceived
-  const yoursToKeepAed = inHandAed - sadakaGivenAed - sadakaDueAed - totalOwedAed
+  const yoursToKeepAed = inHandAed - sadakaGivenAed - expensesAed - totalOwedAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
 
   // Savings stash (backup money — /savings module)
@@ -267,10 +264,10 @@ export default async function DashboardPage() {
                 {sadakaGivenAed > 0 ? '−' : ''}{formatCurrency(sadakaGivenAed, 'AED', true)}
               </span>
             </Link>
-            <Link href="/sadaka" className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka still due</span>
-              <span className="font-display text-sm font-semibold" style={{ color: sadakaDueAed > 0 ? 'var(--gold)' : 'var(--text-muted)' }}>
-                {sadakaDueAed > 0 ? '−' : ''}{formatCurrency(sadakaDueAed, 'AED', true)}
+            <Link href="/expenses" className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Expenses (this month)</span>
+              <span className="font-display text-sm font-semibold" style={{ color: expensesAed > 0 ? '#EF4444' : 'var(--text-muted)' }}>
+                {expensesAed > 0 ? '−' : ''}{formatCurrency(expensesAed, 'AED', true)}
               </span>
             </Link>
             <Link href="/loans" className="flex items-center justify-between">
@@ -286,9 +283,9 @@ export default async function DashboardPage() {
                 {formatCurrency(yoursToKeepAed, 'AED', true)}
               </span>
             </div>
-            {sadakaOwedPkr > 0 && (
-              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                Includes {formatCurrency(sadakaOwedPkr, 'PKR', true)} sadaka converted at {pkrToAed}.
+            {(sadakaOwedAed > 0 || sadakaOwedPkr > 0) && (
+              <p className="text-[11px] pt-1" style={{ color: 'var(--gold)' }}>
+                ⚠ You still owe {formatCurrency(sadakaOwedAed, 'AED', true)}{sadakaOwedPkr > 0 && ` · ${formatCurrency(sadakaOwedPkr, 'PKR', true)}`} sadaka — held in the cash above, not yet given.
               </p>
             )}
           </div>
@@ -502,10 +499,10 @@ export default async function DashboardPage() {
       {/* Quick links — gated by module toggles */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { href: '/joint',   label: 'Joint',   Icon: Landmark,   key: 'joint_account' },
-          { href: '/loans',   label: 'Loans',   Icon: CreditCard, key: 'loans' },
-          { href: '/splits',  label: 'Splits',  Icon: Scissors,   key: 'splits' },
-          { href: '/wasiyya', label: 'Wasiyya', Icon: ScrollText, key: 'wasiyya' },
+          { href: '/expenses', label: 'Expenses', Icon: Receipt,     key: 'expenses' },
+          { href: '/joint',    label: 'Joint',    Icon: Landmark,    key: 'joint_account' },
+          { href: '/loans',    label: 'Loans',    Icon: CreditCard,  key: 'loans' },
+          { href: '/wasiyya',  label: 'Wasiyya',  Icon: ScrollText,  key: 'wasiyya' },
         ].filter(({ key }) => enabled(key)).map(({ href, label, Icon }) => (
           <Link key={href} href={href}
             className="card-inner p-3 flex flex-col items-center gap-1.5 rounded-xl">

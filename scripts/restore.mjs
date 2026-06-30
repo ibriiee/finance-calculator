@@ -45,7 +45,7 @@ const ORDER = [
   'brother_ledger', 'ledger_settlements', 'external_ledger',
   'joint_accounts', 'joint_account_txns', 'loans', 'loan_repayments',
   'financial_goals', 'goal_contributions', 'shared_costs',
-  'zakat_snapshots', 'wasiyya_entries', 'savings_entries', 'rates_cache',
+  'zakat_snapshots', 'wasiyya_entries', 'savings_entries', 'expenses', 'rates_cache',
 ]
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

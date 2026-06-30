@@ -56,6 +56,7 @@ const TABLES = [
   'zakat_snapshots',
   'wasiyya_entries',
   'savings_entries',
+  'expenses',
   'rates_cache',
 ]
 
