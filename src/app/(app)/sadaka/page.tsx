@@ -9,6 +9,7 @@ import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock, File
 import Link from 'next/link'
 import SadakaForm from '@/components/sadaka/SadakaForm'
 import { exportSadakaCsv, exportSadakaPdf, givenEntries } from '@/lib/sadakaExport'
+import { computeSadaka } from '@/lib/sadaka'
 import type { SadakaEntry } from '@/types/database.types'
 
 type AllocResult = {
@@ -76,40 +77,13 @@ export default function SadakaPage() {
 
   const isPayment = (e: SadakaEntry) => Number(e.amount_owed) === 0 && Number(e.amount_given) > 0
 
-  // Track which individual payment entries cover each obligation so we can show a breakdown.
+  // Single source of truth — income-scoped engine shared with Income page + Dashboard.
+  // (Replaces the old owner+currency pool that leaked payments across unrelated incomes.)
+  const computed = computeSadaka(entries)
   const alloc: Record<string, AllocResult> = {}
-  {
-    const groups: Record<string, SadakaEntry[]> = {}
-    for (const e of entries) {
-      const key = e.is_joint ? `joint|${e.currency}` : `${e.owner_id}|${e.currency}`
-      ;(groups[key] ??= []).push(e)
-    }
-    for (const key in groups) {
-      const g = groups[key]
-      // Mutable pool of payment entries, oldest first
-      const pool = g.filter(isPayment)
-        .sort((a, b) => a.created_at.localeCompare(b.created_at))
-        .map(e => ({ entry: e, left: Number(e.amount_given) }))
-      const obligations = g.filter(e => Number(e.amount_owed) > 0)
-        .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      for (const o of obligations) {
-        const owed = Number(o.amount_owed)
-        const ownGiven = Number(o.amount_given)
-        const selfRemaining = Math.max(0, owed - ownGiven)
-        let toApply = selfRemaining
-        const payments: { entry: SadakaEntry; applied: number }[] = []
-        for (const p of pool) {
-          if (toApply <= 0) break
-          const take = Math.min(p.left, toApply)
-          if (take > 0) {
-            payments.push({ entry: p.entry, applied: take })
-            p.left -= take
-            toApply -= take
-          }
-        }
-        alloc[o.id] = { owed, remaining: toApply, givenSoFar: ownGiven + (selfRemaining - toApply), payments }
-      }
-    }
+  for (const e of entries) {
+    const st = computed.byId.get(e.id)
+    if (st) alloc[e.id] = { owed: st.owed, remaining: st.remaining, givenSoFar: st.given, payments: st.payments }
   }
   const remainingOf = (e: SadakaEntry) => alloc[e.id]?.remaining ?? Math.max(0, Number(e.amount_owed) - Number(e.amount_given))
 

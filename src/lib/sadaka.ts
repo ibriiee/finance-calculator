@@ -39,5 +39,116 @@ export function isIncomeSettled(out: Map<string, IncomeOutstanding>, incomeId: s
   return owed > 0 && remaining === 0
 }
 
+// ============================================================
+// UNIFIED SADAKA ENGINE — single source of truth for "how much
+// is given / still owed", used by the Sadaka page, Income page,
+// and Dashboard so they can never disagree.
+//
+// THE RULE (deterministic, income-scoped):
+//  • A payment tagged with source_income_id pays ONLY that income's
+//    obligation(s) of the same owner+currency. It does NOT float
+//    across unrelated incomes (that floating was the old bug).
+//  • An untagged payment (source_income_id = null) is advance credit:
+//    it offsets any remaining obligation of the same owner+currency,
+//    oldest-first.
+//  • Overpaying one income spills its excess into the same advance pool.
+//  • A row is a PAYMENT when amount_owed = 0 and amount_given > 0;
+//    an OBLIGATION when amount_owed > 0.
+// ============================================================
+
+export interface ObligationStatus {
+  owed: number
+  given: number          // direct mark-as-given + linked payments + advance applied
+  remaining: number
+  payments: { entry: SadakaEntry; applied: number }[]  // what cleared it, for breakdowns
+}
+
+export interface SadakaComputed {
+  /** obligation row id → its resolved status */
+  byId: Map<string, ObligationStatus>
+  /** leftover advance credit per `${ownerKey}` after offsetting */
+  advanceLeft: Map<string, number>
+}
+
+const isPaymentRow = (e: SadakaEntry) => Number(e.amount_owed) === 0 && Number(e.amount_given) > 0
+const isObligationRow = (e: SadakaEntry) => Number(e.amount_owed) > 0
+const ownerKeyOf = (e: SadakaEntry) => e.is_joint ? `joint|${e.currency}` : `${e.owner_id}|${e.currency}`
+
+/** Resolve every obligation deterministically. One pass, no cross-income leakage. */
+export function computeSadaka(entries: SadakaEntry[]): SadakaComputed {
+  const obligations = entries.filter(isObligationRow)
+  const payments = entries.filter(isPaymentRow)
+  const byId = new Map<string, ObligationStatus>()
+
+  // 1) Bucket payments: income-linked vs untagged advance credit.
+  const linkedByIncome = new Map<string, SadakaEntry[]>()   // `${ownerKey}|${income}` → payments
+  const advanceLeft = new Map<string, number>()             // ownerKey → credit
+  for (const p of payments) {
+    if (p.source_income_id) {
+      const k = `${ownerKeyOf(p)}|${p.source_income_id}`
+      const list = linkedByIncome.get(k) ?? []
+      list.push(p); linkedByIncome.set(k, list)
+    } else {
+      const k = ownerKeyOf(p)
+      advanceLeft.set(k, (advanceLeft.get(k) ?? 0) + Number(p.amount_given))
+    }
+  }
+
+  // 2) Apply each income's own payments to that income's obligation(s), oldest-first.
+  const oblByIncome = new Map<string, SadakaEntry[]>()
+  for (const o of obligations) {
+    const k = `${ownerKeyOf(o)}|${o.source_income_id ?? 'none'}`
+    const list = oblByIncome.get(k) ?? []
+    list.push(o); oblByIncome.set(k, list)
+  }
+  for (const [k, obls] of oblByIncome) {
+    obls.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    const pool = (linkedByIncome.get(k) ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at))
+    let poolIdx = 0, poolLeftInRow = pool[0] ? Number(pool[0].amount_given) : 0
+    for (const o of obls) {
+      const owed = Number(o.amount_owed)
+      const direct = Number(o.amount_given)
+      let need = Math.max(0, owed - direct)
+      const applied: { entry: SadakaEntry; applied: number }[] = []
+      while (need > 0.0001 && poolIdx < pool.length) {
+        const take = Math.min(poolLeftInRow, need)
+        if (take > 0) { applied.push({ entry: pool[poolIdx], applied: take }); need -= take; poolLeftInRow -= take }
+        if (poolLeftInRow <= 0.0001) { poolIdx++; poolLeftInRow = pool[poolIdx] ? Number(pool[poolIdx].amount_given) : 0 }
+      }
+      byId.set(o.id, { owed, given: owed - need, remaining: need, payments: applied })
+    }
+    // Overpaid this income → spill remaining linked credit into the advance pool.
+    let spill = poolIdx < pool.length ? poolLeftInRow : 0
+    for (let i = poolIdx + 1; i < pool.length; i++) spill += Number(pool[i].amount_given)
+    if (spill > 0.0001) {
+      const ok = ownerKeyOf(obls[0])
+      advanceLeft.set(ok, (advanceLeft.get(ok) ?? 0) + spill)
+    }
+  }
+
+  // 3) Apply advance credit to anything still remaining, oldest-first per owner.
+  const remByOwner = new Map<string, SadakaEntry[]>()
+  for (const o of obligations) {
+    if ((byId.get(o.id)?.remaining ?? 0) > 0.0001) {
+      const ok = ownerKeyOf(o)
+      const list = remByOwner.get(ok) ?? []
+      list.push(o); remByOwner.set(ok, list)
+    }
+  }
+  for (const [ok, obls] of remByOwner) {
+    obls.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    let credit = advanceLeft.get(ok) ?? 0
+    for (const o of obls) {
+      if (credit <= 0.0001) break
+      const st = byId.get(o.id)!
+      const take = Math.min(credit, st.remaining)
+      st.given += take; st.remaining -= take; credit -= take
+    }
+    advanceLeft.set(ok, Math.max(0, credit))
+  }
+
+  return { byId, advanceLeft }
+}
+
 // Self-check lives in sadaka.test.ts (kept out of this file so it never ships to
 // the browser bundle — top-level `module`/`require` refs crash an ESM import).

@@ -7,6 +7,7 @@ import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock, ChevronDown, ChevronUp } from 'lucide-react'
 import IncomeForm from '@/components/income/IncomeForm'
+import { computeSadaka } from '@/lib/sadaka'
 import type { IncomeProject } from '@/types/database.types'
 
 export default function IncomePage() {
@@ -26,14 +27,18 @@ export default function IncomePage() {
   async function load() {
     const [{ data }, { data: sadaka }] = await Promise.all([
       supabase.from('income_projects').select('*').order('created_at', { ascending: false }),
-      supabase.from('sadaka_entries').select('source_income_id, amount_owed, amount_given'),
+      supabase.from('sadaka_entries').select('*'),
     ])
     setItems(data ?? [])
+    // Resolve via the shared engine so per-income sadaka matches the Sadaka page exactly.
+    const computed = computeSadaka((sadaka as any[]) ?? [])
     const map: Record<string, { owed: number; given: number }> = {}
     ;(sadaka ?? []).forEach((s: any) => {
-      if (!s.source_income_id) return
+      if (!s.source_income_id || Number(s.amount_owed) <= 0) return   // obligations only
+      const st = computed.byId.get(s.id)
       const m = map[s.source_income_id] ?? { owed: 0, given: 0 }
-      m.owed += Number(s.amount_owed); m.given += Number(s.amount_given)
+      m.owed += st?.owed ?? Number(s.amount_owed)
+      m.given += st?.given ?? Number(s.amount_given)
       map[s.source_income_id] = m
     })
     setSadakaByIncome(map)
