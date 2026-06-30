@@ -45,6 +45,16 @@ near(byId.get('obl-A')!.remaining, 34.58, 'Contract A still owes 34.58')
 near(byId.get('obl-B')!.remaining, 0, 'Contract B fully cleared')
 near(byId.get('obl-A')!.given, 3715.42, 'Contract A given is its own payments only')
 
+// Float dust must snap to 0 — payments summing to owed (with binary-float
+// residue) must leave remaining EXACTLY 0, else the card leaks into Pending.
+const { byId: b3 } = computeSadaka([
+  O('D', 3750, '2026-06-01'),
+  P('D', 500, '2'), P('D', 150, '3'), P('D', 1115, '4'), P('D', 328, '5'),
+  P('D', 328, '6'), P('D', 600, '7'), P('D', 130, '8'), P('D', 130, '9'),
+  P('D', 184.42, '10'), P('D', 250, '11'), P('D', 34.58, '12'),  // sums to 3750
+])
+assert.strictEqual(b3.get('obl-D')!.remaining, 0, 'fully-paid obligation must snap to exactly 0')
+
 // Advance credit (untagged) offsets remaining obligations oldest-first.
 const { byId: b2 } = computeSadaka([
   O('X', 1000, '2026-01-01'),

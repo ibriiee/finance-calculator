@@ -147,8 +147,21 @@ export function computeSadaka(entries: SadakaEntry[]): SadakaComputed {
     advanceLeft.set(ok, Math.max(0, credit))
   }
 
+  // Snap to cents — float subtraction leaves dust (e.g. 4.5e-13) that would
+  // otherwise show a fully-paid obligation as "remaining > 0" and leak it into
+  // the Pending tab. Sub-cent remainders are treated as fully cleared.
+  for (const st of byId.values()) {
+    st.owed = round2(st.owed)
+    st.given = round2(st.given)
+    st.remaining = round2(st.remaining)
+    if (st.remaining < 0.01) { st.remaining = 0; st.given = st.owed }
+    for (const p of st.payments) p.applied = round2(p.applied)
+  }
+
   return { byId, advanceLeft }
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100
 
 // Self-check lives in sadaka.test.ts (kept out of this file so it never ships to
 // the browser bundle — top-level `module`/`require` refs crash an ESM import).

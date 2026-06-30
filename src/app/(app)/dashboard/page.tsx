@@ -81,16 +81,20 @@ export default async function DashboardPage() {
   const totalEarned = myIncome.filter((i: any) => i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
   const totalReceived = myIncome.filter((i: any) => i.status === 'received' && i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
 
-  // Sadaka pending — same netting as the Sadaka module: per currency,
-  // advances (given > owed) offset new obligations
-  const netPending = (cur: string) => {
+  // Sadaka per currency: what's still DUE (unpaid) and what's already been GIVEN
+  // (paid out of pocket). Both must leave "yours to keep" — due is still owed,
+  // given is cash already gone.
+  const sadakaTotals = (cur: string) => {
     const list = (sadakaEntries ?? []).filter(e => e.currency === cur)
     const owed = list.reduce((s, e) => s + Number(e.amount_owed), 0)
     const given = list.reduce((s, e) => s + Number(e.amount_given), 0)
-    return Math.max(0, owed - given)
+    return { due: Math.max(0, owed - given), given }
   }
-  const sadakaOwedAed = netPending('AED')
-  const sadakaOwedPkr = netPending('PKR')
+  const aedSadaka = sadakaTotals('AED')
+  const pkrSadaka = sadakaTotals('PKR')
+  const sadakaOwedAed = aedSadaka.due
+  const sadakaOwedPkr = pkrSadaka.due
+  const sadakaGivenAed = aedSadaka.given + pkrSadaka.given * pkrToAed
 
   // Brother ledger balance
   let aedBalance = 0, pkrBalance = 0
@@ -125,11 +129,11 @@ export default async function DashboardPage() {
   const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
   const totalOwedAed = loanDebtAed + ledgerDebtAed
 
-  // "What's actually yours" waterfall: in-hand earnings, minus sadaka due,
-  // minus short-term debts (loans you owe + what you owe your brother).
+  // "What's actually yours" waterfall: in-hand earnings, minus sadaka already
+  // given (cash gone), minus sadaka still due (owed), minus short-term debts.
   const sadakaDueAed = sadakaOwedAed + sadakaOwedPkr * pkrToAed
   const inHandAed = totalReceived
-  const yoursToKeepAed = inHandAed - sadakaDueAed - totalOwedAed
+  const yoursToKeepAed = inHandAed - sadakaGivenAed - sadakaDueAed - totalOwedAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
 
   // Savings stash (backup money — /savings module)
@@ -243,7 +247,13 @@ export default async function DashboardPage() {
               </span>
             </div>
             <Link href="/sadaka" className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka due</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka given (paid)</span>
+              <span className="font-display text-sm font-semibold" style={{ color: sadakaGivenAed > 0 ? 'var(--emerald)' : 'var(--text-muted)' }}>
+                {sadakaGivenAed > 0 ? '−' : ''}{formatCurrency(sadakaGivenAed, 'AED', true)}
+              </span>
+            </Link>
+            <Link href="/sadaka" className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Sadaka still due</span>
               <span className="font-display text-sm font-semibold" style={{ color: sadakaDueAed > 0 ? 'var(--gold)' : 'var(--text-muted)' }}>
                 {sadakaDueAed > 0 ? '−' : ''}{formatCurrency(sadakaDueAed, 'AED', true)}
               </span>
