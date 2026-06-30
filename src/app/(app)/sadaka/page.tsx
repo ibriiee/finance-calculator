@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
-import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock, FileText, FileSpreadsheet } from 'lucide-react'
@@ -241,16 +240,20 @@ export default function SadakaPage() {
           description="Add a sadaka entry manually or it auto-creates when income is received" />
       ) : (
         <div className="flex flex-col gap-3">
-          {filtered.map(entry => (
-            <div key={entry.id} className="card p-4">
+          {filtered.map(entry => {
+            const borderColor = (isPayment(entry) || remainingOf(entry) === 0)
+              ? '#10B981'
+              : 'var(--gold)'
+            return (
+            <div key={entry.id} className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 mr-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    {/* hide Pending badge when already in the Pending tab — it's redundant */}
-                    {!(filter === 'pending' && entry.status === 'pending') && <StatusBadge status={entry.status} size="xs" />}
-                    {entry.is_advance && <StatusBadge status="advance_given" label="Advance" size="xs" />}
-                    {entry.is_joint && <StatusBadge status="joint" label="Joint" size="xs" />}
-                  </div>
+                  {(entry.is_advance || entry.is_joint) && (
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {entry.is_advance && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>Advance</span>}
+                      {entry.is_joint && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>Joint</span>}
+                    </div>
+                  )}
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {entry.source_income_id && incomeNames[entry.source_income_id]
                       ? incomeNames[entry.source_income_id]
@@ -348,7 +351,7 @@ export default function SadakaPage() {
                 </div>
               )}
             </div>
-          ))}
+          )})}
         </div>
       )}
 
