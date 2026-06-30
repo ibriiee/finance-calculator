@@ -1,5 +1,11 @@
 # Session Log
 
+2026-06-30 (session 2 — UI redesign + expenses + cash model + typing)
+- Completed: (1) UI: left-border status strips (red=needs action, green=done) on sadaka/income/loans/ledger; collapsible "Advanced" in Sadaka/Income/Loan forms; dashboard hero flip (Yours to keep = big number, waterfall collapsible); income card breakdown + Net toggle; sadaka card breakdown. (2) Unified sadaka engine computeSadaka() in lib/sadaka.ts — kills cross-income payment leak ("35 ghost"), float dust snaps to 0; Sadaka+Income pages use it. (3) Dashboard cash model: Yours to keep = received − all sadaka paid − this-month expenses − debts. (4) FULL Supabase typing fix (Loosen<T> + Relationships:[]) → 73 hidden `never` errors → 0; added 4 missing tables + columns. (5) NEW Expenses module (/expenses) with shared toggle → auto ledger IOU; Splits folded in + removed from nav. (6) Ledger delete button.
+- Changed files: dashboard/income/sadaka/loans/ledger/expenses/settings pages, ExpenseForm/IncomeForm/LoanForm/SadakaForm/BottomNav/StatusBadge, lib/sadaka.ts+test, types/database.types.ts, scripts/backup+restore, supabase/expenses.sql (new), PROJECT_STATUS.md
+- Blockers: **Ibrahim must run supabase/expenses.sql in Supabase** — Expenses won't save until then (degrades to empty meanwhile).
+- Next: confirm expenses.sql run; monthly-rollover handling for cash model later; optionally migrate old shared_costs → expenses.
+
 2026-06-30
 - Completed: Full audit (30 findings). Security: CSV injection fix in sadaka export, validateAmount() helper applied to all 6 forms. Sadaka smart overflow: payment splits across 2 incomes when amount > linked income remaining. Quick wins: stale rates banner on dashboard, loan repayment progress bar + inline log form (auto-sets partial/cleared status), ledger reverse entry button, offline draft persistence (SadakaForm + IncomeForm). Life quick-edit: pencil from week panel → /life/settings?edit=<id>. DB: 4 performance indexes run in Supabase. LAUNCH.md created for deferred items.
 - Changed files: SadakaForm.tsx, sadaka/page.tsx, sadakaExport.ts, IncomeForm.tsx, LoanForm.tsx, LedgerForm.tsx, SavingsForm.tsx, SplitForm.tsx, loans/page.tsx, ledger/page.tsx, dashboard/page.tsx, life/page.tsx, life/settings/page.tsx, lib/utils.ts, supabase/performance-indexes.sql (new), LAUNCH.md (new), PROJECT_STATUS.md

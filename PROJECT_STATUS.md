@@ -21,7 +21,8 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 
 | Module | Route | Status | Notes |
 |--------|-------|--------|-------|
-| Dashboard | `/dashboard` | ✅ | "This Month" hero = **in-hand (received)** with a waterfall: in hand − sadaka due − owed to people = **Yours to keep**; PKR sadaka folded into AED via `pkr_to_aed`. Summary cards + quick links |
+| Dashboard | `/dashboard` | ✅ | Hero = **Yours to keep** (real cash on hand) with a collapsible waterfall: **in hand − sadaka actually paid − expenses (this month) − owed to people**; still-owed sadaka shown as a reminder (held in that cash, not double-counted). PKR folded into AED via `pkr_to_aed`. Summary cards + quick links |
+| Expenses | `/expenses` | ✅ | **Personal/living expenses** (rent, Du/bills, petrol, food-out, groceries, vape, sent-home, health, gift, subscription, custom). Category breakdown, this-month vs all, per-currency spend (your share). **Shared toggle** folds in the old Splits: a split expense auto-creates one `brother_ledger` IOU for the other's share. Feeds the dashboard cash model. Owner-private RLS |
 | Income | `/income` | ✅ | Individual. Start date, ongoing flag, edit/delete, per-entry **sadaka-paid status**. Editing does NOT re-trigger sadaka (insert-only trigger) |
 | Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`). **Smart income linking** (`src/lib/sadaka.ts`): the "pay toward which income" picker hides streams whose sadaka chapter is fully given (settled), shows "X due" per open stream, and warns when a payment overpays a linked stream (excess → advance) |
 | Recipients | `/recipients` | ✅ | Directory of sadaka recipients; total received, last paid, overdue→prioritise flags, **WhatsApp export**. Linked from Sadaka + selectable in SadakaForm |
@@ -30,7 +31,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Zakat | `/zakat` | ✅ | Silver nisab active (+gold ref), assets−liabilities, pay-by date, yearly paid log |
 | Goals | `/goals` | ✅ basic | Individual/joint goals, contributions |
 | Loans | `/loans` | ✅ v2 | Qard Hasan tracking; **both brothers see all loans**, "Added by X" tag, "You owe — by person" breakdown (incl. ledger debt), repayments shown, on-behalf entry |
-| Splits | `/splits` | ✅ v2 | Shared costs; **pay-from-joint-account** (auto withdrawal txn), breakdown bullets (one per line), custom categories, Monthly is a tag only (nothing auto-recurs) |
+| Splits | `/splits` | ⚠️ deprecated | **Folded into Expenses** (use the "Split with brother" toggle). Removed from nav + dashboard; old `shared_costs` data still reachable at `/splits` by URL. Page file kept for history |
 | Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
@@ -71,6 +72,7 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
     **Must be run before Life events / Upcoming work.**
 
 16. `performance-indexes.sql` — 4 performance indexes: `idx_sadaka_income_date`, `idx_repay_loan`, `idx_ledger_settled_date`, `idx_rates_type (UNIQUE)`. **Run 2026-06-30** — confirmed by Ibrahim.
+17. `expenses.sql` — `expenses` table (personal/living costs, owner-private RLS, `is_shared`+`my_pct`+`ledger_entry_id` for split→ledger) + index. **⚠️ MUST RUN — Expenses module won't save until this runs.**
 
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–16 all run as of 2026-06-30** — confirmed by Ibrahim.)
 
@@ -82,7 +84,11 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ## Key technical notes
 - Next.js 16: auth middleware is `src/proxy.ts` (`export async function proxy`), NOT middleware.ts.
   Its matcher must exclude `avatars`, static, manifest, sw.js.
-- `next.config.ts` has `typescript.ignoreBuildErrors: true` (Supabase generic inference returns `never`).
+- **Supabase typing is now real** (2026-06-30): `Database` in `src/types/database.types.ts` uses
+  `type Loosen<T> = { [K in keyof T]: T[K] }` + `Relationships: []` per table so `.from().select()`
+  returns true row types instead of `never`. `tsc --noEmit` is **0 errors**. When adding a table:
+  define its `interface`, then add `tablename: Tbl<Interface>` to `Database['public']['Tables']`.
+  (`next.config.ts` may still carry `ignoreBuildErrors`; it's no longer load-bearing.)
 - Service worker `public/sw.js` is **network-first** (no stale cache).
 - **Encoding:** never bulk-edit files with PowerShell `Set-Content -Encoding utf8` — it mangles
   emojis/special chars into mojibake. Use the Edit/Write tools (UTF-8 safe).
@@ -103,6 +109,23 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-06-30** — **Expenses module + cash-on-hand model + full type safety + UI pass (big session).**
+  *New Expenses module* (`/expenses`, migration `expenses.sql` — **must run**): the missing half —
+  personal/living costs so "yours to keep" reflects real cash. Categories, date, currency,
+  this-month/all, category breakdown. **Splits folded in**: a shared expense auto-creates one
+  `brother_ledger` IOU; Splits removed from nav + dashboard. *Cash model*: dashboard "Yours to keep"
+  = received − **sadaka actually paid (incl. advances)** − this-month expenses − debts (was showing
+  income minus only unpaid obligations). *Sadaka engine unified* (`src/lib/sadaka.ts` `computeSadaka()`):
+  single income-scoped source of truth used by Sadaka + Income pages — kills the cross-income payment
+  leak (the "35 ghost") where the list pooled payments by owner+currency and mislabelled the shortfall;
+  float dust now snaps to 0. *Full Supabase typing*: `Database` type fixed (`Loosen<T>` mapped type +
+  `Relationships: []` so `.from().select()` stops inferring `never`) → **73 hidden type errors → 0**,
+  real compile-time checking now active; added 4 missing tables to the type (sadaka_recipients,
+  joint_accounts, joint_account_txns, life_events) + expenses, and missing columns. *UI*: status
+  **left-border** strips (red = needs action / unpaid, green = done) across sadaka/income/loans/ledger;
+  **collapsible "Advanced"** in Sadaka/Income/Loan forms; **dashboard hero flip** ("Yours to keep" is
+  the big number, waterfall under a "How is this calculated ▾"); income card **breakdown** + Net
+  toggle; sadaka card breakdown. *Ledger delete* button added. `tsc` 0 errors, `next build` clean.
 - **2026-06-30** — **Security hardening + UX upgrades (batch).** *Security:* (1) CSV injection fix in `sadakaExport.ts` — formula chars (`=+-@`) prefixed with `'` before CSV write. (2) `validateAmount()` shared helper in `utils.ts` (> 0, ≤ 10M, not NaN) — applied to **6 forms**: Sadaka, Income, Loan, Ledger, Savings, Splits. (3) Supabase DB indexes: `performance-indexes.sql` added and run — `idx_sadaka_income_date`, `idx_repay_loan`, `idx_ledger_settled_date`, `idx_rates_type`. *UX — quick wins:* (4) Dashboard stale PKR rates banner when `rates_cache.updated_at` > 24h old. (5) Loans: repayment **progress bar** + **inline "Log Repayment"** form — auto-sets status to `partial` or `cleared` based on total repaid. (6) Ledger: **Reverse Entry** button creates equal-opposite transaction. (7) Offline **draft persistence** for SadakaForm + IncomeForm via `localStorage` (survives signal loss on mobile). (8) "Added by" label now shows on **every** sadaka + loan entry, not just shared ones. *Sadaka UX:* (9) **Smart overflow split** — paying 4000 toward a 3750-due income shows a secondary picker to route the extra 250 to another open income or leave as advance. (10) Income name shown as card **title** (was buried as sub-label). *Life room:* (11) **Quick-edit from grid** — pencil icon in week detail panel → `/life/settings?edit=<id>` auto-opens edit form. (12) Calendar month persists in `localStorage` across visits. *Deferred:* `LAUNCH.md` created with all deferred upgrades (family mode, AI, encrypted Wasiyya, 2FA, audit trail, i18n, App Store).
 - **2026-06-28** — **Life Tracker v4 (Hijri + UX) & Sadaka smart linking.** *Life:* (1) **Islamic
   calendar** — new `src/lib/hijri.ts` (Hijri↔Gregorian via `Intl` Umm al-Qura, **no dep**,
