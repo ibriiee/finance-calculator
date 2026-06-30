@@ -32,11 +32,11 @@ export default async function DashboardPage() {
     // Received this month (by actual_received_date) + all pending — avoids the bug
     // where work_completed_date is outside the month window but money was received this month.
     supabase.from('income_projects')
-      .select('amount, status, currency, ownership')
+      .select('id, amount, status, currency, ownership')
       .or(`actual_received_date.gte.${monthStart.toISOString().split('T')[0]},status.eq.pending`)
       .in('ownership', ['ibrahim', 'abu_bakar', 'shared']),
     supabase.from('sadaka_entries')
-      .select('amount_owed, amount_given, currency')
+      .select('source_income_id, amount_owed, amount_given, currency')
       .eq('owner_id', user!.id)
       .eq('is_joint', false),
     supabase.from('brother_ledger')
@@ -81,20 +81,34 @@ export default async function DashboardPage() {
   const totalEarned = myIncome.filter((i: any) => i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
   const totalReceived = myIncome.filter((i: any) => i.status === 'received' && i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
 
-  // Sadaka per currency: what's still DUE (unpaid) and what's already been GIVEN
-  // (paid out of pocket). Both must leave "yours to keep" — due is still owed,
-  // given is cash already gone.
-  const sadakaTotals = (cur: string) => {
-    const list = (sadakaEntries ?? []).filter(e => e.currency === cur)
-    const owed = list.reduce((s, e) => s + Number(e.amount_owed), 0)
-    const given = list.reduce((s, e) => s + Number(e.amount_given), 0)
-    return { due: Math.max(0, owed - given), given }
+  // All-time pending sadaka (for the "Sadaka" card lower down — total charity owed).
+  const sadakaPending = (cur: string) => {
+    const list = (sadakaEntries ?? []).filter((e: any) => e.currency === cur)
+    const owed = list.reduce((s: number, e: any) => s + Number(e.amount_owed), 0)
+    const given = list.reduce((s: number, e: any) => s + Number(e.amount_given), 0)
+    return Math.max(0, owed - given)
   }
-  const aedSadaka = sadakaTotals('AED')
-  const pkrSadaka = sadakaTotals('PKR')
-  const sadakaOwedAed = aedSadaka.due
-  const sadakaOwedPkr = pkrSadaka.due
-  const sadakaGivenAed = aedSadaka.given + pkrSadaka.given * pkrToAed
+  const sadakaOwedAed = sadakaPending('AED')
+  const sadakaOwedPkr = sadakaPending('PKR')
+
+  // Scope sadaka to THIS MONTH's received income so it nets against "in hand"
+  // consistently (the old all-time-vs-this-month mismatch caused wrong totals).
+  // Sadaka prepaid on not-yet-received income stays out — it's an advance asset,
+  // counted when that income arrives.
+  const receivedIds = new Set(
+    (myIncome as any[]).filter(i => i.status === 'received').map(i => i.id)
+  )
+  const scopedSadaka = (sadakaEntries ?? []).filter(
+    (e: any) => e.source_income_id && receivedIds.has(e.source_income_id)
+  )
+  const scopedBy = (cur: string) => {
+    const l = scopedSadaka.filter((e: any) => e.currency === cur)
+    const owed = l.reduce((s: number, e: any) => s + Number(e.amount_owed), 0)
+    const given = l.reduce((s: number, e: any) => s + Number(e.amount_given), 0)
+    return { given, due: Math.max(0, owed - given) }
+  }
+  const aedScoped = scopedBy('AED'), pkrScoped = scopedBy('PKR')
+  const sadakaGivenAed = aedScoped.given + pkrScoped.given * pkrToAed
 
   // Brother ledger balance
   let aedBalance = 0, pkrBalance = 0
@@ -131,7 +145,8 @@ export default async function DashboardPage() {
 
   // "What's actually yours" waterfall: in-hand earnings, minus sadaka already
   // given (cash gone), minus sadaka still due (owed), minus short-term debts.
-  const sadakaDueAed = sadakaOwedAed + sadakaOwedPkr * pkrToAed
+  // All scoped to this month's received income so the numbers reconcile.
+  const sadakaDueAed = aedScoped.due + pkrScoped.due * pkrToAed
   const inHandAed = totalReceived
   const yoursToKeepAed = inHandAed - sadakaGivenAed - sadakaDueAed - totalOwedAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
@@ -440,7 +455,7 @@ export default async function DashboardPage() {
             <Link href="/income" className="text-xs" style={{ color: 'var(--gold)' }}>See all →</Link>
           </div>
           <div className="flex flex-col gap-2">
-            {pendingProjects.map(p => {
+            {pendingProjects.map((p: any) => {
               const overdue = p.expected_payment_date && new Date(p.expected_payment_date) < new Date()
               return (
                 <div key={p.id} className="flex items-center justify-between py-2 border-b last:border-0"

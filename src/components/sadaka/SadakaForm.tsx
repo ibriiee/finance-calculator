@@ -46,7 +46,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     return defaultForm
   })
 
-  const F = (f: string, v: any) => setForm(p => {
+  const F = (f: string, v: any) => setForm((p: any) => {
     const next = { ...p, [f]: v }
     if (!editItem) {
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify(next)) } catch {}
@@ -76,7 +76,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
       // derive on_behalf for edit mode
       if (editItem) {
         const ob = editItem.is_joint ? 'joint' : (editItem.owner_id && editItem.owner_id !== user!.id ? 'other' : 'me')
-        setForm(p => ({ ...p, on_behalf: ob }))
+        setForm((p: any) => ({ ...p, on_behalf: ob }))
       }
     })()
   }, [])

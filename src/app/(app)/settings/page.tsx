@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { User, Percent, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2, ChevronDown } from 'lucide-react'
-import type { Profile } from '@/types/database.types'
+import type { Profile, Currency } from '@/types/database.types'
 
 const MODULES: { key: string; label: string }[] = [
   { key: 'income', label: 'Income & Projects' },
@@ -83,8 +83,8 @@ export default function SettingsPage() {
       display_name: form.display_name || null,
       sadaka_pct: form.sadaka_pct / 100,
       hawl_start_date: form.hawl_start_date || null,
-      default_currency: form.default_currency,
-      nisab_basis: form.nisab_basis,
+      default_currency: form.default_currency as Currency,
+      nisab_basis: form.nisab_basis as 'gold' | 'silver',
       enabled_modules: form.enabled_modules,
     }).eq('id', user!.id)
     setSaving(false)

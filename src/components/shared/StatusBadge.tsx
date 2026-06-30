@@ -33,8 +33,8 @@ interface Props {
 }
 
 export default function StatusBadge({ status, label, size = 'sm' }: Props) {
-  const variant = VARIANTS[status] ?? VARIANTS.pending
-  const text = label ?? LABELS[status] ?? status
+  const variant = VARIANTS[status as keyof typeof VARIANTS] ?? VARIANTS.pending
+  const text = label ?? LABELS[status as keyof typeof LABELS] ?? status
   return (
     <span className={cn(
       'inline-flex items-center font-medium border rounded-full',

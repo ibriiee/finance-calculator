@@ -39,7 +39,7 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
     if (isEdit) return
     supabase.auth.getUser().then(({ data: { user } }) => {
       const mine = ownershipForEmail(user?.email)
-      if (mine) setForm(p => ({ ...p, ownership: mine }))
+      if (mine) setForm((p: any) => ({ ...p, ownership: mine }))
     })
   }, [])
 
@@ -72,7 +72,7 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
     onSaved(); onClose()
   }
 
-  const F = (field: string, val: any) => setForm(p => {
+  const F = (field: string, val: any) => setForm((p: any) => {
     const next = { ...p, [field]: val }
     if (!isEdit) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(next)) } catch {} }
     return next

@@ -239,7 +239,7 @@ export default function IncomePage() {
                 {(expandedIds.has(item.id + '_lag') || ongoing) && (
                   <div className="flex items-center gap-1 text-xs mt-1 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                     {(item as any).work_started_date && <span>Started {shortDate((item as any).work_started_date)} ·</span>}
-                    <span>{ongoing ? 'In progress' : `Done ${shortDate(item.work_completed_date)}`}</span>
+                    <span>{ongoing ? 'In progress' : `Done ${shortDate(item.work_completed_date ?? '')}`}</span>
                     {item.expected_payment_date && (
                       <span className={isOverdue ? 'text-red-400' : ''}>
                         · {isOverdue ? '⚠ Due' : 'Due'} {shortDate(item.expected_payment_date)}

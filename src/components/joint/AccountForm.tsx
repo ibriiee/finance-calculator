@@ -19,7 +19,7 @@ export default function AccountForm({ onClose, onSaved }: Props) {
     const { data: { user } } = await supabase.auth.getUser()
     const { error: err } = await supabase.from('joint_accounts').insert({
       name: form.name, bank_name: form.bank_name || null,
-      currency: form.currency, created_by_id: user!.id, is_active: true,
+      currency: form.currency as 'AED' | 'PKR', created_by_id: user!.id, is_active: true,
     })
     setSaving(false)
     if (err) { setError(err.message); return }
