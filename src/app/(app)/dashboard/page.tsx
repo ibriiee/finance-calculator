@@ -29,9 +29,11 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('profiles').select('id, display_name') as any,
+    // Received this month (by actual_received_date) + all pending — avoids the bug
+    // where work_completed_date is outside the month window but money was received this month.
     supabase.from('income_projects')
       .select('amount, status, currency, ownership')
-      .gte('work_completed_date', monthStart.toISOString().split('T')[0])
+      .or(`actual_received_date.gte.${monthStart.toISOString().split('T')[0]},status.eq.pending`)
       .in('ownership', ['ibrahim', 'abu_bakar', 'shared']),
     supabase.from('sadaka_entries')
       .select('amount_owed, amount_given, currency')

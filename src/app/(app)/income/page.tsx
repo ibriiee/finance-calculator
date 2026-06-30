@@ -5,7 +5,7 @@ import { formatCurrency, shortDate, getLagDays, getLagColor } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock } from 'lucide-react'
+import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock, ChevronDown, ChevronUp } from 'lucide-react'
 import IncomeForm from '@/components/income/IncomeForm'
 import type { IncomeProject } from '@/types/database.types'
 
@@ -17,6 +17,8 @@ export default function IncomePage() {
   const [editItem, setEditItem] = useState<IncomeProject | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'received'>('all')
   const [devMode, setDevMode] = useState(false)
+  const [showNet, setShowNet] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const supabase = createClient()
 
   useEffect(() => { setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
@@ -47,11 +49,24 @@ export default function IncomePage() {
 
   useEffect(() => { load() }, [])
 
+  function toggleExpand(id: string) {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  // isReceived: treat actual_received_date as ground truth — status may lag if
+  // the date was set via edit form rather than the "Mark Received" button.
+  const isReceivedItem = (item: IncomeProject) =>
+    item.status === 'received' || !!(item as any).actual_received_date
+
   const filtered = filter === 'all' ? items
-    : items.filter(i => filter === 'pending' ? i.status !== 'received' : i.status === 'received')
+    : items.filter(i => filter === 'pending' ? !isReceivedItem(i) : isReceivedItem(i))
 
   const totalEarned = items.filter(i => i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
-  const totalPending = items.filter(i => i.status === 'pending' && i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
+  const totalPending = items.filter(i => !isReceivedItem(i) && i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
 
   if (loading) return <LoadingSpinner />
 
@@ -66,7 +81,6 @@ export default function IncomePage() {
           </button>
         } />
 
-      {/* Current month */}
       <p className="text-xs -mt-1" style={{ color: 'var(--text-muted)' }}>
         {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
       </p>
@@ -85,18 +99,22 @@ export default function IncomePage() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2">
-        {(['all', 'pending', 'received'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className="px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-all"
-            style={{
-              background: filter === f ? 'var(--gold)' : 'var(--surface-2)',
-              color: filter === f ? '#0a0a0a' : 'var(--text-muted)',
-            }}>
-            {f}
-          </button>
-        ))}
+      {/* Tabs + net toggle on same row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-2">
+          {(['all', 'pending', 'received'] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className="px-3 py-1.5 rounded-full text-xs font-medium capitalize"
+              style={{ background: filter === f ? 'var(--gold)' : 'var(--surface-2)', color: filter === f ? '#0a0a0a' : 'var(--text-muted)' }}>
+              {f}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowNet(v => !v)}
+          className="px-2.5 py-1.5 rounded-full text-[11px] font-medium"
+          style={{ background: showNet ? 'rgba(16,185,129,0.15)' : 'var(--surface-2)', color: showNet ? '#10B981' : 'var(--text-muted)' }}>
+          {showNet ? 'Net ✓' : 'Net'}
+        </button>
       </div>
 
       {/* List */}
@@ -113,93 +131,140 @@ export default function IncomePage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map(item => {
+            const received = isReceivedItem(item)
             const ongoing = (item as any).is_ongoing || !item.work_completed_date
             const lagDays = item.work_completed_date ? getLagDays(item.work_completed_date, item.actual_received_date) : 0
             const lagColor = getLagColor(lagDays)
-            const isOverdue = item.status === 'pending' && item.expected_payment_date
-              && new Date(item.expected_payment_date) < new Date()
+            const isOverdue = !received && item.expected_payment_date && new Date(item.expected_payment_date) < new Date()
             const sad = sadakaByIncome[item.id]
-            const sadakaPaid = sad ? sad.given >= sad.owed && sad.owed > 0 : false
+            const sadakaPending = sad ? Math.max(0, sad.owed - sad.given) : 0
+            const netAmount = item.amount - (sad?.owed ?? 0)
+            const expanded = expandedIds.has(item.id)
+            const borderColor = received ? '#10B981' : isOverdue ? '#EF4444' : 'var(--gold)'
 
-            const borderColor = item.status === 'received' ? '#10B981' : isOverdue ? '#EF4444' : 'var(--gold)'
             return (
               <div key={item.id} className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-1">
                   <div className="flex-1 mr-3">
                     <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
                     <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--text-muted)' }}>
                       {item.type.replace('_', ' ')} · {item.ownership === 'shared' ? 'Shared' : item.ownership === 'ibrahim' ? 'Ibrahim' : 'Abu Bakar'}
-                      {ongoing && <span className="ml-1" style={{ color: 'var(--text-muted)' }}>· Ongoing</span>}
+                      {ongoing && ' · Ongoing'}
+                      {received && (item as any).actual_received_date && ` · Rcvd ${shortDate((item as any).actual_received_date)}`}
+                      {isOverdue && <span className="text-red-400"> · ⚠ Overdue</span>}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-base font-bold" style={{ color: 'var(--gold)' }}>
-                      {formatCurrency(item.amount, item.currency)}
+                  <div className="text-right">
+                    <span className="text-base font-bold" style={{ color: showNet && sad?.owed ? (netAmount >= 0 ? '#10B981' : '#EF4444') : 'var(--gold)' }}>
+                      {showNet && sad?.owed
+                        ? formatCurrency(netAmount, item.currency)
+                        : formatCurrency(item.amount, item.currency)}
                     </span>
+                    {showNet && sad?.owed && (
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>net after sadaka</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Sadaka status for this earning */}
+                {/* Sadaka line */}
                 {sad && sad.owed > 0 && (
-                  <div className="flex items-center gap-1.5 text-xs mb-1">
-                    <HandHeart size={11} style={{ color: sadakaPaid ? '#10B981' : 'var(--gold)' }} />
-                    <span style={{ color: sadakaPaid ? '#10B981' : 'var(--gold)' }}>
-                      {sadakaPaid
-                        ? `Sadaka paid (${formatCurrency(sad.given, item.currency, true)})`
-                        : `Sadaka ${formatCurrency(sad.given, item.currency, true)}/${formatCurrency(sad.owed, item.currency, true)} given`}
+                  <div className="flex items-center gap-1.5 text-xs mt-1">
+                    <HandHeart size={11} style={{ color: sadakaPending === 0 ? '#10B981' : 'var(--gold)' }} />
+                    <span style={{ color: sadakaPending === 0 ? '#10B981' : 'var(--gold)' }}>
+                      Sadaka {formatCurrency(sad.given, item.currency, true)}/{formatCurrency(sad.owed, item.currency, true)} given
+                      {sadakaPending === 0 && ' ✓'}
                     </span>
                   </div>
                 )}
 
-                {/* Lag visualiser */}
-                <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-                  <Clock size={11} className={lagColor} />
-                  <div className="flex items-center gap-1 text-xs flex-wrap">
-                    {(item as any).work_started_date && (
-                      <><span style={{ color: 'var(--text-muted)' }}>Started {shortDate((item as any).work_started_date)}</span><span style={{ color: 'var(--border)' }}>·</span></>
-                    )}
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      {ongoing ? 'In progress' : `Done ${shortDate(item.work_completed_date)}`}
-                    </span>
-                    {item.expected_payment_date && (
-                      <>
-                        <span style={{ color: 'var(--border)' }}>·</span>
-                        <span className={isOverdue ? 'text-red-400' : ''} style={{ color: isOverdue ? undefined : 'var(--text-muted)' }}>
-                          {isOverdue ? '⚠ Due ' : 'Due '}{shortDate(item.expected_payment_date)}
-                        </span>
-                      </>
-                    )}
-                    {item.actual_received_date && (
-                      <>
-                        <span style={{ color: 'var(--border)' }}>·</span>
-                        <span className="text-emerald-400">Rcvd {shortDate(item.actual_received_date)}</span>
-                      </>
-                    )}
-                    <span style={{ color: 'var(--border)' }}>·</span>
-                    <span className={lagColor}>{lagDays}d lag</span>
-                  </div>
-                </div>
+                {/* Breakdown toggle */}
+                {sad && sad.owed > 0 && (
+                  <button onClick={() => toggleExpand(item.id)}
+                    className="flex items-center gap-1 mt-1.5 text-[11px]"
+                    style={{ color: 'var(--text-muted)' }}>
+                    {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    {expanded ? 'Hide breakdown' : 'Show breakdown'}
+                  </button>
+                )}
 
-                {/* Actions — locked once payment received (unless Developer Mode) */}
-                {item.status === 'received' && !devMode ? (
+                {/* Breakdown panel */}
+                {expanded && sad && sad.owed > 0 && (
+                  <div className="mt-2 rounded-lg p-3 text-xs flex flex-col gap-1" style={{ background: 'var(--surface-2)' }}>
+                    <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                      <span>Gross income</span>
+                      <span>{formatCurrency(item.amount, item.currency)}</span>
+                    </div>
+                    <div className="flex justify-between" style={{ color: 'var(--gold)' }}>
+                      <span>− Sadaka obligation ({Math.round((sad.owed / item.amount) * 100)}%)</span>
+                      <span>−{formatCurrency(sad.owed, item.currency, true)}</span>
+                    </div>
+                    <div className="border-t pt-1 mt-1 flex justify-between font-semibold"
+                         style={{ borderColor: 'var(--border)', color: netAmount >= 0 ? '#10B981' : '#EF4444' }}>
+                      <span>Net yours</span>
+                      <span>{formatCurrency(netAmount, item.currency)}</span>
+                    </div>
+                    {sad.given > 0 && (
+                      <div className="border-t pt-1 mt-1 flex flex-col gap-1" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex justify-between text-emerald-400">
+                          <span>Sadaka given so far</span>
+                          <span>{formatCurrency(sad.given, item.currency, true)}</span>
+                        </div>
+                        {sadakaPending > 0 && (
+                          <div className="flex justify-between" style={{ color: 'var(--gold)' }}>
+                            <span>Still owed</span>
+                            <span>{formatCurrency(sadakaPending, item.currency, true)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Lag details — collapsed by default */}
+                {!ongoing && (
+                  <button onClick={() => toggleExpand(item.id + '_lag')}
+                    className="flex items-center gap-1 mt-2 text-[11px]"
+                    style={{ color: 'var(--text-muted)' }}>
+                    <Clock size={10} className={lagColor} />
+                    <span className={lagColor}>{lagDays}d lag</span>
+                    {expandedIds.has(item.id + '_lag') ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                  </button>
+                )}
+
+                {(expandedIds.has(item.id + '_lag') || ongoing) && (
+                  <div className="flex items-center gap-1 text-xs mt-1 flex-wrap" style={{ color: 'var(--text-muted)' }}>
+                    {(item as any).work_started_date && <span>Started {shortDate((item as any).work_started_date)} ·</span>}
+                    <span>{ongoing ? 'In progress' : `Done ${shortDate(item.work_completed_date)}`}</span>
+                    {item.expected_payment_date && (
+                      <span className={isOverdue ? 'text-red-400' : ''}>
+                        · {isOverdue ? '⚠ Due' : 'Due'} {shortDate(item.expected_payment_date)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                {received && !devMode ? (
                   <div className="flex items-center gap-1.5 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    <Lock size={11} /> Locked — payment received, entry can't be changed
+                    <Lock size={11} /> Locked — payment received
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 mt-3">
-                    <button
-                      onClick={async () => {
-                        if (!confirm('Mark as received? This locks the entry — it can no longer be edited or deleted.')) return
-                        await supabase.from('income_projects').update({
-                          status: 'received',
-                          actual_received_date: new Date().toISOString().split('T')[0]
-                        }).eq('id', item.id)
-                        load()
-                      }}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
-                      style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-                      <Check size={12} /> Mark Received
-                    </button>
+                    {!received && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm('Mark as received? This locks the entry.')) return
+                          await supabase.from('income_projects').update({
+                            status: 'received',
+                            actual_received_date: new Date().toISOString().split('T')[0]
+                          }).eq('id', item.id)
+                          load()
+                        }}
+                        className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+                        style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+                        <Check size={12} /> Mark Received
+                      </button>
+                    )}
                     <button onClick={() => { setEditItem(item); setShowForm(true) }}
                       className="px-3 py-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
                       <Pencil size={13} />
