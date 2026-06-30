@@ -5,11 +5,18 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock, FileText, FileSpreadsheet } from 'lucide-react'
+import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock, FileText, FileSpreadsheet, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import SadakaForm from '@/components/sadaka/SadakaForm'
 import { exportSadakaCsv, exportSadakaPdf, givenEntries } from '@/lib/sadakaExport'
 import type { SadakaEntry } from '@/types/database.types'
+
+type AllocResult = {
+  owed: number
+  remaining: number
+  givenSoFar: number
+  payments: { entry: SadakaEntry; applied: number }[]
+}
 
 export default function SadakaPage() {
   const [entries, setEntries] = useState<SadakaEntry[]>([])
@@ -19,6 +26,8 @@ export default function SadakaPage() {
   const [devMode, setDevMode] = useState(false)
   const [filter, setFilter] = useState<'pending' | 'given' | 'all'>('pending')
   const [exportKey, setExportKey] = useState('all')
+  const [showExport, setShowExport] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
@@ -49,14 +58,13 @@ export default function SadakaPage() {
 
   useEffect(() => { load(); setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
 
-  // Net the whole ledger per currency: advances (given > owed) auto-offset new obligations.
   function totalsFor(list: SadakaEntry[], cur: string) {
     const owed = list.filter(e => e.currency === cur).reduce((s, e) => s + Number(e.amount_owed), 0)
     const given = list.filter(e => e.currency === cur).reduce((s, e) => s + Number(e.amount_given), 0)
     return {
       owed, given,
-      pending: Math.max(0, owed - given),   // still to give
-      advance: Math.max(0, given - owed),   // credit carried forward
+      pending: Math.max(0, owed - given),
+      advance: Math.max(0, given - owed),
     }
   }
   const mine = entries.filter(e => !e.is_joint && e.owner_id === userId)
@@ -66,13 +74,10 @@ export default function SadakaPage() {
   const jointAed = totalsFor(joint, 'AED')
   const jointPkr = totalsFor(joint, 'PKR')
 
-  // A row with no amount_owed is a PAYMENT (money given), not an obligation.
   const isPayment = (e: SadakaEntry) => Number(e.amount_owed) === 0 && Number(e.amount_given) > 0
 
-  // Spread payments across open obligations (oldest first, per owner+currency) so each
-  // obligation card shows how much is still due — and the cards reconcile with the
-  // header's pending total instead of contradicting it.
-  const alloc: Record<string, { owed: number; remaining: number; givenSoFar: number }> = {}
+  // Track which individual payment entries cover each obligation so we can show a breakdown.
+  const alloc: Record<string, AllocResult> = {}
   {
     const groups: Record<string, SadakaEntry[]> = {}
     for (const e of entries) {
@@ -81,16 +86,28 @@ export default function SadakaPage() {
     }
     for (const key in groups) {
       const g = groups[key]
-      let credit = g.filter(isPayment).reduce((s, e) => s + Number(e.amount_given), 0)
+      // Mutable pool of payment entries, oldest first
+      const pool = g.filter(isPayment)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map(e => ({ entry: e, left: Number(e.amount_given) }))
       const obligations = g.filter(e => Number(e.amount_owed) > 0)
         .sort((a, b) => a.created_at.localeCompare(b.created_at))
       for (const o of obligations) {
         const owed = Number(o.amount_owed)
-        const ownGiven = Number(o.amount_given)           // from "Mark as Given"
+        const ownGiven = Number(o.amount_given)
         const selfRemaining = Math.max(0, owed - ownGiven)
-        const applied = Math.min(credit, selfRemaining)
-        credit -= applied
-        alloc[o.id] = { owed, remaining: selfRemaining - applied, givenSoFar: ownGiven + applied }
+        let toApply = selfRemaining
+        const payments: { entry: SadakaEntry; applied: number }[] = []
+        for (const p of pool) {
+          if (toApply <= 0) break
+          const take = Math.min(p.left, toApply)
+          if (take > 0) {
+            payments.push({ entry: p.entry, applied: take })
+            p.left -= take
+            toApply -= take
+          }
+        }
+        alloc[o.id] = { owed, remaining: toApply, givenSoFar: ownGiven + (selfRemaining - toApply), payments }
       }
     }
   }
@@ -100,7 +117,6 @@ export default function SadakaPage() {
     : filter === 'pending' ? entries.filter(e => !isPayment(e) && remainingOf(e) > 0)
     : entries.filter(e => isPayment(e) || e.status === 'given' || Number(e.amount_given) > 0)
 
-  // Export record — given sadaka, scoped to all-time or a specific month
   const allGiven = givenEntries(entries)
   const monthKeyOf = (e: SadakaEntry) => {
     const d = new Date(e.date_given ?? e.created_at)
@@ -114,6 +130,14 @@ export default function SadakaPage() {
   const exportScope = exportKey === 'all'
     ? { label: 'All time', entries: allGiven }
     : { label: monthLabel(exportKey), entries: allGiven.filter(e => monthKeyOf(e) === exportKey) }
+
+  function toggleExpand(id: string) {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   if (loading) return <LoadingSpinner />
 
@@ -131,7 +155,7 @@ export default function SadakaPage() {
           </button>
         } />
 
-      {/* Summary — pending / given / advance, per currency */}
+      {/* Summary */}
       <div className="card p-4">
         <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Your Sadaka</p>
         <div className="grid grid-cols-3 gap-3">
@@ -159,9 +183,7 @@ export default function SadakaPage() {
           <p className="text-xs text-emerald-400 mt-3">All sadaka given — you're clear{aed.advance > 0 ? `, with ${formatCurrency(aed.advance, 'AED', true)} in advance credit` : ''} ✓</p>
         )}
         {aed.advance > 0 && aed.pending > 0 && (
-          <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
-            Advance credit is auto-offsetting new obligations.
-          </p>
+          <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>Advance credit is auto-offsetting new obligations.</p>
         )}
       </div>
 
@@ -184,7 +206,7 @@ export default function SadakaPage() {
         </div>
       )}
 
-      {/* Recipients link */}
+      {/* Recipients link + Export icon on same row */}
       <Link href="/recipients" className="card p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users size={15} style={{ color: 'var(--gold)' }} />
@@ -192,36 +214,6 @@ export default function SadakaPage() {
         </div>
         <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
       </Link>
-
-      {/* Export record — keep a CSV or printable PDF of sadaka given */}
-      <div className="card p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Export record</p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {exportScope.entries.length} given {exportScope.entries.length === 1 ? 'entry' : 'entries'} · for your records
-            </p>
-          </div>
-          <select value={exportKey} onChange={e => setExportKey(e.target.value)}
-            className="text-xs rounded-lg px-2 py-1.5"
-            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-            <option value="all">All time</option>
-            {exportMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
-          </select>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => exportSadakaCsv(exportScope)} disabled={exportScope.entries.length === 0}
-            className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
-            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
-            <FileSpreadsheet size={13} /> CSV
-          </button>
-          <button onClick={() => exportSadakaPdf(exportScope)} disabled={exportScope.entries.length === 0}
-            className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
-            style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-            <FileText size={13} /> PDF record
-          </button>
-        </div>
-      </div>
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -241,9 +233,11 @@ export default function SadakaPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map(entry => {
-            const borderColor = (isPayment(entry) || remainingOf(entry) === 0)
-              ? '#10B981'
-              : 'var(--gold)'
+            const borderColor = (isPayment(entry) || remainingOf(entry) === 0) ? '#10B981' : 'var(--gold)'
+            const a = alloc[entry.id]
+            const isObligation = !isPayment(entry) && Number(entry.amount_owed) > 0
+            const hasBreakdown = isObligation && a && (Number(entry.amount_given) > 0 || a.payments.length > 0)
+            const expanded = expandedIds.has(entry.id)
             return (
             <div key={entry.id} className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>
               <div className="flex items-start justify-between mb-2">
@@ -290,10 +284,10 @@ export default function SadakaPage() {
                       <p className="text-base font-bold" style={{ color: remainingOf(entry) > 0 ? 'var(--gold)' : '#10B981' }}>
                         {formatCurrency(remainingOf(entry), entry.currency)}
                       </p>
-                      {(alloc[entry.id]?.givenSoFar ?? 0) > 0 && (
+                      {(a?.givenSoFar ?? 0) > 0 && (
                         <p className="text-xs text-emerald-400">
                           {remainingOf(entry) > 0
-                            ? `${formatCurrency(alloc[entry.id].givenSoFar, entry.currency)} of ${formatCurrency(entry.amount_owed, entry.currency)} given`
+                            ? `${formatCurrency(a.givenSoFar, entry.currency)} of ${formatCurrency(entry.amount_owed, entry.currency)} given`
                             : 'fully given ✓'}
                         </p>
                       )}
@@ -302,17 +296,56 @@ export default function SadakaPage() {
                 </div>
               </div>
 
-              {/* Progress bar for partially-covered obligations */}
-              {!isPayment(entry) && Number(entry.amount_owed) > 0 && (alloc[entry.id]?.givenSoFar ?? 0) > 0 && (
+              {/* Progress bar */}
+              {isObligation && Number(entry.amount_owed) > 0 && (a?.givenSoFar ?? 0) > 0 && (
                 <div className="mt-2">
                   <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                     <div className="h-full rounded-full"
-                         style={{ width: `${Math.min(100, ((alloc[entry.id]?.givenSoFar ?? 0) / Number(entry.amount_owed)) * 100)}%`, background: 'var(--gold)' }} />
+                         style={{ width: `${Math.min(100, ((a?.givenSoFar ?? 0) / Number(entry.amount_owed)) * 100)}%`, background: 'var(--gold)' }} />
                   </div>
                 </div>
               )}
 
-              {/* Actions — locked once given (unless Developer Mode) */}
+              {/* Breakdown toggle — only on obligations with some given */}
+              {hasBreakdown && (
+                <button onClick={() => toggleExpand(entry.id)}
+                  className="flex items-center gap-1 mt-2 text-[11px]"
+                  style={{ color: 'var(--text-muted)' }}>
+                  {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                  {expanded ? 'Hide breakdown' : 'Show breakdown'}
+                </button>
+              )}
+
+              {/* Breakdown panel */}
+              {expanded && hasBreakdown && a && (
+                <div className="mt-2 rounded-lg p-3 text-xs flex flex-col gap-1" style={{ background: 'var(--surface-2)' }}>
+                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                    <span>Obligation</span>
+                    <span>{formatCurrency(a.owed, entry.currency)}</span>
+                  </div>
+                  {/* Direct mark-as-given amount on this entry */}
+                  {Number(entry.amount_given) > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>− Marked as given</span>
+                      <span>−{formatCurrency(entry.amount_given, entry.currency)}</span>
+                    </div>
+                  )}
+                  {/* Pool payments applied */}
+                  {a.payments.map((p, i) => (
+                    <div key={i} className="flex justify-between text-emerald-400">
+                      <span>− {p.entry.recipient_name ?? 'Sadaka payment'}{p.entry.date_given ? ` · ${shortDate(p.entry.date_given)}` : ''}</span>
+                      <span>−{formatCurrency(p.applied, entry.currency)}</span>
+                    </div>
+                  ))}
+                  <div className="border-t mt-1 pt-1 flex justify-between font-semibold"
+                       style={{ borderColor: 'var(--border)', color: a.remaining > 0 ? 'var(--gold)' : '#10B981' }}>
+                    <span>{a.remaining > 0 ? 'Still owed' : 'Cleared'}</span>
+                    <span>{formatCurrency(a.remaining, entry.currency)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
               {entry.status === 'given' && !devMode ? (
                 <div className="flex items-center gap-1.5 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
                   <Lock size={11} /> Given — locked, can't be edited or deleted
@@ -322,8 +355,6 @@ export default function SadakaPage() {
                   {entry.status !== 'given' && (
                     <button
                       onClick={async () => {
-                        // Clear only what's still due after any payments already applied,
-                        // so we never record more given than the obligation is worth.
                         await supabase.from('sadaka_entries').update({
                           status: 'given',
                           amount_given: Number(entry.amount_given) + remainingOf(entry),
@@ -354,6 +385,47 @@ export default function SadakaPage() {
           )})}
         </div>
       )}
+
+      {/* Export — collapsed to small row at bottom */}
+      <div className="card p-3">
+        <button onClick={() => setShowExport(v => !v)}
+          className="w-full flex items-center justify-between"
+          style={{ color: 'var(--text-muted)' }}>
+          <div className="flex items-center gap-2">
+            <Download size={13} />
+            <span className="text-xs">Export record</span>
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>· {allGiven.length} entries</span>
+          </div>
+          {showExport ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        {showExport && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                {exportScope.entries.length} given {exportScope.entries.length === 1 ? 'entry' : 'entries'}
+              </p>
+              <select value={exportKey} onChange={e => setExportKey(e.target.value)}
+                className="text-xs rounded-lg px-2 py-1.5"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                <option value="all">All time</option>
+                {exportMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => exportSadakaCsv(exportScope)} disabled={exportScope.entries.length === 0}
+                className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                <FileSpreadsheet size={13} /> CSV
+              </button>
+              <button onClick={() => exportSadakaPdf(exportScope)} disabled={exportScope.entries.length === 0}
+                className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+                style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                <FileText size={13} /> PDF record
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {showForm && <SadakaForm onClose={() => { setShowForm(false); setEditItem(null) }} onSaved={load} editItem={editItem} />}
     </div>
