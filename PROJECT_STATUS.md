@@ -109,6 +109,15 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-01** — **Toggle follow-up fix (Awaiting) + input hardening + MAINTENANCE.md.**
+  *Bug:* in "This month" view the **Awaiting** stat showed inflated (30K vs true 15K) — it was computed
+  `earned − received`, and monthly scopes *received* to this month (→0) while *earned* stayed all-time.
+  Now computed straight from status (sum of non-received income), so it's identical in both views.
+  *Data integrity:* the last two forms writing amounts without validation — **GoalForm** and joint
+  **TxnForm** — now use `validateAmount()` (rejects empty/0/negative/huge), closing the last paths that
+  could write `NaN` into the DB and poison every downstream sum. TxnForm also now requires a contributor
+  on deposits. *New doc:* **MAINTENANCE.md** — plain-language survival guide (Supabase pause, account
+  upkeep, backups, "don't npm update") for running the app for years with no developer. `next build` green.
 - **2026-07-01** — **Dashboard "All time ⇄ This month" toggle + 2-year hardening pass.**
   *Toggle* (`?view=month`): default hero = lifetime cash on hand; monthly view scopes income
   (by `actual_received_date`), sadaka given (by `created_at`) and expenses (by `expense_date`) to the

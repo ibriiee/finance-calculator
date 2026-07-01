@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { validateAmount } from '@/lib/utils'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 
@@ -9,6 +10,7 @@ interface Props { onClose: () => void; onSaved: () => void }
 export default function GoalForm({ onClose, onSaved }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '', goal_type: 'joint' as 'individual' | 'joint',
     target_amount: '', currency: 'AED', target_date: '',
@@ -17,8 +19,10 @@ export default function GoalForm({ onClose, onSaved }: Props) {
   const F = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }))
 
   async function save() {
-    if (!form.name || !form.target_amount) return
-    setSaving(true)
+    if (!form.name.trim()) { setError('Goal name is required'); return }
+    const amtErr = validateAmount(form.target_amount)
+    if (amtErr) { setError(amtErr); return }
+    setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('financial_goals').insert({
       owner_id: form.goal_type === 'individual' ? user!.id : null,
@@ -72,6 +76,8 @@ export default function GoalForm({ onClose, onSaved }: Props) {
             <input type="date" value={form.target_date} onChange={e => F('target_date', e.target.value)}
               className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
+
+          {error && <p className="text-xs" style={{ color: '#EF4444' }}>{error}</p>}
 
           <button onClick={save} disabled={saving || !form.name || !form.target_amount}
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"

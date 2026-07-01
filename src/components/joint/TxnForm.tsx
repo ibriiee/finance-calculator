@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { validateAmount } from '@/lib/utils'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 
@@ -37,7 +38,10 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency }
   }, [])
 
   async function save() {
-    if (!form.amount || !me) return
+    if (!me) return
+    const amtErr = validateAmount(form.amount)
+    if (amtErr) { setError(amtErr); return }
+    if (form.txn_type === 'deposit' && !form.contributor_id) { setError('Pick who chipped in'); return }
     setSaving(true); setError('')
     const { error: err } = await supabase.from('joint_account_txns').insert({
       account_id: accountId,

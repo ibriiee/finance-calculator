@@ -1,5 +1,11 @@
 # Session Log
 
+2026-07-01 (session 3 — toggle Awaiting fix + input hardening + runbook)
+- Completed: (1) Fixed "This month" view showing inflated Awaiting (30K vs 15K) — was earned−received; earned all-time but received month-scoped → 0. Now Awaiting = sum of non-received income, view-independent. (2) Closed last NaN-to-DB paths: GoalForm + joint TxnForm now use validateAmount() (were bare parseFloat); TxnForm also requires contributor on deposit. (3) Audited remaining money pages — no currency-mixing bugs (all sums filter by currency or convert via toAed). Zakat calc clean. (4) NEW MAINTENANCE.md — plain-language survival guide for the user (Supabase pause + resume, keep accounts alive, monthly backups, don't npm update). Verified: tsc 0, next build green. Couldn't test authed dashboard (no user session) — fixes are logic-traced + compiled.
+- Changed files: dashboard/page.tsx, components/goals/GoalForm.tsx, components/joint/TxnForm.tsx, NEW MAINTENANCE.md, PROJECT_STATUS.md, SESSION_LOG.md
+- Blockers: none. App is code-complete/hardened. Remaining work is operational (user-side), documented in MAINTENANCE.md.
+- Next: nothing pending. If more polish wanted next session → Sonnet is fine (no money-math left); keep Opus only for new money/architecture features.
+
 2026-07-01 (session 2 — monthly toggle + 2-year hardening)
 - Completed: (1) Dashboard "All time ⇄ This month" toggle (?view=month) — monthly scopes income/sadaka/expenses to current month, drops debt (balance not a flow); pills on Your Money card, labels adapt. (2) Hardening for long unattended runtime: added error.tsx ((app) recoverable screen), global-error.tsx (root last-resort), not-found.tsx — a bad query no longer bricks a page. (3) Division-by-zero guards in goals + dashboard goal-progress + income sadaka-% (were NaN% on 0 amount). (4) Full audit: RLS OK on all 19 tables, SW is network-first (no stale trap), lockfile committed — no change needed. Verified: tsc 0, next build green, dev server boots + /login renders clean (couldn't test authed dashboard — no user session).
 - Changed files: dashboard/page.tsx, goals/page.tsx, income/page.tsx, NEW (app)/error.tsx + global-error.tsx + not-found.tsx, PROJECT_STATUS.md, SESSION_LOG.md

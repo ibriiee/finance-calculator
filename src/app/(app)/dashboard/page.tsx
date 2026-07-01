@@ -92,8 +92,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     i.ownership === 'shared' || i.ownership === myOwnership
   ) ?? []
 
-  // Awaiting is a "right now" balance (still-pending income) — always all-time, view-independent.
-  const totalEarned = myIncome.filter((i: any) => i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
+  // Awaiting = still-pending income (status not yet received). Computed from status
+  // directly, NOT as earned−received, so it stays correct in the monthly view where
+  // "received" is month-scoped (else received-this-month=0 wrongly inflated awaiting).
+  const awaitingAed = myIncome
+    .filter((i: any) => i.currency === 'AED' && i.status !== 'received')
+    .reduce((s: number, i: any) => s + i.amount, 0)
   // In hand: all received (lifetime), or just what landed this month when toggled.
   const totalReceived = myIncome
     .filter((i: any) => i.status === 'received' && i.currency === 'AED' && (!monthly || inMonth(i.actual_received_date)))
@@ -274,8 +278,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div>
             <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Awaiting</p>
             <p className="font-display text-base font-semibold"
-               style={{ color: totalEarned - totalReceived > 0 ? 'var(--amber)' : 'var(--text-muted)' }}>
-              {formatCurrency(Math.max(0, totalEarned - totalReceived), 'AED', true)}
+               style={{ color: awaitingAed > 0 ? 'var(--amber)' : 'var(--text-muted)' }}>
+              {formatCurrency(awaitingAed, 'AED', true)}
             </p>
           </div>
         </div>
