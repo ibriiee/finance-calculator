@@ -21,6 +21,8 @@ export default function LoansPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [rates, setRates] = useState(RATES_DEFAULTS)
+  const [visibleMine, setVisibleMine] = useState(50)
+  const [visibleBrother, setVisibleBrother] = useState(50)
   const supabase = createClient()
 
   async function load() {
@@ -263,11 +265,25 @@ export default function LoansPage() {
           description="Track loans you owe or are owed — with Islamic repayment rules" />
       ) : (
         <div className="flex flex-col gap-3">
-          {myLoans.map(loan => <LoanCard key={loan.id} loan={loan} mine />)}
+          {myLoans.slice(0, visibleMine).map(loan => <LoanCard key={loan.id} loan={loan} mine />)}
+          {myLoans.length > visibleMine && (
+            <button onClick={() => setVisibleMine(v => v + 50)}
+              className="py-2.5 rounded-xl text-xs font-semibold"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+              Load more ({myLoans.length - visibleMine} more)
+            </button>
+          )}
           {brotherLoans.length > 0 && (
             <>
               <p className="section-label mt-2">{names[brotherLoans[0].owner_id] ?? 'Brother'}'s loans</p>
-              {brotherLoans.map(loan => <LoanCard key={loan.id} loan={loan} mine={false} />)}
+              {brotherLoans.slice(0, visibleBrother).map(loan => <LoanCard key={loan.id} loan={loan} mine={false} />)}
+              {brotherLoans.length > visibleBrother && (
+                <button onClick={() => setVisibleBrother(v => v + 50)}
+                  className="py-2.5 rounded-xl text-xs font-semibold"
+                  style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                  Load more ({brotherLoans.length - visibleBrother} more)
+                </button>
+              )}
             </>
           )}
         </div>

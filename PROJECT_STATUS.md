@@ -109,6 +109,16 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-01** — **Near-term upgrade sweep: pagination + rate-limit + LAUNCH.md correction.**
+  *Pagination*: Income, Sadaka, Loans, Recipients lists now render-slice to 50 with a "Load more"
+  button — fetch stays full (totals + `computeSadaka()` FIFO allocation need the complete
+  dataset), only the `.map()` render window is capped. *Security*: `/api/rates` now requires a
+  logged-in session (401 otherwise) — was callable by anyone. Skipped the Upstash per-user
+  throttle from LAUNCH.md; the existing 60-min `rates_cache` TTL already caps real external API
+  calls to 1/hour regardless of request count, which is stronger protection than 1/user/min
+  without a new dependency. *Doc fix*: LAUNCH.md's "UI REDESIGN — next session priority" section
+  (left-border status, collapsible Advanced, dashboard hero flip) was stale — all three shipped
+  2026-06-30, checklist just never got updated. `tsc --noEmit` 0 errors.
 - **2026-07-01** — **Toggle follow-up fix (Awaiting) + input hardening + MAINTENANCE.md.**
   *Bug:* in "This month" view the **Awaiting** stat showed inflated (30K vs true 15K) — it was computed
   `earned − received`, and monthly scopes *received* to this month (→0) while *earned* stayed all-time.

@@ -24,6 +24,7 @@ export default function RecipientsPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [visible, setVisible] = useState(50)
 
   async function load() {
     const [{ data: recs }, { data: ents }] = await Promise.all([
@@ -107,7 +108,7 @@ export default function RecipientsPage() {
           description="Add people you give sadaka to (e.g. Norine Aunty) to track who's been paid and who's overdue." />
       ) : (
         <div className="flex flex-col gap-2">
-          {ranked.map(({ r, s }) => (
+          {ranked.slice(0, visible).map(({ r, s }) => (
             <div key={r.id} className="card p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -142,6 +143,13 @@ export default function RecipientsPage() {
               )}
             </div>
           ))}
+          {ranked.length > visible && (
+            <button onClick={() => setVisible(v => v + 50)}
+              className="py-2.5 rounded-xl text-xs font-semibold"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+              Load more ({ranked.length - visible} more)
+            </button>
+          )}
         </div>
       )}
 

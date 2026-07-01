@@ -23,6 +23,7 @@ export default function IncomePage() {
   const [devMode, setDevMode] = useState(false)
   const [showNet, setShowNet] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [visible, setVisible] = useState(50)
   const supabase = createClient()
 
   useEffect(() => { setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
@@ -151,7 +152,7 @@ export default function IncomePage() {
           } />
       ) : (
         <div className="flex flex-col gap-3">
-          {filtered.map(item => {
+          {filtered.slice(0, visible).map(item => {
             const received = isReceivedItem(item)
             const ongoing = (item as any).is_ongoing || !item.work_completed_date
             const lagDays = item.work_completed_date ? getLagDays(item.work_completed_date, item.actual_received_date) : 0
@@ -318,6 +319,13 @@ export default function IncomePage() {
               </div>
             )
           })}
+          {filtered.length > visible && (
+            <button onClick={() => setVisible(v => v + 50)}
+              className="py-2.5 rounded-xl text-xs font-semibold"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+              Load more ({filtered.length - visible} more)
+            </button>
+          )}
         </div>
       )}
 

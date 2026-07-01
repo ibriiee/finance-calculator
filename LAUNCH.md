@@ -20,8 +20,11 @@ Not forgotten — parked until needed or prioritised.
 - [ ] **Encrypted backup export** — optional AES-256 password on the JSON backup file
       downloaded from Settings → Data Backup. Add warning: "This file contains sensitive
       financial data — store securely."
-- [ ] **Rate-limit /api/rates** — add Supabase Auth check + 1-req/user/min via Upstash
-      or a Supabase Edge Function rate-limiter. Prevents external API quota exhaustion.
+- [x] ~~Rate-limit /api/rates~~ — **Done 2026-07-01**: added the Supabase Auth check (401 if no
+      session). Skipped the Upstash/Edge-Function per-user throttle — the existing 60-min DB
+      cache already caps real external API calls to 1/hour regardless of hit count, which is
+      stronger than 1-req/user/min; adding Upstash would be a new dependency for no extra
+      protection. Revisit only if quota exhaustion actually happens.
 
 ---
 
@@ -61,23 +64,19 @@ Not forgotten — parked until needed or prioritised.
 - [x] ~~Brother ledger: Reverse entry~~ — **Done 2026-06-30** (Reverse button on each unsettled entry)
 - [x] ~~Loan partial repayment progress bar~~ — **Done 2026-06-30** (progress bar + inline Log Repayment form, auto-sets partial/cleared)
 - [x] ~~Stale rates warning banner~~ — **Done 2026-06-30** (Dashboard banner when rates_cache >24h old)
-- [ ] **Pagination on long lists** — Income, Sadaka, Loans, Recipients all do SELECT *.
-      Add `.limit(50)` + "Load more" when each module has 50+ entries. Low priority until 100+ entries exist.
+- [x] ~~Pagination on long lists~~ — **Done 2026-07-01**: Income, Sadaka, Loans, Recipients
+      all render-slice to 50 + "Load more" (fetch stays full — totals/sadaka FIFO allocation
+      need the complete dataset to stay correct; only the `.map()` render window is capped).
 
-## UI REDESIGN — Next session priority
+## UI REDESIGN — done (doc was stale)
 
-Three targeted changes that fix 80% of the UX feel (no data changes, CSS/layout only):
+These three were actually shipped in the 2026-06-30 session per the PROJECT_STATUS.md
+changelog — this checklist just never got updated. Verified still in the code 2026-07-01:
 
-- [ ] **Left-border status system** — Replace status badges on all list cards with a
-      3px coloured left border: gold = pending/obligation, green = done/given, red = overdue.
-      Instant scannability without reading every badge. Apply to: Sadaka, Income, Loans, Ledger.
-- [ ] **Collapsible "Advanced" in forms** — Show 3 primary fields first (Amount, Status/Type,
-      Recipient). All secondary fields (income linking, on-behalf, advance flag, location,
-      method, notes) collapse under an "Advanced ▾" toggle. Reduces overwhelm on mobile.
-      Apply to: SadakaForm, IncomeForm, LoanForm.
-- [ ] **Dashboard hero flip** — Move "Yours to Keep" to the TOP as the large number.
-      Make the waterfall deductions a collapsible "How is this calculated ▾" below it.
-      Currently the most important number is at the bottom after 4 lines of deductions.
+- [x] ~~Left-border status system~~ — 3px coloured left border on Sadaka/Income/Loans/Ledger cards.
+- [x] ~~Collapsible "Advanced" in forms~~ — SadakaForm/IncomeForm/LoanForm all have it.
+- [x] ~~Dashboard hero flip~~ — "Yours to keep" is the top hero number, waterfall is
+      collapsible "How is this calculated ▾" below it.
 
 ---
 
@@ -115,5 +114,5 @@ Current architecture is hardcoded for 2 users (ibrahim + abu_bakar). If expandin
 
 ---
 
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-01_
 _Owner: Ibrahim_

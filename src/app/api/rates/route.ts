@@ -61,6 +61,11 @@ async function fetchFxRates(): Promise<{ pkrToUsd: number; usdToAed: number } | 
 export async function GET() {
   const supabase = await createClient()
 
+  // Require a logged-in session — this endpoint hits paid-tier external APIs
+  // (metals-api/goldapi) on cache miss, so it can't be left open to the public internet.
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
   // Check cache freshness
   const { data: cache } = await supabase
     .from('rates_cache')

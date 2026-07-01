@@ -29,6 +29,7 @@ export default function SadakaPage() {
   const [exportKey, setExportKey] = useState('all')
   const [showExport, setShowExport] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [visible, setVisible] = useState(50)
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
@@ -206,7 +207,7 @@ export default function SadakaPage() {
           description="Add a sadaka entry manually or it auto-creates when income is received" />
       ) : (
         <div className="flex flex-col gap-3">
-          {filtered.map(entry => {
+          {filtered.slice(0, visible).map(entry => {
             // green = given/cleared, red = still owed (needs action)
             const borderColor = (isPayment(entry) || remainingOf(entry) === 0) ? '#10B981' : '#EF4444'
             const a = alloc[entry.id]
@@ -358,6 +359,13 @@ export default function SadakaPage() {
               )}
             </div>
           )})}
+          {filtered.length > visible && (
+            <button onClick={() => setVisible(v => v + 50)}
+              className="py-2.5 rounded-xl text-xs font-semibold"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+              Load more ({filtered.length - visible} more)
+            </button>
+          )}
         </div>
       )}
 

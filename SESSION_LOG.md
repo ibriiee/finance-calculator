@@ -41,3 +41,9 @@
 - Changed files: src/lib/hijri.ts (new), src/lib/sadaka.ts (new), lifeMath.ts, database.types.ts, life/page.tsx, life/settings/page.tsx, settings/page.tsx, components/sadaka/SadakaForm.tsx, BottomNav.tsx, PROJECT_STATUS.md, SESSION_LOG.md.
 - Blockers: NONE new. No DB migration needed (recurrence is plain TEXT, accepts hijri_yearly; Islamic-dates toggle is localStorage mizan_islamic_dates). Migration 15 (life-events.sql) still required if not yet run.
 - Next: optional deeper life-grid zoom (tap year/decade → day grid); true per-wife profile needs a relationships rework (for now wife's Zakat = a 2nd hijri_yearly event); .ics calendar feed still the recommended notification route.
+
+2026-07-01 (session 3)
+- Completed: Closed out LAUNCH.md's "near-term" upgrade bucket. Pagination (render-slice to 50 + "Load more") on Income/Sadaka/Loans/Recipients — fetch stays full since totals + computeSadaka() FIFO need the complete dataset, only the .map() render window is capped. /api/rates now 401s without a session (was public); skipped the Upstash per-user throttle since the existing 60-min rates_cache TTL already caps real external calls to 1/hour, no new dep. Discovered the "UI REDESIGN — next session priority" section in LAUNCH.md was stale (left-border status/collapsible Advanced/dashboard hero flip all shipped 2026-06-30) — corrected the doc, wrote no code for it. tsc 0 errors, next build clean (25 routes).
+- Changed files: income/page.tsx, sadaka/page.tsx, loans/page.tsx, recipients/page.tsx, api/rates/route.ts, LAUNCH.md, PROJECT_STATUS.md
+- Blockers: None
+- Next: LAUNCH.md's remaining buckets (security/data-integrity, AI, multi-user, i18n, App Store) are deliberately still deferred — each needs an explicit scope call (some require new deps or architecture rework) before starting.
