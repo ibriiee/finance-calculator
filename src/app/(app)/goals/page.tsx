@@ -37,7 +37,7 @@ export default function GoalsPage() {
     const withProgress = (g ?? []).map(goal => {
       const contribs = (c ?? []).filter(x => x.goal_id === goal.id)
       const saved = contribs.reduce((s, x) => s + x.amount, 0)
-      return { ...goal, saved, pct: Math.min(100, Math.round((saved / goal.target_amount) * 100)), contributions: contribs }
+      return { ...goal, saved, pct: goal.target_amount > 0 ? Math.min(100, Math.round((saved / goal.target_amount) * 100)) : 0, contributions: contribs }
     })
     setGoals(withProgress)
     setLoading(false)

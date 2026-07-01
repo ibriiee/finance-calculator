@@ -217,7 +217,7 @@ export default function IncomePage() {
                       <span>{formatCurrency(item.amount, item.currency)}</span>
                     </div>
                     <div className="flex justify-between" style={{ color: 'var(--gold)' }}>
-                      <span>− Sadaka obligation ({Math.round((sad.owed / item.amount) * 100)}%)</span>
+                      <span>− Sadaka obligation ({item.amount > 0 ? Math.round((sad.owed / item.amount) * 100) : 0}%)</span>
                       <span>−{formatCurrency(sad.owed, item.currency, true)}</span>
                     </div>
                     <div className="border-t pt-1 mt-1 flex justify-between font-semibold"

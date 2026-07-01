@@ -21,7 +21,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 
 | Module | Route | Status | Notes |
 |--------|-------|--------|-------|
-| Dashboard | `/dashboard` | ✅ | Hero = **Yours to keep** (real cash on hand) with a collapsible waterfall: **all received − sadaka actually paid − expenses − owed to people** (all cumulative, not monthly — else last month's income drops out while its sadaka stays subtracted → false negative); still-owed sadaka shown as a reminder (held in that cash, not double-counted). PKR folded into AED via `pkr_to_aed`. Summary cards + quick links |
+| Dashboard | `/dashboard` | ✅ | Hero = **Yours to keep** (real cash on hand) with a collapsible waterfall: **all received − sadaka actually paid − expenses − owed to people** (all cumulative, not monthly — else last month's income drops out while its sadaka stays subtracted → false negative); still-owed sadaka shown as a reminder (held in that cash, not double-counted). **All time ⇄ This month toggle** (`?view=month`): monthly view scopes income/sadaka/expenses to the current month and drops debt (a running balance, not a monthly flow). PKR folded into AED via `pkr_to_aed`. Summary cards + quick links |
 | Expenses | `/expenses` | ✅ | **Personal/living expenses** (rent, Du/bills, petrol, food-out, groceries, vape, sent-home, health, gift, subscription, custom). Category breakdown, this-month vs all, per-currency spend (your share). **Shared toggle** folds in the old Splits: a split expense auto-creates one `brother_ledger` IOU for the other's share. Feeds the dashboard cash model. Owner-private RLS |
 | Income | `/income` | ✅ | Individual. Start date, ongoing flag, edit/delete, per-entry **sadaka-paid status**. Editing does NOT re-trigger sadaka (insert-only trigger) |
 | Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`). **Smart income linking** (`src/lib/sadaka.ts`): the "pay toward which income" picker hides streams whose sadaka chapter is fully given (settled), shows "X due" per open stream, and warns when a payment overpays a linked stream (excess → advance) |
@@ -109,6 +109,19 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-01** — **Dashboard "All time ⇄ This month" toggle + 2-year hardening pass.**
+  *Toggle* (`?view=month`): default hero = lifetime cash on hand; monthly view scopes income
+  (by `actual_received_date`), sadaka given (by `created_at`) and expenses (by `expense_date`) to the
+  current month and omits debt owed (a cumulative balance, not a monthly flow — mixing it in was the
+  original negative-keep bug class). Pills on the "Your Money" card; labels adapt (In hand → Received).
+  *Hardening for long unattended runtime (no Claude for ~2 yrs):* added **error boundaries** —
+  `(app)/error.tsx` (recoverable "try again" screen), `global-error.tsx` (root-layout last resort),
+  `not-found.tsx` — so one bad query/render no longer bricks a page. Added **division-by-zero guards**
+  in goals + dashboard goal-progress + income sadaka-% (were unguarded → `NaN%` on a 0 amount).
+  *Audited clean, no change needed:* RLS enabled on all 19 tables; service worker is network-first
+  (always fresh online, never caches financial/API data); `package-lock.json` committed (build frozen).
+  Full `next build` green. Operational risks flagged (not code): Supabase free-tier pauses after
+  inactivity; PKR-rate fallback goes stale — update in Settings → Currencies; don't run `npm update`.
 - **2026-07-01** — **Fix: "Yours to keep" went negative (−7.5K) — cash-model time-window mismatch.**
   Dashboard scoped *in-hand* to income received **this calendar month** (`actual_received_date >= monthStart`)
   while sadaka given and money owed were counted **all-time**. Income received in a prior month dropped out

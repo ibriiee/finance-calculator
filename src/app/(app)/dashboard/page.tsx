@@ -5,9 +5,18 @@ import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCar
 import StatusBadge from '@/components/shared/StatusBadge'
 import { daysLeft } from '@/lib/lifeMath'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // "This month" toggle. Default = lifetime cash on hand (what you actually have).
+  // ?view=month = this month's flow only: received − sadaka given − expenses this
+  // month. Debt owed is a running balance, not a this-month outgoing, so it's left
+  // out of the monthly figure (mixing a cumulative balance into a monthly window is
+  // exactly the class of bug that made "yours to keep" go negative before).
+  const monthly = (await searchParams).view === 'month'
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+  const inMonth = (d?: string | null) => !!d && new Date(d) >= monthStart
 
   // All independent reads in parallel — these were sequential before and
   // made every "back to home" navigation feel slow.
@@ -34,11 +43,11 @@ export default async function DashboardPage() {
     // from. Scoping this to the current month was the "yours to keep goes negative"
     // bug — last month's 15k dropped out while its sadaka stayed subtracted all-time.
     supabase.from('income_projects')
-      .select('id, amount, status, currency, ownership')
+      .select('id, amount, status, currency, ownership, actual_received_date')
       .neq('status', 'cancelled')
       .in('ownership', ['ibrahim', 'abu_bakar', 'shared']),
     supabase.from('sadaka_entries')
-      .select('source_income_id, amount_owed, amount_given, currency')
+      .select('source_income_id, amount_owed, amount_given, currency, created_at')
       .eq('owner_id', user!.id)
       .eq('is_joint', false),
     supabase.from('brother_ledger')
@@ -83,8 +92,12 @@ export default async function DashboardPage() {
     i.ownership === 'shared' || i.ownership === myOwnership
   ) ?? []
 
+  // Awaiting is a "right now" balance (still-pending income) — always all-time, view-independent.
   const totalEarned = myIncome.filter((i: any) => i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
-  const totalReceived = myIncome.filter((i: any) => i.status === 'received' && i.currency === 'AED').reduce((s: number, i: any) => s + i.amount, 0)
+  // In hand: all received (lifetime), or just what landed this month when toggled.
+  const totalReceived = myIncome
+    .filter((i: any) => i.status === 'received' && i.currency === 'AED' && (!monthly || inMonth(i.actual_received_date)))
+    .reduce((s: number, i: any) => s + i.amount, 0)
 
   // All-time pending sadaka (still owed) — for the "Sadaka" card + a reminder line.
   const sadakaPending = (cur: string) => {
@@ -99,13 +112,13 @@ export default async function DashboardPage() {
   // Cash model: sadaka actually PAID OUT (cash gone, incl. advances). This leaves
   // "yours to keep" because it already left your pocket.
   const sumGiven = (cur: string) => (sadakaEntries ?? [])
-    .filter((e: any) => e.currency === cur)
+    .filter((e: any) => e.currency === cur && (!monthly || inMonth(e.created_at)))
     .reduce((s: number, e: any) => s + Number(e.amount_given), 0)
   const sadakaGivenAed = sumGiven('AED') + sumGiven('PKR') * pkrToAed
 
   // Expenses all-time (your share — shared expenses only cost you my_pct).
   const expenseShare = (cur: string) => (expensesData ?? [])
-    .filter((e: any) => e.currency === cur)
+    .filter((e: any) => e.currency === cur && (!monthly || inMonth(e.expense_date)))
     .reduce((s: number, e: any) => s + Number(e.amount) * Number(e.my_pct ?? 1), 0)
   const expensesAed = expenseShare('AED') + expenseShare('PKR') * pkrToAed
 
@@ -130,7 +143,7 @@ export default async function DashboardPage() {
 
   const goalProgress = (goals as any[] | null)?.map((g: any) => {
     const saved = contributions?.filter((c: any) => c.goal_id === g.id).reduce((s: number, c: any) => s + c.amount, 0) ?? 0
-    return { ...g, saved, pct: Math.min(100, Math.round((saved / g.target_amount) * 100)) }
+    return { ...g, saved, pct: g.target_amount > 0 ? Math.min(100, Math.round((saved / g.target_amount) * 100)) : 0 }
   })
   let loanDebtAed = 0
   ;(loansData ?? []).forEach((l: any) => {
@@ -146,7 +159,10 @@ export default async function DashboardPage() {
   // − short-term debts you owe. Money you physically have left to spend. Every arm
   // is cumulative so money-in and money-out share the same time window (see income query).
   const inHandAed = totalReceived
-  const yoursToKeepAed = inHandAed - sadakaGivenAed - expensesAed - totalOwedAed
+  // Monthly view is a pure cash flow: debt owed is a cumulative balance, not a
+  // this-month outgoing, so it only reduces the lifetime figure.
+  const owedApplied = monthly ? 0 : totalOwedAed
+  const yoursToKeepAed = inHandAed - sadakaGivenAed - expensesAed - owedApplied
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
 
   // Savings stash (backup money — /savings module)
@@ -219,9 +235,27 @@ export default async function DashboardPage() {
       {/* This month — Yours to Keep as hero, waterfall in collapsible */}
       {enabled('income') && (
       <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <span className="section-label">Your Money</span>
           <Link href="/income" className="text-xs" style={{ color: 'var(--gold)' }}>View all →</Link>
+        </div>
+
+        {/* All-time cash on hand ⇄ this-month flow */}
+        <div className="flex gap-2 mb-4">
+          <Link href="/dashboard" scroll={false}
+            className="text-[11px] px-3 py-1 rounded-full font-medium"
+            style={!monthly
+              ? { background: 'rgba(201,168,76,0.15)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.4)' }
+              : { color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            All time
+          </Link>
+          <Link href="/dashboard?view=month" scroll={false}
+            className="text-[11px] px-3 py-1 rounded-full font-medium"
+            style={monthly
+              ? { background: 'rgba(201,168,76,0.15)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.4)' }
+              : { color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            This month
+          </Link>
         </div>
 
         {/* Hero = yours to keep */}
@@ -232,7 +266,7 @@ export default async function DashboardPage() {
         </p>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div>
-            <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>In hand</p>
+            <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>{monthly ? 'Received' : 'In hand'}</p>
             <p className="font-display text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
               {formatCurrency(inHandAed, 'AED', true)}
             </p>
@@ -254,7 +288,7 @@ export default async function DashboardPage() {
           </summary>
           <div className="flex flex-col gap-2.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>In hand (received)</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{monthly ? 'Received this month' : 'In hand (received)'}</span>
               <span className="font-display text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
                 {formatCurrency(inHandAed, 'AED', true)}
               </span>
@@ -271,12 +305,14 @@ export default async function DashboardPage() {
                 {expensesAed > 0 ? '−' : ''}{formatCurrency(expensesAed, 'AED', true)}
               </span>
             </Link>
+            {!monthly && (
             <Link href="/loans" className="flex items-center justify-between">
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Owed to people</span>
               <span className="font-display text-sm font-semibold" style={{ color: totalOwedAed > 0 ? '#EF4444' : 'var(--text-muted)' }}>
                 {totalOwedAed > 0 ? '−' : ''}{formatCurrency(totalOwedAed, 'AED', true)}
               </span>
             </Link>
+            )}
             <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--border)' }}>
               <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>= Yours to keep</span>
               <span className="font-display text-sm font-semibold"

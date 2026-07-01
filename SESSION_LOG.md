@@ -1,5 +1,11 @@
 # Session Log
 
+2026-07-01 (session 2 — monthly toggle + 2-year hardening)
+- Completed: (1) Dashboard "All time ⇄ This month" toggle (?view=month) — monthly scopes income/sadaka/expenses to current month, drops debt (balance not a flow); pills on Your Money card, labels adapt. (2) Hardening for long unattended runtime: added error.tsx ((app) recoverable screen), global-error.tsx (root last-resort), not-found.tsx — a bad query no longer bricks a page. (3) Division-by-zero guards in goals + dashboard goal-progress + income sadaka-% (were NaN% on 0 amount). (4) Full audit: RLS OK on all 19 tables, SW is network-first (no stale trap), lockfile committed — no change needed. Verified: tsc 0, next build green, dev server boots + /login renders clean (couldn't test authed dashboard — no user session).
+- Changed files: dashboard/page.tsx, goals/page.tsx, income/page.tsx, NEW (app)/error.tsx + global-error.tsx + not-found.tsx, PROJECT_STATUS.md, SESSION_LOG.md
+- Blockers: none. Operational (non-code) risks flagged to user: Supabase free-tier pause on inactivity; stale PKR-rate fallback (update in Settings); do NOT run npm update (lockfile freeze keeps build reproducible).
+- Next: nothing pending. Future small edits → Sonnet is fine; keep Opus only for money-math/architecture.
+
 2026-07-01 (cash-model negative-keep bug)
 - Completed: Fixed "Yours to keep" showing −7.5K red. Root cause = time-window mismatch, not the sadaka engine: dashboard counted in-hand income as *received this calendar month* while sadaka-given and owed were all-time, so a 15k received last month dropped out of in-hand but the 7.5k sadaka paid from it stayed subtracted (0 − 7500). Made the whole cash model cumulative: income = all received (status != cancelled, no date filter), expenses = all-time (was this-month). Relabelled "This Month" → "Your Money", "Expenses (this month)" → "Expenses". Advance sadaka now nets against the income it was drawn from → +7.5K green. Typecheck clean (tsc exit 0).
 - Changed files: src/app/(app)/dashboard/page.tsx, PROJECT_STATUS.md, SESSION_LOG.md
