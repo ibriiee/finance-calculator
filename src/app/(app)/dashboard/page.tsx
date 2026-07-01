@@ -11,7 +11,6 @@ export default async function DashboardPage() {
 
   // All independent reads in parallel — these were sequential before and
   // made every "back to home" navigation feel slow.
-  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
   const [
     { data: profile },
     { data: profiles },
@@ -30,11 +29,13 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('profiles').select('id, display_name') as any,
-    // Received this month (by actual_received_date) + all pending — avoids the bug
-    // where work_completed_date is outside the month window but money was received this month.
+    // Cash on hand is cumulative, not monthly: count ALL received income (any date)
+    // so sadaka/expenses paid from an earlier month net against the income they came
+    // from. Scoping this to the current month was the "yours to keep goes negative"
+    // bug — last month's 15k dropped out while its sadaka stayed subtracted all-time.
     supabase.from('income_projects')
       .select('id, amount, status, currency, ownership')
-      .or(`actual_received_date.gte.${monthStart.toISOString().split('T')[0]},status.eq.pending`)
+      .neq('status', 'cancelled')
       .in('ownership', ['ibrahim', 'abu_bakar', 'shared']),
     supabase.from('sadaka_entries')
       .select('source_income_id, amount_owed, amount_given, currency')
@@ -69,8 +70,7 @@ export default async function DashboardPage() {
     supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
     supabase.from('expenses')
       .select('amount, currency, my_pct, expense_date')
-      .eq('owner_id', user!.id)
-      .gte('expense_date', monthStart.toISOString().split('T')[0]),
+      .eq('owner_id', user!.id),
     supabase.from('rates_cache').select('rate_value, updated_at').eq('rate_type', 'pkr_to_aed').single(),
   ]) as any[]
   const pkrToAed = Number(pkrRate?.rate_value) || 0.0132
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
     .reduce((s: number, e: any) => s + Number(e.amount_given), 0)
   const sadakaGivenAed = sumGiven('AED') + sumGiven('PKR') * pkrToAed
 
-  // Expenses this month (your share — shared expenses only cost you my_pct).
+  // Expenses all-time (your share — shared expenses only cost you my_pct).
   const expenseShare = (cur: string) => (expensesData ?? [])
     .filter((e: any) => e.currency === cur)
     .reduce((s: number, e: any) => s + Number(e.amount) * Number(e.my_pct ?? 1), 0)
@@ -142,8 +142,9 @@ export default async function DashboardPage() {
   const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
   const totalOwedAed = loanDebtAed + ledgerDebtAed
 
-  // Real cash on hand = received − sadaka actually paid − expenses (your share)
-  // − short-term debts you owe. Money you physically have left to spend.
+  // Real cash on hand = all received − all sadaka paid − all expenses (your share)
+  // − short-term debts you owe. Money you physically have left to spend. Every arm
+  // is cumulative so money-in and money-out share the same time window (see income query).
   const inHandAed = totalReceived
   const yoursToKeepAed = inHandAed - sadakaGivenAed - expensesAed - totalOwedAed
   const totalSavingsAed = (goalProgress ?? []).filter(g => g.currency === 'AED').reduce((s, g) => s + g.saved, 0)
@@ -219,7 +220,7 @@ export default async function DashboardPage() {
       {enabled('income') && (
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
-          <span className="section-label">This Month</span>
+          <span className="section-label">Your Money</span>
           <Link href="/income" className="text-xs" style={{ color: 'var(--gold)' }}>View all →</Link>
         </div>
 
@@ -265,7 +266,7 @@ export default async function DashboardPage() {
               </span>
             </Link>
             <Link href="/expenses" className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Expenses (this month)</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>− Expenses</span>
               <span className="font-display text-sm font-semibold" style={{ color: expensesAed > 0 ? '#EF4444' : 'var(--text-muted)' }}>
                 {expensesAed > 0 ? '−' : ''}{formatCurrency(expensesAed, 'AED', true)}
               </span>

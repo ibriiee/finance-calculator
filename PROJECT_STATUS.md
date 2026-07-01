@@ -21,7 +21,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 
 | Module | Route | Status | Notes |
 |--------|-------|--------|-------|
-| Dashboard | `/dashboard` | ✅ | Hero = **Yours to keep** (real cash on hand) with a collapsible waterfall: **in hand − sadaka actually paid − expenses (this month) − owed to people**; still-owed sadaka shown as a reminder (held in that cash, not double-counted). PKR folded into AED via `pkr_to_aed`. Summary cards + quick links |
+| Dashboard | `/dashboard` | ✅ | Hero = **Yours to keep** (real cash on hand) with a collapsible waterfall: **all received − sadaka actually paid − expenses − owed to people** (all cumulative, not monthly — else last month's income drops out while its sadaka stays subtracted → false negative); still-owed sadaka shown as a reminder (held in that cash, not double-counted). PKR folded into AED via `pkr_to_aed`. Summary cards + quick links |
 | Expenses | `/expenses` | ✅ | **Personal/living expenses** (rent, Du/bills, petrol, food-out, groceries, vape, sent-home, health, gift, subscription, custom). Category breakdown, this-month vs all, per-currency spend (your share). **Shared toggle** folds in the old Splits: a split expense auto-creates one `brother_ledger` IOU for the other's share. Feeds the dashboard cash model. Owner-private RLS |
 | Income | `/income` | ✅ | Individual. Start date, ongoing flag, edit/delete, per-entry **sadaka-paid status**. Editing does NOT re-trigger sadaka (insert-only trigger) |
 | Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`). **Smart income linking** (`src/lib/sadaka.ts`): the "pay toward which income" picker hides streams whose sadaka chapter is fully given (settled), shows "X due" per open stream, and warns when a payment overpays a linked stream (excess → advance) |
@@ -109,6 +109,14 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-01** — **Fix: "Yours to keep" went negative (−7.5K) — cash-model time-window mismatch.**
+  Dashboard scoped *in-hand* to income received **this calendar month** (`actual_received_date >= monthStart`)
+  while sadaka given and money owed were counted **all-time**. Income received in a prior month dropped out
+  of "in hand", but the sadaka paid from it stayed subtracted → false negative (received 15k on 30 Jun, gave
+  3.75k + 3.75k advance sadaka → showed −7.5k red instead of +7.5k). Cash on hand is cumulative, not monthly:
+  made every arm lifetime — income = **all received** (`status != cancelled`, no date filter), expenses = **all-time**
+  (was this-month). Relabelled hero section "This Month" → "Your Money", waterfall "Expenses (this month)" → "Expenses".
+  Advance sadaka now correctly nets against the income it was drawn from. `dashboard/page.tsx` only; typecheck clean.
 - **2026-06-30** — **Expenses module + cash-on-hand model + full type safety + UI pass (big session).**
   *New Expenses module* (`/expenses`, migration `expenses.sql` — **must run**): the missing half —
   personal/living costs so "yours to keep" reflects real cash. Categories, date, currency,
