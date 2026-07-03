@@ -47,3 +47,13 @@
 - Changed files: income/page.tsx, sadaka/page.tsx, loans/page.tsx, recipients/page.tsx, api/rates/route.ts, LAUNCH.md, PROJECT_STATUS.md
 - Blockers: None
 - Next: LAUNCH.md's remaining buckets (security/data-integrity, AI, multi-user, i18n, App Store) are deliberately still deferred — each needs an explicit scope call (some require new deps or architecture rework) before starting.
+
+[2026-07-02]
+- Completed: full CTO audit -> docs/CTO-AUDIT-2026-07.md. 3 CRITICAL: rates pipeline
+  dead (RLS blocks /api/rates writes, silent), dashboard PKR asymmetry in "Yours to
+  keep", life_events missing from backup/export/reset. P1: no DB CHECK constraints,
+  ignoreBuildErrors on, tsx not a devDep, shared-income 100% double-count (owner Q).
+- Changed files: docs/CTO-AUDIT-2026-07.md (new), PROJECT_STATUS.md (changelog)
+- Blockers: none — audit only, no code changed. FIX-01 needs owner to confirm
+  SUPABASE_SERVICE_ROLE_KEY in Vercel. FIX-07 needs owner decision (50% vs 100%).
+- Next: execute audit doc in ID order — Session 1 = FIX-03, FIX-05, FIX-06 (Haiku tier).

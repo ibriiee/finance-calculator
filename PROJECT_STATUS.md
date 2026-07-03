@@ -109,6 +109,19 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-02** — **CTO audit → `docs/CTO-AUDIT-2026-07.md` (read it before ANY new work).**
+  Full-codebase audit (25+ files, all 18 migrations, RLS, scripts; all 3 self-check suites run — pass;
+  `tsc` 0 errors). **3 CRITICAL silent bugs found, none yet fixed:** (1) rates pipeline dead since
+  install — `rates_write` RLS is service_role-only but `/api/rates` writes as the logged-in user, every
+  upsert silently rejected, so zakat/nisab + PKR folding still run on June seed values (silver 3.15 vs
+  real ≈ 5–6 → nisab ~45% low, can flip a WAJIB verdict); (2) dashboard "Yours to keep" currency
+  asymmetry — PKR sadaka/expenses subtract (×rate) but PKR income never adds (AED-only filter), the
+  negative-keep bug class returning in the currency dimension; (3) `life_events` missing from
+  `backup.mjs` TABLES + Settings `DATA_TABLES` → disaster-recovery/export silently lose it. Plus P1s:
+  zero DB CHECK constraints, `ignoreBuildErrors` still on, `tsx` not a devDep (tests unrunnable offline),
+  shared income counted 100% in each brother's cash (vs 50/50 sadaka split — owner decision), zakat
+  `snapshot_year` fragile parse. The audit doc has full fix specs (FIX-01…FIX-15), model routing,
+  verify steps, execution order — written for Haiku/Sonnet execution.
 - **2026-07-01** — **Near-term upgrade sweep: pagination + rate-limit + LAUNCH.md correction.**
   *Pagination*: Income, Sadaka, Loans, Recipients lists now render-slice to 50 with a "Load more"
   button — fetch stays full (totals + `computeSadaka()` FIFO allocation need the complete
