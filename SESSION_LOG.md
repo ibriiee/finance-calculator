@@ -57,3 +57,15 @@
 - Blockers: none — audit only, no code changed. FIX-01 needs owner to confirm
   SUPABASE_SERVICE_ROLE_KEY in Vercel. FIX-07 needs owner decision (50% vs 100%).
 - Next: execute audit doc in ID order — Session 1 = FIX-03, FIX-05, FIX-06 (Haiku tier).
+
+[2026-07-03]
+- Completed: CTO audit second pass — appended FIX-16..19 + P2-15..18 to
+  docs/CTO-AUDIT-2026-07.md. FIX-16: all 3 sadaka triggers corrupt advance_given
+  payment rows into obligations (filter by status, not amount_owed=0). FIX-17:
+  SadakaForm edit wipes amount_given on partially-given obligations. FIX-18: failed
+  fetches show fake empty states. FIX-19: ~8 unchecked mutation writes. FIX-01 gained
+  step 4b (fallback must never overwrite good rates / bump updated_at).
+- Changed files: docs/CTO-AUDIT-2026-07.md, PROJECT_STATUS.md, SESSION_LOG.md
+- Blockers: none — audit only. FIX-16 SQL must run before FIX-17/19 code lands.
+- Next: execute in the doc's session order — Session 1 = FIX-03/05/06 (Haiku), then
+  Session 2 = the three owner-run files (FIX-16 triggers, FIX-04 checks, FIX-15 cron).

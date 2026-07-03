@@ -109,6 +109,19 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-03** — **CTO audit second pass — FIX-16..19 + P2-15..18 appended to `docs/CTO-AUDIT-2026-07.md`.**
+  Audit-only, no code changed. New HIGH findings: *FIX-16* — all 3 sadaka trigger functions (income
+  edit / income delete / sadaka-% change) filter by `status` instead of the `amount_owed = 0` payment
+  invariant, so a linked **advance_given payment row gets converted into an obligation** (silent
+  charity-record corruption; SQL fix specced as migration 19, owner must run). *FIX-17* — SadakaForm
+  **edit wipes `amount_given`** on partially-given obligations + rewrites `date_given` to today.
+  *FIX-18* — a failed fetch renders as a fake "No entries yet" empty state on every page (certain to
+  fire on Supabase free-tier resume). *FIX-19* — ~8 mutation writes ignore their result (Settings
+  shows "Saved ✓" even on failure). Also *FIX-01 step 4b*: the rates fallback path overwrites
+  last-known-good rates with hardcoded constants AND bumps `updated_at` (resets the staleness clock).
+  P2 adds: month-scope sadaka by `date_given` (P2-15), reset-password proxy bounce (P2-16), analytics
+  PKR goal-contribution conversion (P2-17), income currency/ownership edit lock (P2-18). Execution
+  order updated (8 sessions). Verified this pass: `tsc` 0 errors; all 3 self-checks pass.
 - **2026-07-02** — **CTO audit → `docs/CTO-AUDIT-2026-07.md` (read it before ANY new work).**
   Full-codebase audit (25+ files, all 18 migrations, RLS, scripts; all 3 self-check suites run — pass;
   `tsc` 0 errors). **3 CRITICAL silent bugs found, none yet fixed:** (1) rates pipeline dead since

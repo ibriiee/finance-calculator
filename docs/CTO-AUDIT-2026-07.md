@@ -1,4 +1,4 @@
-# Mizan — CTO Audit & Upgrade Plan (2026-07-02)
+# Mizan — CTO Audit & Upgrade Plan (2026-07-02, second pass 2026-07-03)
 
 > **Purpose.** Full-codebase audit of Mizan against its north star: *run correctly,
 > unattended, for 2–5+ years, for exactly 2 users, with no developer available.*
@@ -35,6 +35,13 @@ are in the *plumbing*: the FX/metals rate pipeline has been **dead since install
 backup/restore + export/reset paths **silently drop the `life_events` table**.
 None of these throw an error anywhere — which is exactly the failure class that kills
 an unattended app.
+
+**Second pass (2026-07-03) found two more silent-corruption bugs and two resilience
+gaps:** all three sadaka SQL trigger functions can **convert payment rows into
+obligations** (FIX-16), editing a partially-given sadaka obligation **erases its
+recorded payments** (FIX-17), a Supabase-pause/network failure renders every page as
+a fake "No entries yet" empty state (FIX-18), and roughly a dozen mutation writes
+never check their result (FIX-19).
 
 Health signals verified 2026-07-02:
 - `npx tsc --noEmit` → **0 errors** ✓
@@ -113,6 +120,18 @@ folding also uses the frozen 0.0132 forever.
    gold_aed_gram  100 – 2000       silver_aed_gram  1 – 50
    gold_usd_oz    800 – 20000      silver_usd_oz    5 – 500
    ```
+4b. **Never let the fallback path overwrite real data** (second-pass finding). The
+   current code, on cache-expired + API failure (or missing API key — the roadmap says
+   `GOLD_API_KEY` was never configured), writes the **hardcoded** fallbacks
+   (`goldUsdOz = 4000`, `silverUsdOz = 50`) over whatever the cache held, AND bumps
+   `updated_at` — which *resets the staleness clock*, so the dashboard/zakat stale
+   banners can never fire even though the numbers are years old. Rule for the rewrite:
+   - If **both** fetchers return `null` → write **nothing**; respond with the existing
+     cache rows plus `"stale": true` and the cache's real `updated_at`.
+   - Only seed fallback values when the corresponding `rate_type` row does **not
+     exist at all** (fresh install), with `source: 'fallback'`.
+   - A row whose `source` is `'api'` or `'manual'` may only be overwritten by a
+     clamped **api/manual** value — never by a hardcoded constant.
 5. Add the missing **manual override** in Settings → new small "Currencies" card:
    one input for PKR→AED + Save button that POSTs to a new thin route
    `src/app/api/rates/manual/route.ts` (auth-gated, admin client, clamps as above,
@@ -364,6 +383,182 @@ snapshot → row's `snapshot_year` is pure digits; temporarily set a rates row
 
 ---
 
+### FIX-16 · All three sadaka triggers corrupt payment rows into obligations
+**Severity:** HIGH (silent charity-record corruption — same class as the P0s) ·
+**Model:** Haiku creates the file, **owner runs it** · **Files (new):**
+`supabase/fix-payment-row-triggers.sql`; also edit the same three functions inside
+`supabase/FRESH-INSTALL.sql` so a future rebuild isn't re-broken.
+
+**Verified root cause.** The whole sadaka model rests on one invariant (stated in
+`src/lib/sadaka.ts` header): *a row is a PAYMENT when `amount_owed = 0` and
+`amount_given > 0`; an OBLIGATION when `amount_owed > 0`.* Payment rows created by
+`SadakaForm` carry `status = 'given'` **or `'advance_given'`** (form offers both —
+anchor: `<option value="advance_given">Advance Given</option>`). But all three SQL
+trigger functions filter on **status**, not on the invariant:
+
+| Function (file) | Broken filter | What happens to an `advance_given` payment linked to that income |
+|---|---|---|
+| `adjust_sadaka_on_income_edit` (`sadaka-trigger-v2.sql`) | `AND s.status <> 'given'` | Income amount edited → the payment row gets `amount_owed = ROUND(NEW.amount × factor × pct)` — **a payment becomes a full second obligation** (pending double-counts) |
+| `sync_sadaka_on_income_delete` (`sadaka-sync.sql`), UPDATE arm | `AND amount_given > 0` | Income deleted → payment gets `amount_owed = amount_given, status = 'given'` — becomes a self-cancelling obligation; its advance-credit spill **vanishes** and it disappears from the Income page's "Given to" breakdown (filter `amount_owed !== 0` excludes it) |
+| `recalc_sadaka_on_pct_change` (`sadaka-sync.sql`), both UPDATEs | `AND s.status <> 'given'` / `AND status <> 'given'` | Sadaka % changed in Settings → same corruption as row 1, across **every** income at once |
+
+Reachable path: record an "Advance Given" payment and link it to an income (the form's
+income-linking flow encourages exactly this), then later edit that income's amount,
+delete it, or change your sadaka % in Settings. No error is raised anywhere.
+
+**Fix spec — one guard, applied uniformly: payment rows (`amount_owed = 0`) must be
+invisible to all three functions.** Create `supabase/fix-payment-row-triggers.sql`
+containing `CREATE OR REPLACE FUNCTION` for all three functions, copied **verbatim**
+from their current files with only these WHERE-clause changes:
+
+1. `adjust_sadaka_on_income_edit` — the UPDATE gains `AND s.amount_owed > 0`.
+2. `sync_sadaka_on_income_delete` — the UPDATE arm becomes
+   `WHERE source_income_id = OLD.id AND amount_owed > 0 AND amount_given > 0`
+   (the DELETE arm `amount_given = 0` already only matches obligations — leave it).
+3. `recalc_sadaka_on_pct_change` — **both** UPDATEs gain `AND amount_owed > 0`
+   (the second, status-refresh UPDATE otherwise flips `advance_given` payments to
+   `status='given'`, which locks them in the UI).
+
+Do **not** re-create the triggers themselves (they already point at these function
+names; `CREATE OR REPLACE FUNCTION` is enough). Apply the identical three edits to
+the same function bodies inside `FRESH-INSTALL.sql`. Add as migration **19** in
+`PROJECT_STATUS.md`'s SQL list.
+
+**Verify (owner, in Supabase SQL editor, test mode):**
+1. Insert a test income of 1000 (obligation 200 auto-created), then a payment row via
+   the app: Advance Given 50 linked to that income.
+2. Edit the income amount to 1200. Check `sadaka_entries`: the payment row must still
+   have `amount_owed = 0`. The obligation row must show `amount_owed = 240`.
+3. Change sadaka % in Settings and re-check; delete the income and re-check
+   (payment row must survive untouched with `amount_owed = 0`).
+4. Clean up test rows.
+
+**Pre-flight (also in the SQL file, before the fixes):** detect rows already corrupted
+by past edits — `SELECT id, status, amount_owed, amount_given FROM sadaka_entries
+WHERE status = 'advance_given' AND amount_owed > 0;` Any hits: owner decides row by
+row (they were payments; restore with `UPDATE … SET amount_owed = 0` after review).
+
+---
+
+### FIX-17 · SadakaForm edit erases recorded payments on partially-given obligations
+**Severity:** HIGH (data loss via normal UI use) · **Model:** Sonnet ·
+**File:** `src/components/sadaka/SadakaForm.tsx`
+
+**Verified.** The save payload is rebuilt from form state on every save — including
+edits (anchor: `const isPayment = form.status === 'given' || form.status === 'advance_given'`
+… `amount_owed: owed, amount_given: given`):
+
+1. **`partially_given` wipe:** the status `<select>` only offers
+   `pending / given / advance_given`. An obligation the triggers marked
+   `partially_given` (owed 500, given 200) opens in edit with `form.status =
+   'partially_given'` → `isPayment` is false → payload writes **`amount_given: 0`**
+   — the recorded 200 vanishes on an innocent edit (e.g. fixing a typo in notes).
+2. **`date_given` rewritten to today** on every edit of a payment row:
+   `date_given: given > 0 ? new Date().toISOString().split('T')[0] : null` — the
+   original date (a record-book fact) is lost.
+3. **`on_behalf` race:** edit mode derives `on_behalf` in an async `useEffect`;
+   saving before profiles load silently reassigns the entry's `owner_id` to "me".
+
+**Fix spec:**
+1. In **edit mode**, never recompute ownership/amount fields from scratch. Build the
+   update payload as a **delta**:
+   - Payment row (`Number(editItem.amount_owed) === 0 && Number(editItem.amount_given) > 0`):
+     update `amount_given = amount`, keep `amount_owed: 0`, and **preserve
+     `date_given: editItem.date_given`** (only set today's date when the row never
+     had one).
+   - Obligation row: update `amount_owed = amount` and **do not include
+     `amount_given`, `date_given`, or `status` in the payload at all** unless the
+     user explicitly changed the status select. If `editItem.status ===
+     'partially_given'`, render it as a disabled "Partially given (X of Y)" option so
+     the select is truthful and unchanged saves keep it.
+   - Keep `owner_id`/`is_joint`/`shared` out of the edit payload unless `on_behalf`
+     was actually changed by the user **after** profiles loaded (track a
+     `behalfTouched` flag; also disable the Save button in edit mode until the
+     profiles fetch resolved).
+2. Create mode is untouched (it already works).
+
+**Verify:** on localhost test mode — create an obligation of 500, pay 200 toward it
+(via a linked payment), confirm the card shows "200 of 500 given"; open **edit** on
+the obligation, change only the notes, save → card must still show "200 of 500
+given" and the DB row's `amount_given` must be unchanged. Edit a payment row's
+amount → its `date_given` must not move.
+
+---
+
+### FIX-18 · A failed fetch renders as a fake empty state on every page
+**Severity:** HIGH (resilience — this WILL fire on Supabase free-tier resume) ·
+**Model:** Sonnet · **Files:** every `(app)` page with a `load()` (list below) + one
+new shared component.
+
+**Verified pattern** (identical in all pages): `const { data } = await
+supabase.from(…).select(…)` → `setItems(data ?? [])` → render `EmptyState` when the
+array is empty. A paused/waking Supabase project, an expired session, or a network
+blip returns `data = null` + an `error` that is **discarded** — the user sees
+"No projects yet" under their real financial data. On the 2-year horizon the pause
+scenario is a *certainty* (see §6). Trust in the record book dies the first time
+this happens.
+
+**Fix spec:**
+1. New `src/components/shared/LoadError.tsx` — a small amber banner card:
+   `⚠ Couldn't load your data — the server may be waking up. [Try again]`
+   Props: `{ onRetry: () => void }`. Reuse the existing amber banner styling from the
+   dashboard's stale-rates banner (copy its inline styles).
+2. In each page's `load()`: capture the `error` of the **primary** query (the one that
+   feeds the main list), e.g. `const { data, error } = …`. Add `const [loadError,
+   setLoadError] = useState(false)`; set it when any primary error is non-null; clear
+   it on a successful load.
+3. Render: `if (loadError) return <LoadError onRetry={load} />` **before** the
+   empty-state branch (keep the module header visible).
+4. Pages to patch (grep `EmptyState` + `async function load`): `income`, `sadaka`,
+   `expenses`, `loans`, `ledger`, `joint`, `goals`, `savings`, `recipients`,
+   `wasiyya`, `splits`, `analytics` (no EmptyState but same silent pattern), `life`.
+   The dashboard is a server component wrapped by `(app)/error.tsx` — already covered.
+5. Keep it mechanical: no retries-with-backoff, no state machines. One flag, one
+   banner, one retry button per page. `// ponytail:`-comment it as deliberate.
+
+**Verify:** on localhost, temporarily set `NEXT_PUBLIC_SUPABASE_URL` to an unreachable
+host → every page above must show the banner (not "No entries yet"); restore the URL,
+press "Try again" → data appears without a full reload.
+
+---
+
+### FIX-19 · Mutation writes that never check their result
+**Severity:** HIGH (silent write-loss; the "Saved ✓" lie) · **Model:** Sonnet ·
+**Files:** listed per row below.
+
+**Verified locations** (each `await`s a Supabase mutation and ignores `error`):
+
+| File | Anchor | Failure mode today |
+|---|---|---|
+| `settings/page.tsx` `save()` | `await supabase.from('profiles').update({` | Shows **"Saved ✓"** even when the update failed (sadaka %, modules, hawl date silently not saved) |
+| `sadaka/page.tsx` Mark-as-Given | `await supabase.from('sadaka_entries').update({` | Button appears to work; obligation still pending after reload |
+| `sadaka/page.tsx` delete | `await supabase.from('sadaka_entries').delete()` | Entry reappears on reload |
+| `income/page.tsx` Mark Received | `await supabase.from('income_projects').update({` | Income stays pending; user believes it's received |
+| `ledger/page.tsx` Reverse + Delete | `await supabase.from('brother_ledger').insert({` / `.delete()` | Balance unchanged, no feedback |
+| `expenses/page.tsx` `deleteItem()` | `await supabase.from('brother_ledger').delete()` then `.from('expenses').delete()` | Two unchecked deletes; can strand an IOU or delete the IOU of a **settled** debt (history loss) |
+| `zakat/page.tsx` `saveSnapshot()` | `await supabase.from('zakat_snapshots').upsert({` | Snapshot silently absent (markPaid is already covered by FIX-08.3) |
+| `loans/page.tsx` `logRepayment()` status update | `await supabase.from('loans').update({ status:` | Repayment row saved but status not — card stays red |
+
+**Fix spec (uniform pattern, no new abstractions):**
+1. Everywhere above: `const { error } = await …; if (error) { alert('Could not save: '
+   + error.message); return }` — matching the pattern `income/page.tsx deleteItem`
+   already uses. In `settings/page.tsx`, gate the `setSaved(true)` behind
+   `!error`, else show the message inline (an `error` state already exists in forms —
+   mirror it).
+2. `expenses/page.tsx deleteItem` additionally: fetch the linked ledger entry first;
+   **only delete it when `is_settled === false`** (deleting a settled IOU erases the
+   record of a debt that was actually paid). If it's settled, delete the expense only
+   and `alert` that the settled ledger record was kept.
+3. `loans/page.tsx logRepayment`: also run `validateAmount(repayAmount)` before
+   inserting (the inline repay form skipped the sweep that added it to the 6 main
+   forms — anchor: `const amt = parseFloat(repayAmount)`).
+
+**Verify:** `npx tsc --noEmit` → 0. On localhost: kill network in DevTools (offline),
+press "Mark as Given" → an alert must appear and the UI must NOT pretend success;
+restore network, retry → succeeds. Settings: same offline test → no "Saved ✓".
+
+---
+
 ## 5. P2 — MEDIUM (paper cuts; batch into one session)
 
 | ID | Finding (verified) | Fix | Model |
@@ -374,6 +569,10 @@ snapshot → row's `snapshot_year` is pure digits; temporarily set a rates row
 | P2-12 | `next-pwa` in dependencies but never imported (`next.config.ts` doesn't use it; SW registered manually) | Flag to owner: `npm uninstall next-pwa` (removes ~0 risk, shrinks install). Do only with owner's go-ahead per no-dep-changes rule. | Haiku |
 | P2-13 | Month boundary uses server TZ (Vercel = UTC) vs users in UAE (UTC+4): entries logged 00:00–04:00 Gulf time land in the "wrong" month view | Accept + document (2-user app; cosmetic). Add code comment at `monthStart` in dashboard. | Haiku |
 | P2-14 | `validateAmount` cap is 10M — fine for AED, but PKR incomes can legitimately exceed it (10M PKR ≈ AED 132k) | Raise cap to 100M **for PKR only**: pass currency into `validateAmount(raw, currency?)`, keep 10M default. Update all call sites (grep `validateAmount(`). | Sonnet |
+| P2-15 | Dashboard "This month" scopes sadaka-given by the **row's `created_at`**, not when it was given — "Mark as Given" on an old obligation books the cash into the month the obligation was *created* | In `dashboard/page.tsx`: add `date_given` to the sadaka select; in `sumGiven`, month-filter on `e.date_given ?? e.created_at`. All-time view unaffected. | Haiku |
+| P2-16 | `/auth/reset-password` is bounced to `/login` by `proxy.ts` for logged-out users (the recovery flow only works by accident: browser carries the `#access_token` hash to /login, whose `useEffect` forwards it back). Breaks entirely if Supabase switches recovery links to PKCE `?code=` (query params are dropped by the redirect) | In `proxy.ts`, treat `/auth` as an auth page: `const isAuthPage = pathname.startsWith('/login') \|\| pathname.startsWith('/auth')` — but only apply the *logged-in → dashboard* redirect to `/login`, so a recovery-session user can still reach the reset form. | Haiku |
+| P2-17 | Analytics Net Position sums **goal contributions 1:1 as AED** regardless of the goal's currency (`goal_contributions` has no currency column; a PKR goal's 100,000 counts as AED 100,000) | In `analytics/page.tsx`: also fetch `financial_goals.id,currency`; map `goal_id → currency`; convert each contribution via `toAed(amount, goalCurrency)` before summing `goalSavedAed`. | Sonnet |
+| P2-18 | Editing an income's **currency** leaves its linked sadaka obligation in the old currency (trigger only reacts to `amount`); editing **ownership** individual↔shared doesn't re-split the obligation | Smallest honest fix: in `IncomeForm.tsx` edit mode, when `editItem.sadaka_triggered` is true, disable the currency + ownership selects with helper text "locked — linked sadaka exists (delete & re-add to change)". No trigger surgery. | Sonnet |
 
 ---
 
@@ -427,11 +626,13 @@ moved. **Verify:** Actions tab → manual run → green.
 | Session | Tasks | Model | Preconditions |
 |---|---|---|---|
 | 1 | FIX-03 (backup tables) → FIX-05 (build errors) → FIX-06 (tsx + npm test) | Haiku | none |
-| 2 | FIX-01 (rates pipeline) | Sonnet | Vercel env has `SUPABASE_SERVICE_ROLE_KEY` (owner confirms) |
-| 3 | FIX-02 (currency symmetry) | Sonnet | FIX-01 merged (needs live `pkrToAed`) |
-| 4 | FIX-04 (SQL file) + FIX-15 (workflow file) | Haiku (files) + **owner runs both** | — |
-| 5 | FIX-07 (owner decision) + FIX-08 (zakat) | Sonnet | Owner answered FIX-07 question |
-| 6 | P2 batch (09–14) | Haiku/Sonnet per table | all P0/P1 landed |
+| 2 | FIX-16 (trigger SQL file) + FIX-04 (integrity SQL file) + FIX-15 (workflow file) | Haiku (files) + **owner runs all three** | — |
+| 3 | FIX-01 (rates pipeline incl. 4b) | Sonnet | Vercel env has `SUPABASE_SERVICE_ROLE_KEY` (owner confirms) |
+| 4 | FIX-02 (currency symmetry) | Sonnet | FIX-01 merged (needs live `pkrToAed`) |
+| 5 | FIX-17 (SadakaForm edit) → FIX-19 (unchecked writes) | Sonnet | FIX-16 run in Supabase (else edits re-corrupt) |
+| 6 | FIX-18 (load-error banners) | Sonnet | — |
+| 7 | FIX-07 (owner decision) + FIX-08 (zakat) | Sonnet | Owner answered FIX-07 question |
+| 8 | P2 batch (09–18) | Haiku/Sonnet per table | all P0/P1 landed |
 
 Per-session close-out ritual: `npm test` ✓ → `npm run build` ✓ → commit (one task per
 commit, message `fix(scope): <FIX-ID> <one-liner>`) → push → update
@@ -450,3 +651,9 @@ commit, message `fix(scope): <FIX-ID> <one-liner>`) → push → update
 *Audit performed 2026-07-02 — 25+ source files, all 18 SQL migrations, RLS policies,
 scripts, and all three self-check suites read/executed. Every finding cites its
 evidence; nothing herein is speculative.*
+
+*Second pass 2026-07-03 — re-read the sadaka trigger SQL against the payment/obligation
+invariant, all money-writing forms, and every page's load/mutation paths. Added
+FIX-16..19 (trigger corruption, edit data-loss, silent fetch failures, unchecked
+writes), FIX-01 step 4b (fallback-overwrite), P2-15..18. `tsc` 0 errors and all three
+self-checks re-verified this pass.*
