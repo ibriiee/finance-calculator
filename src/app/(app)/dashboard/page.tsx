@@ -87,21 +87,28 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const otherProfile = (profiles as Array<{ id: string; display_name: string | null }> | null)
     ?.find(p => p.id !== user!.id)
 
+  // EVERY arm of this money model must apply the same time window AND the same
+  // currency folding. Asymmetry here has caused 3 shipped bugs (see PROJECT_STATUS
+  // 2026-06-30, 2026-07-01 ×2) — a currency-dimension repeat was FIX-02 (2026-07-04).
   const myOwnership = ownershipForEmail(user!.email ?? profile?.email)
   const myIncome = monthIncome?.filter((i: any) =>
     i.ownership === 'shared' || i.ownership === myOwnership
   ) ?? []
+  // Each brother's income is separate money — a "shared" row is split 50/50
+  // (matches the sadaka trigger's split), never counted at 100% for both.
+  const incomeShare = (i: any) => i.ownership === 'shared' ? 0.5 : 1
+  const toAed = (amount: number, currency: string) => currency === 'PKR' ? amount * pkrToAed : amount
 
   // Awaiting = still-pending income (status not yet received). Computed from status
   // directly, NOT as earned−received, so it stays correct in the monthly view where
   // "received" is month-scoped (else received-this-month=0 wrongly inflated awaiting).
   const awaitingAed = myIncome
-    .filter((i: any) => i.currency === 'AED' && i.status !== 'received')
-    .reduce((s: number, i: any) => s + i.amount, 0)
+    .filter((i: any) => i.status !== 'received')
+    .reduce((s: number, i: any) => s + toAed(Number(i.amount) * incomeShare(i), i.currency), 0)
   // In hand: all received (lifetime), or just what landed this month when toggled.
   const totalReceived = myIncome
-    .filter((i: any) => i.status === 'received' && i.currency === 'AED' && (!monthly || inMonth(i.actual_received_date)))
-    .reduce((s: number, i: any) => s + i.amount, 0)
+    .filter((i: any) => i.status === 'received' && (!monthly || inMonth(i.actual_received_date)))
+    .reduce((s: number, i: any) => s + toAed(Number(i.amount) * incomeShare(i), i.currency), 0)
 
   // All-time pending sadaka (still owed) — for the "Sadaka" card + a reminder line.
   const sadakaPending = (cur: string) => {
@@ -151,13 +158,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   })
   let loanDebtAed = 0
   ;(loansData ?? []).forEach((l: any) => {
-    if (l.loan_type === 'i_owe' && l.currency_type === 'AED') {
+    // USD/gold/silver loans are left out — display-only in /loans, not folded here.
+    if (l.loan_type === 'i_owe' && (l.currency_type === 'AED' || l.currency_type === 'PKR')) {
       const repaid = (repays ?? []).filter((r: any) => r.loan_id === l.id).reduce((s: number, r: any) => s + Number(r.amount), 0)
-      loanDebtAed += Math.max(0, Number(l.original_amount) - repaid)
+      const remaining = Math.max(0, Number(l.original_amount) - repaid)
+      loanDebtAed += toAed(remaining, l.currency_type)
     }
   })
-  const ledgerDebtAed = aedBalance < 0 ? -aedBalance : 0
+  // Brother Ledger card below keeps aedBalance/pkrBalance exactly as-is (per-currency,
+  // already correct) — only this rollup total folds PKR for the hero waterfall.
+  const ledgerDebtAed = (aedBalance < 0 ? -aedBalance : 0) + (pkrBalance < 0 ? -pkrBalance * pkrToAed : 0)
   const totalOwedAed = loanDebtAed + ledgerDebtAed
+  const anyPkrFolded = myIncome.some((i: any) => i.currency === 'PKR')
+    || (sadakaEntries ?? []).some((e: any) => e.currency === 'PKR' && Number(e.amount_given) > 0)
+    || (expensesData ?? []).some((e: any) => e.currency === 'PKR')
+    || (loansData ?? []).some((l: any) => l.loan_type === 'i_owe' && l.currency_type === 'PKR')
+    || pkrBalance < 0
+  const anySharedIncome = myIncome.some((i: any) => i.ownership === 'shared')
 
   // Real cash on hand = all received − all sadaka paid − all expenses (your share)
   // − short-term debts you owe. Money you physically have left to spend. Every arm
@@ -327,6 +344,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {(sadakaOwedAed > 0 || sadakaOwedPkr > 0) && (
               <p className="text-[11px] pt-1" style={{ color: 'var(--gold)' }}>
                 ⚠ You still owe {formatCurrency(sadakaOwedAed, 'AED', true)}{sadakaOwedPkr > 0 && ` · ${formatCurrency(sadakaOwedPkr, 'PKR', true)}`} sadaka — held in the cash above, not yet given.
+              </p>
+            )}
+            {anyPkrFolded && (
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                PKR folded in at {pkrToAed.toFixed(4)} — see Settings → Currencies.
+              </p>
+            )}
+            {anySharedIncome && (
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Shared income counted at your half.
               </p>
             )}
           </div>
