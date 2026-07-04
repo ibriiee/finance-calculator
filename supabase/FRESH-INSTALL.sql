@@ -780,7 +780,8 @@ BEGIN
     FROM public.profiles p
     WHERE p.id = s.owner_id
       AND s.source_income_id = NEW.id
-      AND s.status <> 'given';   -- given entries stay locked
+      AND s.status <> 'given'      -- given entries stay locked
+      AND s.amount_owed > 0;       -- payment rows (amount_owed = 0) are invisible here (FIX-16)
   END IF;
   RETURN NEW;
 END;
@@ -838,10 +839,10 @@ BEGIN
   DELETE FROM public.sadaka_entries
   WHERE source_income_id = OLD.id AND amount_given = 0;
 
-  -- Partially given → close the entry at what was actually given
+  -- Partially given OBLIGATION → close the entry at what was actually given (FIX-16)
   UPDATE public.sadaka_entries
   SET amount_owed = amount_given, status = 'given'
-  WHERE source_income_id = OLD.id AND amount_given > 0;
+  WHERE source_income_id = OLD.id AND amount_owed > 0 AND amount_given > 0;
 
   RETURN OLD;
 END;
@@ -867,7 +868,8 @@ BEGIN
     FROM public.income_projects ip
     WHERE ip.id = s.source_income_id
       AND s.owner_id = NEW.id
-      AND s.status <> 'given';
+      AND s.status <> 'given'
+      AND s.amount_owed > 0;   -- payment rows invisible here (FIX-16)
 
     -- Refresh status after the recalc
     UPDATE public.sadaka_entries
@@ -878,7 +880,8 @@ BEGIN
     END
     WHERE owner_id = NEW.id
       AND source_income_id IS NOT NULL
-      AND status <> 'given';
+      AND status <> 'given'
+      AND amount_owed > 0;   -- payment rows invisible here (FIX-16)
   END IF;
   RETURN NEW;
 END;

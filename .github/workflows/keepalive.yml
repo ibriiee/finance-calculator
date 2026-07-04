@@ -1,0 +1,12 @@
+name: supabase-keepalive
+on:
+  schedule: [{ cron: '0 6 * * 1,4' }]   # Mon+Thu 06:00 UTC — well inside the 7-day pause window
+  workflow_dispatch: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping database (counts as DB activity)
+        run: |
+          curl -sf "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" > /dev/null
