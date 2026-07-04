@@ -22,6 +22,8 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
   const [outstanding, setOutstanding] = useState<ReturnType<typeof incomeOutstanding>>(new Map())
   const [secondaryIncomeId, setSecondaryIncomeId] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [profilesLoaded, setProfilesLoaded] = useState(false)
+  const [behalfTouched, setBehalfTouched] = useState(false)
 
   const defaultForm = {
     amount_owed: (editItem?.amount_owed || editItem?.amount_given) ? String(editItem.amount_owed || editItem.amount_given) : '',
@@ -78,6 +80,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
         const ob = editItem.is_joint ? 'joint' : (editItem.owner_id && editItem.owner_id !== user!.id ? 'other' : 'me')
         setForm((p: any) => ({ ...p, on_behalf: ob }))
       }
+      setProfilesLoaded(true)
     })()
   }, [])
 
@@ -90,10 +93,57 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     }
     setSaving(true); setError('')
     const amount = parseFloat(form.amount_owed)
-    // A "given"/"advance" entry is MONEY PAID, not a new obligation. Record it as a
-    // pure payment (owed 0, given = amount) so it DEDUCTS from your pending pool
-    // instead of inventing a self-cancelling obligation. A "pending" entry is a new
-    // obligation (owed = amount, nothing given yet).
+
+    if (isEdit) {
+      // Edit mode never recomputes the payload from scratch — build a DELTA so an
+      // innocent edit (fixing a typo in notes) can't wipe amount_given, rewrite
+      // date_given to today, or reassign ownership (FIX-17). Shared metadata is
+      // always safe to update; owed/given/date_given/status/ownership are gated.
+      const wasPayment = Number(editItem.amount_owed) === 0 && Number(editItem.amount_given) > 0
+      const statusChanged = form.status !== editItem.status
+      const willBePayment = statusChanged ? (form.status === 'given' || form.status === 'advance_given') : wasPayment
+
+      const payload: any = {
+        currency: form.currency,
+        is_advance: form.is_advance || form.status === 'advance_given',
+        source_income_id: form.from_income_id || null,
+        recipient_id: form.recipient_id || null,
+        recipient_name: form.recipient_name || (form.recipient_id ? recipients.find(r => r.id === form.recipient_id)?.name : null) || null,
+        recipient_type: form.recipient_type as any,
+        location: form.location as any, method: form.method as any,
+        notes: form.notes || null,
+      }
+      if (statusChanged) payload.status = form.status
+
+      if (willBePayment) {
+        payload.amount_given = amount
+        payload.amount_owed = 0
+        // Preserve the original date_given fact — only stamp today's date the
+        // first time this row becomes a payment.
+        payload.date_given = editItem.date_given ?? new Date().toISOString().split('T')[0]
+      } else {
+        payload.amount_owed = amount
+        // amount_given / date_given deliberately omitted: an obligation-only
+        // edit must never touch what's already been paid toward it.
+      }
+
+      if (behalfTouched) {
+        payload.owner_id = form.on_behalf === 'other' ? other!.id : me.id
+        payload.is_joint = form.on_behalf === 'joint'
+        payload.shared = form.on_behalf !== 'me'
+      }
+
+      const { error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id)
+      setSaving(false)
+      if (err) { setError(err.message); return }
+      onSaved(); onClose()
+      return
+    }
+
+    // Create mode (untouched): a "given"/"advance" entry is MONEY PAID, not a new
+    // obligation. Record it as a pure payment (owed 0, given = amount) so it
+    // DEDUCTS from your pending pool instead of inventing a self-cancelling
+    // obligation. A "pending" entry is a new obligation (owed = amount).
     const isPayment = form.status === 'given' || form.status === 'advance_given'
     const owed = isPayment ? 0 : amount
     const given = isPayment ? amount : 0
@@ -122,9 +172,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     const canSplit = isOverpay && secondaryIncomeId
 
     let err
-    if (isEdit) {
-      ;({ error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id))
-    } else if (canSplit) {
+    if (canSplit) {
       // Two entries: primary clears its income exactly, secondary gets the rest
       const secondaryAmount = amount - linkedRemaining
       const base = { ...payload, added_by_id: me.id, amount_owed: 0 }
@@ -163,6 +211,11 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
 
           <select value={form.status} onChange={e => F('status', e.target.value)}
             className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            {editItem?.status === 'partially_given' && (
+              <option value="partially_given" disabled>
+                Partially given ({editItem.amount_given} of {editItem.amount_owed})
+              </option>
+            )}
             <option value="pending">Pending (obligation)</option>
             <option value="given">Already Given</option>
             <option value="advance_given">Advance Given</option>
@@ -295,7 +348,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
                     { val: 'other', label: other?.name ?? 'Brother' },
                     { val: 'joint', label: 'Joint' },
                   ].map(opt => (
-                    <button key={opt.val} type="button" onClick={() => F('on_behalf', opt.val)}
+                    <button key={opt.val} type="button" onClick={() => { F('on_behalf', opt.val); if (profilesLoaded) setBehalfTouched(true) }}
                       className="py-2.5 px-2 rounded-xl text-xs font-medium truncate"
                       style={{
                         background: form.on_behalf === opt.val ? 'var(--gold-dim)' : 'var(--surface-2)',
@@ -327,7 +380,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
             </div>
           )}
 
-          <button onClick={save} disabled={saving || !form.amount_owed}
+          <button onClick={save} disabled={saving || !form.amount_owed || (isEdit && !profilesLoaded)}
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
