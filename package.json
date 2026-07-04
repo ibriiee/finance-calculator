@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx src/lib/sadaka.test.ts && tsx src/lib/lifeMath.test.ts && tsx src/lib/hijri.test.ts",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs"
   },
@@ -43,6 +44,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "tsx": "4.23.0",
     "typescript": "^5"
   }
 }

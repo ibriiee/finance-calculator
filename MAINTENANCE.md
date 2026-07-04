@@ -50,6 +50,17 @@ Vercel is the hardest thing to recover.
 
 ---
 
+## 🧪 Testing (if you ever need to modify the code)
+
+Before deploying **any** code change, run:
+```bash
+npm test
+```
+
+All three tests must pass (sadaka math, life math, Hijri calendar). These are the verified core of the app — if they pass, the money calculations are correct.
+
+---
+
 ## ⛔ Do NOT do these (they break a frozen app with no one to fix it)
 
 - **Don't run `npm update` or `npm install <newer versions>`.** The dependencies (Next.js 16 etc.) are
