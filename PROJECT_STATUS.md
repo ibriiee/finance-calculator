@@ -10,6 +10,21 @@ Turbopack) + Supabase (auth, Postgres, RLS, realtime) + PWA. Deployed on Vercel 
 
 ---
 
+## ⚠️ OUTSTANDING — read `docs/CTO-AUDIT-2026-07.md` before any new work
+3 CRITICAL bugs found 2026-07-02, still unfixed as of this note (2026-07-04, flagged by
+Brain's `full-brief`/`life-sync`, unverified against latest code — confirm status first):
+1. **Rates pipeline dead** — `/api/rates` writes as the logged-in user but `rates_write`
+   RLS is service_role-only; every upsert silently rejected. Zakat/nisab still running on
+   June seed values (silver 3.15 vs real ≈5–6 → nisab ~45% low, can flip a WAJIB verdict).
+2. **PKR income missing from "Yours to keep"** — dashboard's cash waterfall subtracts PKR
+   sadaka/expenses but never adds PKR income (AED-only filter) — currency-dimension
+   negative-keep bug.
+3. **`life_events` missing from `backup.mjs` + Settings `DATA_TABLES`** — silently excluded
+   from export/disaster-recovery.
+Full fix specs (FIX-01 etc.), model routing, verify steps: `docs/CTO-AUDIT-2026-07.md`.
+
+---
+
 ## Core purpose
 Track monthly/yearly **earnings** → ensure the dedicated **sadaka** is actually paid from them →
 track **who** received sadaka, when, and who is overdue → manage **joint** household money,
@@ -100,7 +115,7 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
   oldest first) for display only — DB rows stay clean, so each obligation card shows
   what's still due and the cards reconcile with the header total. `source_income_id`
   optionally tags which income a payment/obligation relates to.
-- **Backups / disaster recovery:** `npm run backup` dumps all 18 tables (both users,
+- **Backups / disaster recovery:** `npm run backup` dumps all 20 tables (both users,
   service_role) to git-ignored `backups/*.json`; `npm run restore -- <file>` reloads
   into a fresh project, remapping user UUIDs by email. Full runbook (incl. what to do
   if Supabase access is lost) in `docs/DISASTER-RECOVERY.md`. Run a backup regularly +
@@ -245,7 +260,7 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
   progress bar + "X of Y given") and reconcile with the header. "Mark as Given" now clears only
   what's still due after payments (no double-count). Prod build clean (22 routes).
 - **2026-06-22** — **Backup + disaster-recovery tooling** (so a repeat of the outage below
-  can't lose data). Added `npm run backup` (`scripts/backup.mjs`, dumps all 18 tables for
+  can't lose data). Added `npm run backup` (`scripts/backup.mjs`, dumps all 20 tables for
   both users to git-ignored `backups/*.json` with an id↔email map) and `npm run restore`
   (`scripts/restore.mjs`, reloads into a fresh project and remaps user UUIDs by email,
   idempotent). New `docs/DISASTER-RECOVERY.md` runbook covers prevention (2nd org owner,

@@ -57,6 +57,7 @@ const TABLES = [
   'wasiyya_entries',
   'savings_entries',
   'expenses',
+  'life_events',
   'rates_cache',
 ]
 

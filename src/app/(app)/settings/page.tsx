@@ -108,7 +108,7 @@ export default function SettingsPage() {
     'income_projects', 'sadaka_entries', 'sadaka_recipients', 'brother_ledger',
     'ledger_settlements', 'external_ledger', 'loans', 'loan_repayments',
     'shared_costs', 'zakat_snapshots', 'financial_goals', 'goal_contributions',
-    'wasiyya_entries', 'joint_accounts', 'joint_account_txns', 'savings_entries', 'expenses',
+    'wasiyya_entries', 'joint_accounts', 'joint_account_txns', 'savings_entries', 'expenses', 'life_events',
   ]
 
   async function exportData() {
@@ -158,7 +158,7 @@ export default function SettingsPage() {
   }
 
   async function resetData() {
-    const ok = prompt('This permanently deletes ALL financial data (income, sadaka, ledger, joint account, zakat, goals, loans, splits, wasiyya, recipients). Your account & settings stay.\n\n⚠ Shared records (ledger, joint account, splits, shared sadaka) are deleted for BOTH of you — make sure your brother is okay with this and export a backup first.\n\nType DELETE to confirm.')
+    const ok = prompt('This permanently deletes ALL financial data (income, sadaka, ledger, joint account, zakat, goals, loans, splits, wasiyya, recipients, life events). Your account & settings stay.\n\n⚠ Shared records (ledger, joint account, splits, shared sadaka) are deleted for BOTH of you — make sure your brother is okay with this and export a backup first.\n\nType DELETE to confirm.')
     if (ok !== 'DELETE') return
     setBusy('reset')
     for (const t of DATA_TABLES) {
