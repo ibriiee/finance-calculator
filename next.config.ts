@@ -3,8 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Enable React strict mode for better DX
   reactStrictMode: true,
-  // Allow build to succeed despite Supabase generic type mismatches (runtime is correct)
-  typescript: { ignoreBuildErrors: true },
   // Optimize images
   images: {
     formats: ['image/avif', 'image/webp'],
