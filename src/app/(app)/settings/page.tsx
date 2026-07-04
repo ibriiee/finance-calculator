@@ -92,10 +92,44 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const [rateResult, setRateResult] = useState<string | null>(null)
   async function refreshRates() {
     setRefreshing(true)
-    await fetch('/api/rates')
+    setRateResult(null)
+    try {
+      const res = await fetch('/api/rates')
+      const json = await res.json()
+      if (!json.success) setRateResult(json.error ?? 'Refresh failed')
+      else if (json.writeErrors?.length) setRateResult(`Saved with issues: ${json.writeErrors.join('; ')}`)
+      else if (json.stale) setRateResult('Rate sources unavailable — showing last known values.')
+      else setRateResult('Rates refreshed ✓')
+    } catch {
+      setRateResult('Refresh failed — network error')
+    }
     setRefreshing(false)
+  }
+
+  const [pkrOverride, setPkrOverride] = useState('')
+  const [savingPkr, setSavingPkr] = useState(false)
+  const [pkrResult, setPkrResult] = useState<string | null>(null)
+  async function saveManualPkr() {
+    const value = parseFloat(pkrOverride)
+    if (!value || value <= 0) { setPkrResult('Enter a valid PKR→AED rate'); return }
+    setSavingPkr(true)
+    setPkrResult(null)
+    try {
+      const res = await fetch('/api/rates/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pkr_to_aed: value }),
+      })
+      const json = await res.json()
+      setPkrResult(json.success ? 'Saved ✓' : (json.error ?? 'Save failed'))
+      if (json.success) setPkrOverride('')
+    } catch {
+      setPkrResult('Save failed — network error')
+    }
+    setSavingPkr(false)
   }
 
   async function logout() {
@@ -330,6 +364,32 @@ export default function SettingsPage() {
               {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               {refreshing ? 'Refreshing…' : 'Refresh Rates Now'}
             </button>
+            {rateResult && (
+              <p className="text-xs mt-2" style={{ color: rateResult.includes('✓') ? 'var(--emerald)' : '#EF4444' }}>
+                {rateResult}
+              </p>
+            )}
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>
+                Manual PKR → AED override (if auto-refresh ever fails)
+              </label>
+              <div className="flex gap-2">
+                <input value={pkrOverride} onChange={e => setPkrOverride(e.target.value)}
+                  type="number" step="0.0001" placeholder="e.g. 0.0132"
+                  className="flex-1 px-3 py-2 rounded-xl text-sm"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                <button onClick={saveManualPkr} disabled={savingPkr}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold"
+                  style={{ background: 'var(--gold-dim)', color: 'var(--gold)', border: '1px solid var(--gold)' }}>
+                  {savingPkr ? '…' : 'Save'}
+                </button>
+              </div>
+              {pkrResult && (
+                <p className="text-xs mt-2" style={{ color: pkrResult.includes('✓') ? 'var(--emerald)' : '#EF4444' }}>
+                  {pkrResult}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
