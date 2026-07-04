@@ -11,16 +11,14 @@ Turbopack) + Supabase (auth, Postgres, RLS, realtime) + PWA. Deployed on Vercel 
 ---
 
 ## ⚠️ OUTSTANDING — read `docs/CTO-AUDIT-2026-07.md` before any new work
-3 CRITICAL bugs found 2026-07-02, still unfixed as of this note (2026-07-04, flagged by
-Brain's `full-brief`/`life-sync`, unverified against latest code — confirm status first):
+2 CRITICAL bugs remain unfixed (as of 2026-07-04):
 1. **Rates pipeline dead** — `/api/rates` writes as the logged-in user but `rates_write`
    RLS is service_role-only; every upsert silently rejected. Zakat/nisab still running on
    June seed values (silver 3.15 vs real ≈5–6 → nisab ~45% low, can flip a WAJIB verdict).
 2. **PKR income missing from "Yours to keep"** — dashboard's cash waterfall subtracts PKR
    sadaka/expenses but never adds PKR income (AED-only filter) — currency-dimension
    negative-keep bug.
-3. **`life_events` missing from `backup.mjs` + Settings `DATA_TABLES`** — silently excluded
-   from export/disaster-recovery.
+✅ FIX-03 (life_events missing from backup) fixed 2026-07-04.
 Full fix specs (FIX-01 etc.), model routing, verify steps: `docs/CTO-AUDIT-2026-07.md`.
 
 ---
@@ -124,6 +122,8 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-04** — **CTO audit fixes Session 1: FIX-03/05/06.**
+  *FIX-03* — `life_events` was missing from backup.mjs and Settings DATA_TABLES, causing silent data loss on disaster recovery. Updated backup, export, reset paths; updated "18 → 20 tables" references in docs. Verified: `npm run backup` includes life_events. *FIX-05* — Removed `ignoreBuildErrors` from next.config.ts; `tsc --noEmit` is 0 errors, so the flag was silently accepting type errors that future models might introduce. Verified: `npm run build` passes clean. *FIX-06* — Pinned `tsx` as exact devDependency (4.23.0) and wired `npm test` script to make the three self-check suites runnable forever (offline, years later). Verified: all three tests pass (sadaka, lifeMath, hijri). Updated MAINTENANCE.md with testing instructions.
 - **2026-07-03** — **CTO audit second pass — FIX-16..19 + P2-15..18 appended to `docs/CTO-AUDIT-2026-07.md`.**
   Audit-only, no code changed. New HIGH findings: *FIX-16* — all 3 sadaka trigger functions (income
   edit / income delete / sadaka-% change) filter by `status` instead of the `amount_owed = 0` payment
