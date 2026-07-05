@@ -27,6 +27,8 @@ export default function ZakatPage() {
   })
   const [result, setResult] = useState<{ nisab: number; nisabSilver: number; nisabGold: number; net: number; due: number; wajib: boolean; hawlDays: number; dueDate: string | null } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [zakatError, setZakatError] = useState<string | null>(null)
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null)
   const supabase = createClient()
 
   async function load() {
@@ -43,6 +45,8 @@ export default function ZakatPage() {
       const m: Record<string, number> = {}
       rCache.forEach((r: any) => { m[r.rate_type] = r.rate_value })
       setRates({ gold: m.gold_aed_gram ?? 472, silver: m.silver_aed_gram ?? 5.9, pkr: m.pkr_to_aed ?? 0.013, usd: m.usd_to_aed ?? 3.6725 })
+      const newest = rCache.reduce((max: string | null, r: any) => (!max || r.updated_at > max) ? r.updated_at : max, null as string | null)
+      setRatesUpdatedAt(newest)
     }
     setLoading(false)
   }
@@ -81,11 +85,15 @@ export default function ZakatPage() {
 
   async function saveSnapshot() {
     if (!result) return
-    setSaving(true)
+    setSaving(true); setZakatError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const n = (s: string) => parseFloat(s || '0') || 0
-    const year = new Date().toLocaleDateString('en-GB', { year: 'numeric', calendar: 'islamic' }).split('/').pop() ?? '1447'
-    await supabase.from('zakat_snapshots').upsert({
+    // formatToParts guarantees a pure-digit year — the old toLocaleDateString
+    // string could carry an " AH" suffix depending on runtime, which would
+    // corrupt the UNIQUE (owner_id, snapshot_year) key space.
+    const year = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { year: 'numeric' })
+      .formatToParts(new Date()).find(p => p.type === 'year')?.value ?? '1447'
+    const { error } = await supabase.from('zakat_snapshots').upsert({
       owner_id: user!.id, snapshot_year: year,
       snapshot_date: new Date().toISOString().split('T')[0],
       cash_aed: n(assets.cash_aed), cash_pkr: n(assets.cash_pkr), cash_usd: n(assets.cash_usd),
@@ -99,13 +107,17 @@ export default function ZakatPage() {
       zakat_due_aed: result.due, is_wajib: result.wajib, hawl_days_completed: result.hawlDays,
       nisab_basis: nisabBasis, due_date: result.dueDate,
     }, { onConflict: 'owner_id,snapshot_year' })
-    setSaving(false); load()
+    setSaving(false)
+    if (error) { setZakatError('Could not save snapshot: ' + error.message); return }
+    load()
   }
 
   async function markPaid(id: string) {
-    await supabase.from('zakat_snapshots').update({
+    const { error } = await supabase.from('zakat_snapshots').update({
       zakat_paid: true, zakat_paid_date: new Date().toISOString().split('T')[0],
     }).eq('id', id)
+    if (error) { setZakatError('Could not mark as paid: ' + error.message); return }
+    setZakatError(null)
     load()
   }
 
@@ -129,6 +141,19 @@ export default function ZakatPage() {
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
       <ModuleHeader title="Zakat" subtitle="Hanafi · 2.5% on net wealth" />
+
+      {/* Stale-rate banner — a borderline nisab call on old rates is a fiqh risk */}
+      {ratesUpdatedAt && (Date.now() - new Date(ratesUpdatedAt).getTime() > 7 * 24 * 60 * 60 * 1000) && (
+        <div className="rounded-xl px-4 py-2.5 text-xs" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B' }}>
+          ⚠ Rates last updated {Math.floor((Date.now() - new Date(ratesUpdatedAt).getTime()) / 86400000)} days ago — nisab may be off. Refresh via Settings → Currencies.
+        </div>
+      )}
+
+      {zakatError && (
+        <div className="rounded-xl px-4 py-2.5 text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>
+          ⚠ {zakatError}
+        </div>
+      )}
 
       {/* Live rates info */}
       <div className="card p-3 flex gap-4 text-xs" style={{ color: 'var(--text-muted)' }}>
