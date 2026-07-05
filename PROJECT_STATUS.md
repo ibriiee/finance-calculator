@@ -11,15 +11,14 @@ Turbopack) + Supabase (auth, Postgres, RLS, realtime) + PWA. Deployed on Vercel 
 ---
 
 ## ⚠️ OUTSTANDING — read `docs/CTO-AUDIT-2026-07.md` before any new work
-2 CRITICAL bugs remain unfixed (as of 2026-07-04):
-1. **Rates pipeline dead** — `/api/rates` writes as the logged-in user but `rates_write`
-   RLS is service_role-only; every upsert silently rejected. Zakat/nisab still running on
-   June seed values (silver 3.15 vs real ≈5–6 → nisab ~45% low, can flip a WAJIB verdict).
-2. **PKR income missing from "Yours to keep"** — dashboard's cash waterfall subtracts PKR
-   sadaka/expenses but never adds PKR income (AED-only filter) — currency-dimension
-   negative-keep bug.
-✅ FIX-03 (life_events missing from backup) fixed 2026-07-04.
-Full fix specs (FIX-01 etc.), model routing, verify steps: `docs/CTO-AUDIT-2026-07.md`.
+**All P0/P1/P2 fixes from the 2026-07 audit are now landed (2026-07-05).** Two items need
+**owner action**, not more code:
+1. **Run the pending SQL migrations** in Supabase SQL Editor: `supabase/fix-payment-row-triggers.sql`
+   (check the pre-flight SELECT first) and `supabase/integrity-checks.sql` (migrations 18 & 19).
+2. **Enable the keepalive workflow**: add `SUPABASE_URL` + `SUPABASE_ANON_KEY` repo secrets on
+   GitHub and confirm `.github/workflows/keepalive.yml` runs green (Actions tab → run manually once).
+Deliberately NOT done: P2-12 (removing unused `next-pwa` dependency) — flagged, needs owner
+go-ahead per the no-new-deps rule. Full fix specs, verify steps: `docs/CTO-AUDIT-2026-07.md`.
 
 ---
 
@@ -86,6 +85,13 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 
 16. `performance-indexes.sql` — 4 performance indexes: `idx_sadaka_income_date`, `idx_repay_loan`, `idx_ledger_settled_date`, `idx_rates_type (UNIQUE)`. **Run 2026-06-30** — confirmed by Ibrahim.
 17. `expenses.sql` — `expenses` table (personal/living costs, owner-private RLS, `is_shared`+`my_pct`+`ledger_entry_id` for split→ledger) + index. **⚠️ MUST RUN — Expenses module won't save until this runs.**
+18. `integrity-checks.sql` — CHECK constraints (positive amounts, valid currency/status/ownership
+    enums) as a DB-level integrity floor. **⚠️ NOT YET RUN — owner action needed.** Pre-flight
+    SELECTs first; fix any returned rows before the ALTERs.
+19. `fix-payment-row-triggers.sql` — fixes 3 sadaka trigger functions that filtered on `status`
+    instead of the `amount_owed = 0` payment invariant, letting an `advance_given` payment row get
+    corrupted into a phantom obligation (income edit / delete / sadaka-% change). **⚠️ NOT YET
+    RUN — owner action needed.** Check the pre-flight SELECT for already-corrupted rows first.
 
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–16 all run as of 2026-06-30** — confirmed by Ibrahim.)
 
@@ -122,6 +128,33 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-05** — **CTO audit fixes Sessions 2-8: everything remaining, all landed in one pass.**
+  *FIX-16* — 3 sadaka trigger functions gained `amount_owed > 0` guards so a payment row can never
+  be corrupted into a phantom obligation (new `supabase/fix-payment-row-triggers.sql`, same edits
+  applied to `FRESH-INSTALL.sql`; **owner must run it**). *FIX-04* — new `supabase/integrity-checks.sql`
+  adds CHECK constraints as a DB-level integrity floor (**owner must run it**). *FIX-15* — new
+  `.github/workflows/keepalive.yml` pings Supabase twice weekly to prevent the 7-day free-tier pause
+  (**owner must add `SUPABASE_URL`/`SUPABASE_ANON_KEY` repo secrets**). *FIX-01* — the rates pipeline
+  was dead since install (RLS silently rejected every write from the anon client); new
+  `src/lib/supabase/admin.ts` service-role client, clamped rate ranges, a fallback rewrite that never
+  overwrites real data with hardcoded constants, and a manual PKR→AED override in Settings. *FIX-02* —
+  dashboard "Yours to keep" now folds PKR income (was AED-only, asymmetric with PKR sadaka/expenses
+  which already folded). *FIX-07* (owner-confirmed: incomes are separate, not combined) — shared
+  income now counts at 50% per brother instead of 100% for both. *FIX-17* — SadakaForm edit mode now
+  builds a delta payload instead of rebuilding from scratch, so it can no longer wipe `amount_given`
+  on a partially-given obligation or rewrite `date_given`; ownership only changes if explicitly
+  touched after profiles load. *FIX-19* — 8 previously-unchecked mutation writes (Settings save,
+  Sadaka mark-given/delete, Income mark-received, Ledger reverse/delete, Loans repayment) now surface
+  errors instead of pretending success; Expenses delete no longer erases a settled ledger IOU.
+  *FIX-18* — new shared `LoadError` component + patched 12 pages so a failed fetch (Supabase
+  pause/network blip) shows a retry banner instead of a fake "No entries yet". *FIX-08* — Zakat page
+  gained a stale-rate banner (7+ days), a robust `Intl.formatToParts` snapshot year (old string could
+  carry an " AH" suffix), and error surfacing on save/mark-paid. *P2 batch (09-18)* — compact-currency
+  M tier, PKR validateAmount cap raised to 100M, dashboard sadaka month-scope by `date_given`,
+  `/auth/reset-password` no longer bounced by the logged-in redirect, CSP-Report-Only header,
+  analytics Net Position converts goal contributions by currency, IncomeForm locks currency/ownership
+  once sadaka is triggered. P2-12 (remove unused `next-pwa`) flagged to owner, not acted on. Verified
+  every step: `tsc --noEmit` 0 errors, `npm test` all 3 pass, `npm run build` clean (26 routes).
 - **2026-07-04** — **CTO audit fixes Session 1: FIX-03/05/06.**
   *FIX-03* — `life_events` was missing from backup.mjs and Settings DATA_TABLES, causing silent data loss on disaster recovery. Updated backup, export, reset paths; updated "18 → 20 tables" references in docs. Verified: `npm run backup` includes life_events. *FIX-05* — Removed `ignoreBuildErrors` from next.config.ts; `tsc --noEmit` is 0 errors, so the flag was silently accepting type errors that future models might introduce. Verified: `npm run build` passes clean. *FIX-06* — Pinned `tsx` as exact devDependency (4.23.0) and wired `npm test` script to make the three self-check suites runnable forever (offline, years later). Verified: all three tests pass (sadaka, lifeMath, hijri). Updated MAINTENANCE.md with testing instructions.
 - **2026-07-03** — **CTO audit second pass — FIX-16..19 + P2-15..18 appended to `docs/CTO-AUDIT-2026-07.md`.**
