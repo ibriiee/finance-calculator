@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Hourglass, Settings, Bell, X, CalendarDays, Pencil } from 'lucide-react'
 import {
   deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived,
@@ -26,6 +27,7 @@ const MS_DAY = 86_400_000
 export default function LifePage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [dob, setDob] = useState<string | null>(null)
   const [years, setYears] = useState(63)
   const [events, setEvents] = useState<LifeEvent[]>([])
@@ -67,21 +69,28 @@ export default function LifePage() {
   }, [dob, years, events, showIslamic])
   function toggleIslamic(v: boolean) { setShowIslamic(v); localStorage.setItem('mizan_islamic_dates', v ? '1' : '0') }
 
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      const [{ data: prof }, { data: evs }] = await Promise.all([
-        supabase.from('profiles').select('date_of_birth, life_expectancy_years').eq('id', user!.id).single(),
-        supabase.from('life_events').select('*').eq('owner_id', user!.id).order('event_date'),
-      ])
-      setDob((prof as any)?.date_of_birth ?? null)
-      setYears((prof as any)?.life_expectancy_years ?? 63)
-      setEvents((evs as LifeEvent[]) ?? [])
-      setLoading(false)
-    })()
-  }, [])
+  async function load() {
+    const { data: { user } } = await supabase.auth.getUser()
+    const [{ data: prof, error }, { data: evs }] = await Promise.all([
+      supabase.from('profiles').select('date_of_birth, life_expectancy_years').eq('id', user!.id).single(),
+      supabase.from('life_events').select('*').eq('owner_id', user!.id).order('event_date'),
+    ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
+    setDob((prof as any)?.date_of_birth ?? null)
+    setYears((prof as any)?.life_expectancy_years ?? 63)
+    setEvents((evs as LifeEvent[]) ?? [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 p-4 animate-slide-up">
+      <ModuleHeader title="Life Tracker" subtitle="Remember death — live with intention" back={false} />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   if (!dob) {
     return (

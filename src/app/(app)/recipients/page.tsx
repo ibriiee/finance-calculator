@@ -5,6 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, Users, Share2, Check, AlertTriangle } from 'lucide-react'
 import RecipientForm from '@/components/sadaka/RecipientForm'
 
@@ -22,15 +23,18 @@ export default function RecipientsPage() {
   const [recipients, setRecipients] = useState<Recipient[]>([])
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState(50)
 
   async function load() {
-    const [{ data: recs }, { data: ents }] = await Promise.all([
+    const [{ data: recs, error }, { data: ents }] = await Promise.all([
       supabase.from('sadaka_recipients').select('*').eq('is_active', true).order('name'),
       supabase.from('sadaka_entries').select('id, recipient_id, amount_given, currency, date_given, created_at').gt('amount_given', 0),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setRecipients((recs as any) ?? [])
     setEntries((ents as any) ?? [])
     setLoading(false)
@@ -81,6 +85,12 @@ export default function RecipientsPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Recipients" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   const overdueCount = ranked.filter(x => x.s.overdue).length
 

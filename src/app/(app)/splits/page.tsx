@@ -6,6 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, Scissors } from 'lucide-react'
 import SplitForm from '@/components/splits/SplitForm'
 import type { SharedCost } from '@/types/database.types'
@@ -14,13 +15,16 @@ export default function SplitsPage() {
   const [splits, setSplits] = useState<SharedCost[]>([])
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const supabase = createClient()
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const { data } = await supabase.from('shared_costs').select('*').order('cost_date', { ascending: false })
+    const { data, error } = await supabase.from('shared_costs').select('*').order('cost_date', { ascending: false })
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setSplits(data ?? [])
     setLoading(false)
   }
@@ -30,6 +34,12 @@ export default function SplitsPage() {
   const catIcons: Record<string, string> = { house: '🏠', vehicle: '🚗', gift: '🎁', charity: '🤲', investment: '📈', business: '💼', other: '•' }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Shared Splits" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">

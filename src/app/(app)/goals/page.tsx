@@ -5,6 +5,7 @@ import { formatCurrency, shortDate, calcMonthsRemaining } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, Target, TrendingUp } from 'lucide-react'
 import GoalForm from '@/components/goals/GoalForm'
 import type { FinancialGoal, GoalContribution } from '@/types/database.types'
@@ -17,6 +18,7 @@ export default function GoalsPage() {
   const [goals, setGoals] = useState<GoalWithProgress[]>([])
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [contributing, setContributing] = useState<string | null>(null)
   const [contribAmount, setContribAmount] = useState('')
@@ -26,11 +28,13 @@ export default function GoalsPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: g }, { data: c }, { data: profs }] = await Promise.all([
+    const [{ data: g, error }, { data: c }, { data: profs }] = await Promise.all([
       supabase.from('financial_goals').select('*').or(`owner_id.eq.${user!.id},goal_type.eq.joint`).eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('goal_contributions').select('*'),
       supabase.from('profiles').select('id, display_name'),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     const nameMap: Record<string, string> = {}
     ;(profs ?? []).forEach((p: any) => { nameMap[p.id] = p.display_name ?? 'User' })
     setNames(nameMap)
@@ -57,6 +61,12 @@ export default function GoalsPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Financial Goals" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">

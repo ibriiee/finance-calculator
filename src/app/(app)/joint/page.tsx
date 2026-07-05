@@ -5,6 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, Landmark, ArrowDownCircle, ArrowUpCircle, Building2 } from 'lucide-react'
 import AccountForm from '@/components/joint/AccountForm'
 import TxnForm from '@/components/joint/TxnForm'
@@ -20,6 +21,7 @@ export default function JointAccountPage() {
   const [userId, setUserId] = useState('')
   const [pkrToAed, setPkrToAed] = useState(0.0132)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showAccountForm, setShowAccountForm] = useState(false)
   const [txnFor, setTxnFor] = useState<Account | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -27,12 +29,14 @@ export default function JointAccountPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: accs }, { data: tx }, { data: profs }, { data: rate }] = await Promise.all([
+    const [{ data: accs, error }, { data: tx }, { data: profs }, { data: rate }] = await Promise.all([
       supabase.from('joint_accounts').select('*').order('created_at', { ascending: true }),
       supabase.from('joint_account_txns').select('*').order('txn_date', { ascending: false }),
       supabase.from('profiles').select('id, display_name'),
       supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setAccounts((accs as any) ?? [])
     setTxns((tx as any) ?? [])
     const map: Record<string, string> = {}
@@ -71,6 +75,12 @@ export default function JointAccountPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Joint Account" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   const peopleIds = Object.keys(names)
 

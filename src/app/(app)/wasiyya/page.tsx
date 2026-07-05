@@ -5,6 +5,7 @@ import { shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, FileText, Lock, Eye, EyeOff } from 'lucide-react'
 import WasiyyaForm from '@/components/wasiyya/WasiyyaForm'
 import type { WasiyyaEntry } from '@/types/database.types'
@@ -12,14 +13,17 @@ import type { WasiyyaEntry } from '@/types/database.types'
 export default function WasiyyaPage() {
   const [entries, setEntries] = useState<WasiyyaEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const supabase = createClient()
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('wasiyya_entries').select('*')
+    const { data, error } = await supabase.from('wasiyya_entries').select('*')
       .eq('owner_id', user!.id).order('created_at', { ascending: false })
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setEntries(data ?? [])
     setLoading(false)
   }
@@ -39,6 +43,12 @@ export default function WasiyyaPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Wasiyya" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">

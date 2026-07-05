@@ -4,12 +4,14 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Donut, MonthlyBars } from '@/components/analytics/Charts'
 import { TrendingUp, HandHeart, Wallet, Target, Scale } from 'lucide-react'
 
 export default function AnalyticsPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly')
   const [income, setIncome] = useState<any[]>([])
   const [sadaka, setSadaka] = useState<any[]>([])
@@ -24,7 +26,7 @@ export default function AnalyticsPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: inc }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }] = await Promise.all([
+    const [{ data: inc, error }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }] = await Promise.all([
       supabase.from('income_projects').select('amount, currency, status, work_completed_date, created_at').eq('owner_id', user!.id),
       supabase.from('sadaka_entries').select('amount_owed, amount_given, currency, location, date_given, created_at').or(`owner_id.eq.${user!.id},is_joint.eq.true`),
       supabase.from('loans').select('id, owner_id, loan_type, currency_type, original_amount, status').eq('owner_id', user!.id).neq('status', 'cleared'),
@@ -34,6 +36,8 @@ export default function AnalyticsPage() {
       supabase.from('goal_contributions').select('goal_id, amount, contributor_id'),
       supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setIncome((inc as any) ?? [])
     setSadaka((sad as any) ?? [])
     setLoans((lns as any) ?? [])
@@ -47,6 +51,12 @@ export default function AnalyticsPage() {
   useEffect(() => { load() }, [])
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Analytics" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   const aed = (arr: any[], f: (x: any) => number) => arr.filter(x => x.currency === 'AED').reduce((s, x) => s + f(x), 0)
   const toAed = (amount: number, cur: string) => cur === 'PKR' ? amount * pkrToAed : cur === 'AED' ? amount : 0
