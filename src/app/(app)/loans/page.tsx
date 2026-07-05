@@ -6,8 +6,10 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import LoanForm from '@/components/loans/LoanForm'
+import { validateAmount } from '@/lib/utils'
 import type { Loan } from '@/types/database.types'
 
 const RATES_DEFAULTS = { gold_aed_gram: 472, silver_aed_gram: 5.9 }
@@ -19,6 +21,7 @@ export default function LoansPage() {
   const [userId, setUserId] = useState('')
   const [ledgerDebt, setLedgerDebt] = useState<{ currency: string; amount: number; toName: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [rates, setRates] = useState(RATES_DEFAULTS)
   const [visibleMine, setVisibleMine] = useState(50)
@@ -28,13 +31,15 @@ export default function LoansPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: l }, { data: r }, { data: profs }, { data: reps }, { data: ledger }] = await Promise.all([
+    const [{ data: l, error }, { data: r }, { data: profs }, { data: reps }, { data: ledger }] = await Promise.all([
       supabase.from('loans').select('*').order('created_at', { ascending: false }),
       supabase.from('rates_cache').select('*'),
       supabase.from('profiles').select('id, display_name'),
       supabase.from('loan_repayments').select('loan_id, amount'),
       supabase.from('brother_ledger').select('from_user_id, to_user_id, amount, currency').eq('is_settled', false),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setLoans(l ?? [])
     setRepays((reps as any) ?? [])
     const nameMap: Record<string, string> = {}
@@ -98,6 +103,7 @@ export default function LoansPage() {
     const [repayAmount, setRepayAmount] = useState('')
     const [repayDate, setRepayDate] = useState(new Date().toISOString().split('T')[0])
     const [repaying, setRepaying] = useState(false)
+    const [repayError, setRepayError] = useState('')
     const isOverdue = loan.due_date && new Date(loan.due_date) < new Date() && loan.status !== 'cleared'
     const isGold = ['gold_grams', 'silver_grams'].includes(loan.currency_type)
     const addedBy = (loan as any).added_by_id as string | null
@@ -109,20 +115,21 @@ export default function LoansPage() {
     const repaidPct = original > 0 ? Math.min(100, Math.round((repaid / original) * 100)) : 0
 
     async function logRepayment() {
+      const amtErr = validateAmount(repayAmount)
+      if (amtErr) { setRepayError(amtErr); return }
+      setRepaying(true); setRepayError('')
       const amt = parseFloat(repayAmount)
-      if (!amt || amt <= 0) return
-      setRepaying(true)
       const { error } = await supabase.from('loan_repayments').insert({
         loan_id: loan.id, amount: amt,
         repayment_date: repayDate, notes: null,
       } as any)
-      if (!error) {
-        const newRepaid = repaid + amt
-        const newStatus = newRepaid >= original ? 'cleared' : 'partial'
-        await supabase.from('loans').update({ status: newStatus }).eq('id', loan.id)
-        setRepayAmount(''); setShowRepay(false); load()
-      }
+      if (error) { setRepaying(false); setRepayError('Could not save repayment: ' + error.message); return }
+      const newRepaid = repaid + amt
+      const newStatus = newRepaid >= original ? 'cleared' : 'partial'
+      const { error: statusErr } = await supabase.from('loans').update({ status: newStatus }).eq('id', loan.id)
       setRepaying(false)
+      if (statusErr) { setRepayError('Repayment saved, but the card status could not update: ' + statusErr.message); return }
+      setRepayAmount(''); setShowRepay(false); load()
     }
 
     // green = cleared, red = still outstanding (needs action)
@@ -198,6 +205,7 @@ export default function LoansPage() {
                   {repaying && <Loader2 size={12} className="animate-spin" />}
                   Save Repayment
                 </button>
+                {repayError && <p className="text-[11px]" style={{ color: '#EF4444' }}>⚠ {repayError}</p>}
               </div>
             )}
           </div>
@@ -207,6 +215,12 @@ export default function LoansPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Loans" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">

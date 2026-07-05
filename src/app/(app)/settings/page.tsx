@@ -79,7 +79,7 @@ export default function SettingsPage() {
   async function save() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').update({
       display_name: form.display_name || null,
       sadaka_pct: form.sadaka_pct / 100,
       hawl_start_date: form.hawl_start_date || null,
@@ -88,6 +88,7 @@ export default function SettingsPage() {
       enabled_modules: form.enabled_modules,
     }).eq('id', user!.id)
     setSaving(false)
+    if (error) { alert('Could not save: ' + error.message); return }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

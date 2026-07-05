@@ -5,6 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, Wallet, Pencil, Trash2, Users } from 'lucide-react'
 import ExpenseForm, { EXPENSE_CATEGORIES } from '@/components/expenses/ExpenseForm'
 import type { Expense } from '@/types/database.types'
@@ -15,13 +16,16 @@ const catLabel = (c: string) => CAT_LABEL[c] ?? `• ${c.charAt(0).toUpperCase()
 export default function ExpensesPage() {
   const [items, setItems] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Expense | null>(null)
   const [scope, setScope] = useState<'month' | 'all'>('month')
   const supabase = createClient()
 
   async function load() {
-    const { data } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false })
+    const { data, error } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false })
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setItems((data as Expense[]) ?? [])
     setLoading(false)
   }
@@ -29,9 +33,20 @@ export default function ExpensesPage() {
 
   async function deleteItem(e: Expense) {
     if (!confirm('Delete this expense?')) return
-    // Remove the linked ledger IOU too, if it was a shared expense.
-    if (e.ledger_entry_id) await supabase.from('brother_ledger').delete().eq('id', e.ledger_entry_id)
-    await supabase.from('expenses').delete().eq('id', e.id)
+    // Remove the linked ledger IOU too, if it was a shared expense — but never
+    // delete a SETTLED IOU, that would erase the record of a debt that was
+    // actually paid. Only an open (unsettled) IOU dies with its expense.
+    if (e.ledger_entry_id) {
+      const { data: ledgerEntry } = await supabase.from('brother_ledger').select('is_settled').eq('id', e.ledger_entry_id).single()
+      if (ledgerEntry && !ledgerEntry.is_settled) {
+        const { error: ledgerErr } = await supabase.from('brother_ledger').delete().eq('id', e.ledger_entry_id)
+        if (ledgerErr) { alert('Could not delete linked ledger entry: ' + ledgerErr.message); return }
+      } else if (ledgerEntry?.is_settled) {
+        alert('This expense\'s ledger record is already settled — it will be kept; only the expense is deleted.')
+      }
+    }
+    const { error } = await supabase.from('expenses').delete().eq('id', e.id)
+    if (error) { alert('Could not delete: ' + error.message); return }
     load()
   }
 
@@ -54,6 +69,12 @@ export default function ExpensesPage() {
   const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Expenses" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">

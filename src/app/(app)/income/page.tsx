@@ -5,6 +5,7 @@ import { formatCurrency, shortDate, getLagDays, getLagColor } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock, ChevronDown, ChevronUp } from 'lucide-react'
 import IncomeForm from '@/components/income/IncomeForm'
 import { computeSadaka } from '@/lib/sadaka'
@@ -17,6 +18,7 @@ export default function IncomePage() {
   // even after the payment cards disappear from the Sadaka tab (once fully given).
   const [paymentsByIncome, setPaymentsByIncome] = useState<Record<string, { name: string; amount: number; date: string | null; currency: string }[]>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<IncomeProject | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'received'>('all')
@@ -29,10 +31,12 @@ export default function IncomePage() {
   useEffect(() => { setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
 
   async function load() {
-    const [{ data }, { data: sadaka }] = await Promise.all([
+    const [{ data, error }, { data: sadaka }] = await Promise.all([
       supabase.from('income_projects').select('*').order('created_at', { ascending: false }),
       supabase.from('sadaka_entries').select('*'),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setItems(data ?? [])
     // Resolve via the shared engine so per-income sadaka matches the Sadaka page exactly.
     const computed = computeSadaka((sadaka as any[]) ?? [])
@@ -91,6 +95,12 @@ export default function IncomePage() {
   const totalPending = items.filter(i => !isReceivedItem(i) && i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Income & Projects" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
@@ -295,10 +305,11 @@ export default function IncomePage() {
                       <button
                         onClick={async () => {
                           if (!confirm('Mark as received? This locks the entry.')) return
-                          await supabase.from('income_projects').update({
+                          const { error } = await supabase.from('income_projects').update({
                             status: 'received',
                             actual_received_date: new Date().toISOString().split('T')[0]
                           }).eq('id', item.id)
+                          if (error) { alert('Could not save: ' + error.message); return }
                           load()
                         }}
                         className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"

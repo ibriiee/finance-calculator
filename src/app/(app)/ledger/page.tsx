@@ -5,6 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, ArrowLeftRight, ArrowUpRight, ArrowDownLeft, CheckCircle2, RotateCcw, Trash2 } from 'lucide-react'
 import LedgerForm from '@/components/ledger/LedgerForm'
 import SettleUpModal from '@/components/ledger/SettleUpModal'
@@ -15,6 +16,7 @@ export default function LedgerPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [userId, setUserId] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [showSettle, setShowSettle] = useState(false)
   const [filter, setFilter] = useState<'unsettled' | 'all'>('unsettled')
@@ -23,10 +25,12 @@ export default function LedgerPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: ledger }, { data: profs }] = await Promise.all([
+    const [{ data: ledger, error }, { data: profs }] = await Promise.all([
       supabase.from('brother_ledger').select('*').order('transaction_date', { ascending: false }),
       supabase.from('profiles').select('*'),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setEntries(ledger ?? [])
     setProfiles(profs ?? [])
     setLoading(false)
@@ -56,6 +60,12 @@ export default function LedgerPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Brother Ledger" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
@@ -165,7 +175,7 @@ export default function LedgerPage() {
                         <button
                           onClick={async () => {
                             if (!confirm('Reverse this entry? Creates an equal opposite transaction.')) return
-                            await supabase.from('brother_ledger').insert({
+                            const { error } = await supabase.from('brother_ledger').insert({
                               from_user_id: entry.to_user_id,
                               to_user_id: entry.from_user_id,
                               amount: entry.amount,
@@ -176,6 +186,7 @@ export default function LedgerPage() {
                               source_type: 'manual',
                               is_settled: false,
                             } as any)
+                            if (error) { alert('Could not reverse: ' + error.message); return }
                             load()
                           }}
                           className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg"
@@ -185,7 +196,8 @@ export default function LedgerPage() {
                         <button
                           onClick={async () => {
                             if (!confirm('Delete this entry permanently? Use Reverse instead if you just want to cancel it out.')) return
-                            await supabase.from('brother_ledger').delete().eq('id', entry.id)
+                            const { error } = await supabase.from('brother_ledger').delete().eq('id', entry.id)
+                            if (error) { alert('Could not delete: ' + error.message); return }
                             load()
                           }}
                           className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg"

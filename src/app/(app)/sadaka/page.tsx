@@ -5,6 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, HandHeart, Check, Users, ChevronRight, Pencil, Trash2, Lock, FileText, FileSpreadsheet, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import SadakaForm from '@/components/sadaka/SadakaForm'
@@ -22,6 +23,7 @@ type AllocResult = {
 export default function SadakaPage() {
   const [entries, setEntries] = useState<SadakaEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<SadakaEntry | null>(null)
   const [devMode, setDevMode] = useState(false)
@@ -39,7 +41,7 @@ export default function SadakaPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: sadaka }, { data: profile }, { data: profs }, { data: inc }] = await Promise.all([
+    const [{ data: sadaka, error }, { data: profile }, { data: profs }, { data: inc }] = await Promise.all([
       supabase.from('sadaka_entries').select('*')
         .or(`owner_id.eq.${user!.id},is_joint.eq.true,shared.eq.true`)
         .order('created_at', { ascending: false }),
@@ -47,6 +49,8 @@ export default function SadakaPage() {
       supabase.from('profiles').select('id, display_name'),
       supabase.from('income_projects').select('id, name'),
     ])
+    if (error) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
     setEntries(sadaka ?? [])
     setSadakaRate(profile?.sadaka_pct ?? 0.2)
     const map: Record<string, string> = {}
@@ -115,6 +119,12 @@ export default function SadakaPage() {
   }
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Sadaka" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   const LOCATION_LABELS: Record<string, string> = { UAE: 'UAE', Pakistan: 'Pakistan', other: 'Other' }
   const METHOD_LABELS: Record<string, string> = { cash: 'Cash', gift: 'Gift', food: 'Food', bank_transfer: 'Bank transfer', other: 'Other' }
@@ -331,11 +341,12 @@ export default function SadakaPage() {
                   {entry.status !== 'given' && (
                     <button
                       onClick={async () => {
-                        await supabase.from('sadaka_entries').update({
+                        const { error } = await supabase.from('sadaka_entries').update({
                           status: 'given',
                           amount_given: Number(entry.amount_given) + remainingOf(entry),
                           date_given: new Date().toISOString().split('T')[0],
                         }).eq('id', entry.id)
+                        if (error) { alert('Could not save: ' + error.message); return }
                         load()
                       }}
                       className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
@@ -349,7 +360,8 @@ export default function SadakaPage() {
                   </button>
                   <button onClick={async () => {
                       if (!confirm('Delete this sadaka entry?')) return
-                      await supabase.from('sadaka_entries').delete().eq('id', entry.id)
+                      const { error } = await supabase.from('sadaka_entries').delete().eq('id', entry.id)
+                      if (error) { alert('Could not delete: ' + error.message); return }
                       load()
                     }}
                     className="px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
