@@ -39,7 +39,7 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency }
 
   async function save() {
     if (!me) return
-    const amtErr = validateAmount(form.amount)
+    const amtErr = validateAmount(form.amount, accountCurrency)
     if (amtErr) { setError(amtErr); return }
     if (form.txn_type === 'deposit' && !form.contributor_id) { setError('Pick who chipped in'); return }
     setSaving(true); setError('')

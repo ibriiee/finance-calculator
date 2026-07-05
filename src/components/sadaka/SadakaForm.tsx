@@ -86,7 +86,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
 
   async function save() {
     if (!me) return
-    const amtErr = validateAmount(form.amount_owed)
+    const amtErr = validateAmount(form.amount_owed, form.currency)
     if (amtErr) { setError(amtErr); return }
     if (form.on_behalf === 'other' && !other) {
       setError('Your brother\'s profile isn\'t loaded yet.'); return

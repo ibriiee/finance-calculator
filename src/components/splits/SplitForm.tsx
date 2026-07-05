@@ -32,7 +32,7 @@ export default function SplitForm({ onClose, onSaved }: Props) {
 
   async function save() {
     if (!form.name.trim()) { setError('Name is required'); return }
-    const amtErr = validateAmount(form.total_amount)
+    const amtErr = validateAmount(form.total_amount, form.currency)
     if (amtErr) { setError(amtErr); return }
     if (customCategory && !form.custom_category.trim()) { setError('Type your custom category'); return }
     setSaving(true); setError('')

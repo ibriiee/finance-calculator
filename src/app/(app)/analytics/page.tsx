@@ -20,13 +20,14 @@ export default function AnalyticsPage() {
   const [ledger, setLedger] = useState<any[]>([])
   const [savings, setSavings] = useState<any[]>([])
   const [contribs, setContribs] = useState<any[]>([])
+  const [goalCurrencies, setGoalCurrencies] = useState<Record<string, string>>({})
   const [pkrToAed, setPkrToAed] = useState(0.0132)
   const [userId, setUserId] = useState('')
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: inc, error }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }] = await Promise.all([
+    const [{ data: inc, error }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }, { data: gls }] = await Promise.all([
       supabase.from('income_projects').select('amount, currency, status, work_completed_date, created_at').eq('owner_id', user!.id),
       supabase.from('sadaka_entries').select('amount_owed, amount_given, currency, location, date_given, created_at').or(`owner_id.eq.${user!.id},is_joint.eq.true`),
       supabase.from('loans').select('id, owner_id, loan_type, currency_type, original_amount, status').eq('owner_id', user!.id).neq('status', 'cleared'),
@@ -35,6 +36,7 @@ export default function AnalyticsPage() {
       supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
       supabase.from('goal_contributions').select('goal_id, amount, contributor_id'),
       supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
+      supabase.from('financial_goals').select('id, currency'),
     ])
     if (error) { setLoadError(true); setLoading(false); return }
     setLoadError(false)
@@ -45,6 +47,9 @@ export default function AnalyticsPage() {
     setLedger((led as any) ?? [])
     setSavings((sav as any) ?? [])
     setContribs((con as any) ?? [])
+    const gcMap: Record<string, string> = {}
+    ;(gls ?? []).forEach((g: any) => { gcMap[g.id] = g.currency })
+    setGoalCurrencies(gcMap)
     if (rate?.rate_value) setPkrToAed(Number(rate.rate_value))
     setLoading(false)
   }
@@ -120,8 +125,10 @@ export default function AnalyticsPage() {
   })
   const savingsAed = savings.reduce((t: number, s: any) =>
     t + (s.txn_type === 'withdrawal' ? -1 : 1) * toAed(Number(s.amount), s.currency), 0)
+  // goal_contributions has no currency column of its own — a PKR goal's
+  // contributions were counted 1:1 as AED. Convert via the parent goal's currency.
   const goalSavedAed = contribs.filter((c: any) => c.contributor_id === userId)
-    .reduce((s: number, c: any) => s + Number(c.amount), 0)
+    .reduce((s: number, c: any) => s + toAed(Number(c.amount), goalCurrencies[c.goal_id] ?? 'AED'), 0)
 
   const assets = savingsAed + goalSavedAed + owedToMeAed + Math.max(0, ledgerNetAed)
   const liabilities = iOweAed + Math.max(0, -ledgerNetAed)

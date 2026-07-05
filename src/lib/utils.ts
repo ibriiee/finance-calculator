@@ -9,7 +9,10 @@ export function formatCurrency(amount: number, currency: string, compact = false
   const absAmount = Math.abs(amount)
   let formatted: string
 
-  if (compact && absAmount >= 1000) {
+  if (compact && absAmount >= 1_000_000) {
+    const m = absAmount / 1_000_000
+    formatted = m % 1 === 0 ? `${m}M` : `${m.toFixed(1)}M`
+  } else if (compact && absAmount >= 1000) {
     const k = absAmount / 1000
     formatted = k % 1 === 0 ? `${k}K` : `${k.toFixed(1)}K`
   } else {
@@ -75,12 +78,15 @@ export function calcMonthsRemaining(targetDate: string): number {
   return Math.max(0, (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth())
 }
 
-/** Returns an error string if invalid, null if OK. Max 10 million to catch fat-finger entries. */
-export function validateAmount(raw: string): string | null {
+/** Returns an error string if invalid, null if OK. Max 10M (AED) to catch
+ *  fat-finger entries — 100M for PKR, since a legitimate PKR income can
+ *  exceed 10M (≈ AED 132k) while the AED cap stays tight. */
+export function validateAmount(raw: string, currency?: string): string | null {
   const n = parseFloat(raw)
   if (!raw || isNaN(n)) return 'Enter a valid number'
   if (n <= 0) return 'Amount must be greater than 0'
-  if (n > 10_000_000) return 'Amount seems too large — check and re-enter'
+  const cap = currency === 'PKR' ? 100_000_000 : 10_000_000
+  if (n > cap) return 'Amount seems too large — check and re-enter'
   return null
 }
 

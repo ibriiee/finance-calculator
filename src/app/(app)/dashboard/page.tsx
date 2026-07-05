@@ -15,6 +15,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // out of the monthly figure (mixing a cumulative balance into a monthly window is
   // exactly the class of bug that made "yours to keep" go negative before).
   const monthly = (await searchParams).view === 'month'
+  // Month boundary uses server TZ (Vercel = UTC), not the users' Gulf time
+  // (UTC+4) — an entry logged 00:00-04:00 Gulf time can land in the "wrong"
+  // month view. Accepted as cosmetic for a 2-user app (P2-13); not fixed.
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
   const inMonth = (d?: string | null) => !!d && new Date(d) >= monthStart
 
@@ -47,7 +50,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .neq('status', 'cancelled')
       .in('ownership', ['ibrahim', 'abu_bakar', 'shared']),
     supabase.from('sadaka_entries')
-      .select('source_income_id, amount_owed, amount_given, currency, created_at')
+      .select('source_income_id, amount_owed, amount_given, currency, created_at, date_given')
       .eq('owner_id', user!.id)
       .eq('is_joint', false),
     supabase.from('brother_ledger')
@@ -123,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // Cash model: sadaka actually PAID OUT (cash gone, incl. advances). This leaves
   // "yours to keep" because it already left your pocket.
   const sumGiven = (cur: string) => (sadakaEntries ?? [])
-    .filter((e: any) => e.currency === cur && (!monthly || inMonth(e.created_at)))
+    .filter((e: any) => e.currency === cur && (!monthly || inMonth(e.date_given ?? e.created_at)))
     .reduce((s: number, e: any) => s + Number(e.amount_given), 0)
   const sadakaGivenAed = sumGiven('AED') + sumGiven('PKR') * pkrToAed
 

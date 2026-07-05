@@ -35,7 +35,7 @@ export default function LoanForm({ onClose, onSaved }: Props) {
 
   async function save() {
     if (!form.counterparty_name.trim()) { setError('Name is required'); return }
-    const amtErr = validateAmount(form.original_amount)
+    const amtErr = validateAmount(form.original_amount, form.currency_type)
     if (amtErr) { setError(amtErr); return }
     if (!me) return
     setSaving(true); setError('')

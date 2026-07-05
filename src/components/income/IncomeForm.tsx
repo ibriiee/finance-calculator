@@ -14,6 +14,10 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
   const [error, setError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const isEdit = !!editItem
+  // Currency/ownership edits don't reach the sadaka trigger (it only reacts to
+  // amount), so changing either here would silently desync a linked
+  // obligation's currency or split. Lock both once sadaka has been triggered.
+  const sadakaLocked = isEdit && !!editItem?.sadaka_triggered
   const DRAFT_KEY = 'mizan_income_draft'
   const defaultForm = {
     name: editItem?.name ?? '',
@@ -45,7 +49,7 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
 
   async function save() {
     if (!form.name.trim()) { setError('Project name is required'); return }
-    const amtErr = validateAmount(form.amount)
+    const amtErr = validateAmount(form.amount, form.currency)
     if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
@@ -100,8 +104,8 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
               <option value="gift">Gift</option>
               <option value="other">Other</option>
             </select>
-            <select value={form.ownership} onChange={e => F('ownership', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            <select value={form.ownership} onChange={e => F('ownership', e.target.value)} disabled={sadakaLocked}
+              className="px-3 py-3 rounded-xl text-sm disabled:opacity-50" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
               <option value="ibrahim">Ibrahim</option>
               <option value="abu_bakar">Abu Bakar</option>
               <option value="shared">Shared</option>
@@ -109,14 +113,19 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <select value={form.currency} onChange={e => F('currency', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            <select value={form.currency} onChange={e => F('currency', e.target.value)} disabled={sadakaLocked}
+              className="px-3 py-3 rounded-xl text-sm disabled:opacity-50" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
               <option value="AED">AED</option>
               <option value="PKR">PKR</option>
             </select>
             <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
               className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
+          {sadakaLocked && (
+            <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
+              Currency & ownership locked — linked sadaka exists (delete & re-add to change).
+            </p>
+          )}
 
           {/* ── ADVANCED TOGGLE ── */}
           <button type="button" onClick={() => setShowAdvanced(v => !v)}

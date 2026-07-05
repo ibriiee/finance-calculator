@@ -23,7 +23,7 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser }: Prop
   const F = (f: string, v: string) => setForm(p => ({ ...p, [f]: v }))
 
   async function save() {
-    const amtErr = validateAmount(form.amount)
+    const amtErr = validateAmount(form.amount, form.currency)
     if (amtErr) { setError(amtErr); return }
     if (!form.description.trim()) { setError('Description is required'); return }
     if (!otherUser?.id) {

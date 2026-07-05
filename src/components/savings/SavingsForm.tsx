@@ -29,7 +29,7 @@ export default function SavingsForm({ onClose, onSaved, defaults }: Props) {
 
   async function save() {
     if (!form.account_name.trim()) { setError('Account name is required'); return }
-    const amtErr = validateAmount(form.amount)
+    const amtErr = validateAmount(form.amount, form.currency)
     if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()

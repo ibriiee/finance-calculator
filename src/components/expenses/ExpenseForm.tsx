@@ -51,7 +51,7 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
 
   async function save() {
     if (!form.description.trim()) { setError('What was it for?'); return }
-    const amtErr = validateAmount(form.amount)
+    const amtErr = validateAmount(form.amount, form.currency)
     if (amtErr) { setError(amtErr); return }
     if (customCat && !form.custom_category.trim()) { setError('Type your custom category'); return }
     setSaving(true); setError('')

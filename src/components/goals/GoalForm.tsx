@@ -20,7 +20,7 @@ export default function GoalForm({ onClose, onSaved }: Props) {
 
   async function save() {
     if (!form.name.trim()) { setError('Goal name is required'); return }
-    const amtErr = validateAmount(form.target_amount)
+    const amtErr = validateAmount(form.target_amount, form.currency)
     if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()

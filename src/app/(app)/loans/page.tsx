@@ -115,7 +115,7 @@ export default function LoansPage() {
     const repaidPct = original > 0 ? Math.min(100, Math.round((repaid / original) * 100)) : 0
 
     async function logRepayment() {
-      const amtErr = validateAmount(repayAmount)
+      const amtErr = validateAmount(repayAmount, loan.currency_type)
       if (amtErr) { setRepayError(amtErr); return }
       setRepaying(true); setRepayError('')
       const amt = parseFloat(repayAmount)
