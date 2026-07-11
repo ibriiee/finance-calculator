@@ -1007,3 +1007,13 @@ CREATE POLICY "life_events_own" ON public.life_events FOR ALL USING (auth.uid() 
 
 CREATE INDEX IF NOT EXISTS life_events_owner_idx ON public.life_events (owner_id, event_date);
 
+-- ============================================================
+-- SHARED INCOME VISIBILITY (migration 20 — 2026-07-11 audit FIX-23)
+-- A 'shared' income must be readable by BOTH brothers: the dashboard counts
+-- it at 50% each (FIX-07) and the sadaka picker links payments to it.
+-- SELECT-only widening; writes stay owner-only via income_own.
+-- ============================================================
+DROP POLICY IF EXISTS "income_shared_select" ON public.income_projects;
+CREATE POLICY "income_shared_select" ON public.income_projects
+  FOR SELECT USING (auth.uid() = owner_id OR ownership = 'shared');
+
