@@ -10,15 +10,20 @@ Turbopack) + Supabase (auth, Postgres, RLS, realtime) + PWA. Deployed on Vercel 
 
 ---
 
-## ⚠️ OUTSTANDING — read `docs/CTO-AUDIT-2026-07.md` before any new work
-**All P0/P1/P2 fixes from the 2026-07 audit are now landed (2026-07-05).** Two items need
+## ⚠️ OUTSTANDING — read `docs/CTO-AUDIT-2026-07.md` + `docs/CTO-AUDIT-2026-07-11.md` before any new work
+**All fixes from both audits are landed in code (2026-07-11).** Four items need
 **owner action**, not more code:
 1. **Run the pending SQL migrations** in Supabase SQL Editor: `supabase/fix-payment-row-triggers.sql`
-   (check the pre-flight SELECT first) and `supabase/integrity-checks.sql` (migrations 18 & 19).
+   (check the pre-flight SELECT first), `supabase/integrity-checks.sql`, and
+   `supabase/shared-income-visibility.sql` (migrations 18, 19 & 20).
 2. **Enable the keepalive workflow**: add `SUPABASE_URL` + `SUPABASE_ANON_KEY` repo secrets on
    GitHub and confirm `.github/workflows/keepalive.yml` runs green (Actions tab → run manually once).
+3. **Raise Supabase "Max rows" to 10000** (project → Settings → API) so growing tables can't
+   silently truncate totals (backups already paginate past it, this protects page totals too).
+4. **Verify one live repayment**: log a small loan repayment in the app and confirm the row
+   appears in `loan_repayments` — the feature was broken since install (FIX-20, fixed 2026-07-11).
 Deliberately NOT done: P2-12 (removing unused `next-pwa` dependency) — flagged, needs owner
-go-ahead per the no-new-deps rule. Full fix specs, verify steps: `docs/CTO-AUDIT-2026-07.md`.
+go-ahead per the no-new-deps rule. Full fix specs, verify steps: the two audit docs above.
 
 ---
 
@@ -92,6 +97,9 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
     instead of the `amount_owed = 0` payment invariant, letting an `advance_given` payment row get
     corrupted into a phantom obligation (income edit / delete / sadaka-% change). **⚠️ NOT YET
     RUN — owner action needed.** Check the pre-flight SELECT for already-corrupted rows first.
+20. `shared-income-visibility.sql` — SELECT-only RLS widening so a `shared` income is readable
+    by BOTH brothers (dashboard 50% split, sadaka picker, income-name lookup all assumed this;
+    writes stay owner-only). **⚠️ NOT YET RUN — owner action needed.** (2026-07-11 audit FIX-23)
 
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–16 all run as of 2026-06-30** — confirmed by Ibrahim.)
 
@@ -128,6 +136,29 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-11** — **Independent CTO audit #2 (`docs/CTO-AUDIT-2026-07-11.md`) + all its fixes landed.**
+  Verified the entire 2026-07-05 batch against real diffs (18/19 claims correct), then found and
+  fixed: *FIX-20 (P0)* — "Log Repayment" had **never worked**: the insert named a non-existent
+  column (`repayment_date` vs `payment_date`) and omitted NOT-NULL `paid_by_id`, hidden by an
+  `as any` cast (cast removed — tsc now guards the payload). *FIX-21* — backup.mjs + Settings
+  export now **paginate past PostgREST's 1000-row cap** (silent truncation class); owner must also
+  raise Supabase "Max rows" to 10000 (added to MAINTENANCE.md). *FIX-22* — Settings export aborts
+  loudly on any table error (a "successful" backup could contain silently-empty tables); reset
+  reports per-table failures. *FIX-23* — new migration 20 `shared-income-visibility.sql`
+  (**owner must run**): shared income was owner-only under RLS, silently defeating the FIX-07 50%
+  split for the non-adding brother. *FIX-24* — SadakaForm edit status-flips: payment→pending now
+  zeroes `amount_given`/`date_given`; obligation→payment is blocked (would double-count — use
+  "Mark as Given"). *FIX-25* — Zakat page surfaces a failed rates read (was silently computing
+  nisab on hardcoded defaults with no banner) + full-page LoadError on snapshot-load failure.
+  *P2 batch 19-28* — fetchFxRates never substitutes hardcoded constants under `source:'api'`;
+  Savings page got the missing LoadError (transient errors no longer render as "table missing");
+  SettleUpModal checks both writes (no more silent/double settlements); ExpenseForm surfaces IOU
+  creation failures; GoalForm + goal contributions validated & checked; expenses delete aborts if
+  the IOU state can't be read; analytics tiles/trend/location-donut + income header totals now fold
+  PKR (Pakistan sadaka was invisible in the location donut); SadakaForm blocks cross-currency
+  income links (engine scopes by currency — such payments cleared nothing); life-settings DOB +
+  event writes surface errors; dashboard stale-rates banner fires on any folded PKR. Verified:
+  `tsc --noEmit` 0 errors, `npm test` 3/3, `npm run build` clean.
 - **2026-07-05** — **CTO audit fixes Sessions 2-8: everything remaining, all landed in one pass.**
   *FIX-16* — 3 sadaka trigger functions gained `amount_owed > 0` guards so a payment row can never
   be corrupted into a phantom obligation (new `supabase/fix-payment-row-triggers.sql`, same edits

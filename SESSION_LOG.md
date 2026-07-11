@@ -69,3 +69,19 @@
 - Blockers: none — audit only. FIX-16 SQL must run before FIX-17/19 code lands.
 - Next: execute in the doc's session order — Session 1 = FIX-03/05/06 (Haiku), then
   Session 2 = the three owner-run files (FIX-16 triggers, FIX-04 checks, FIX-15 cron).
+
+[2026-07-11]
+- Completed: Independent CTO audit #2 (docs/CTO-AUDIT-2026-07-11.md) — verified the
+  whole 2026-07-05 batch (18/19 claims pass), then landed ALL new fixes: FIX-20 (P0,
+  loan repayment insert never worked — wrong column + missing paid_by_id behind an
+  `as any`), FIX-21/22 (backup & Settings export paginate past the 1000-row cap and
+  abort loudly on errors), FIX-23 (migration 20: shared-income SELECT policy — owner
+  must run), FIX-24 (SadakaForm status-flip edges), FIX-25 (zakat surfaces failed
+  rates read), P2-19..28 batch. tsc 0, npm test 3/3, build clean.
+- Changed files: loans/settings/zakat/savings/expenses/goals/analytics/income/
+  dashboard/life-settings pages, SadakaForm, SettleUpModal, ExpenseForm, GoalForm,
+  api/rates/route.ts, backup.mjs, FRESH-INSTALL.sql, +shared-income-visibility.sql,
+  MAINTENANCE.md, PROJECT_STATUS.md, docs/CTO-AUDIT-2026-07-11.md
+- Blockers: owner actions — run migrations 18/19/20, keepalive secrets, raise
+  Supabase Max rows to 10000, verify one live repayment end-to-end.
+- Next: owner actions above; P2-12 (next-pwa removal) still awaiting go-ahead.
