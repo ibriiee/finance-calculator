@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Scale, CheckCircle2, XCircle, Info } from 'lucide-react'
 import type { ZakatSnapshot } from '@/types/database.types'
 
@@ -29,15 +30,23 @@ export default function ZakatPage() {
   const [saving, setSaving] = useState(false)
   const [zakatError, setZakatError] = useState<string | null>(null)
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [ratesFailed, setRatesFailed] = useState(false)
   const supabase = createClient()
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    const [{ data: snaps }, { data: profile }, { data: rCache }] = await Promise.all([
+    const [{ data: snaps, error: snapsErr }, { data: profile }, { data: rCache, error: ratesErr }] = await Promise.all([
       supabase.from('zakat_snapshots').select('*').eq('owner_id', user!.id).order('created_at', { ascending: false }),
       supabase.from('profiles').select('hawl_start_date, nisab_basis').eq('id', user!.id).single(),
       supabase.from('rates_cache').select('*'),
     ])
+    if (snapsErr) { setLoadError(true); setLoading(false); return }
+    setLoadError(false)
+    // A failed/empty rates read must be VISIBLE — otherwise the nisab silently
+    // computes on the hardcoded defaults with no stale banner (FIX-25: the
+    // banner keys off ratesUpdatedAt, which stays null on a failed read).
+    setRatesFailed(!!ratesErr || !rCache || rCache.length === 0)
     setSnapshots(snaps ?? [])
     setHawlStart(profile?.hawl_start_date ?? null)
     setNisabBasis(((profile as any)?.nisab_basis ?? 'silver') as 'silver' | 'gold')
@@ -137,10 +146,23 @@ export default function ZakatPage() {
   ]
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Zakat" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
       <ModuleHeader title="Zakat" subtitle="Hanafi · 2.5% on net wealth" />
+
+      {/* Rates read failed — the calculator is silently on built-in defaults */}
+      {ratesFailed && (
+        <div className="rounded-xl px-4 py-2.5 text-xs" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B' }}>
+          ⚠ Couldn't load live rates — using built-in defaults. Reload before trusting the nisab.
+        </div>
+      )}
 
       {/* Stale-rate banner — a borderline nisab call on old rates is a fiqh risk */}
       {ratesUpdatedAt && (Date.now() - new Date(ratesUpdatedAt).getTime() > 7 * 24 * 60 * 60 * 1000) && (
