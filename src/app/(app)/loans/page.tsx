@@ -120,9 +120,9 @@ export default function LoansPage() {
       setRepaying(true); setRepayError('')
       const amt = parseFloat(repayAmount)
       const { error } = await supabase.from('loan_repayments').insert({
-        loan_id: loan.id, amount: amt,
-        repayment_date: repayDate, notes: null,
-      } as any)
+        loan_id: loan.id, amount: amt, paid_by_id: userId,
+        payment_date: repayDate, notes: null,
+      })
       if (error) { setRepaying(false); setRepayError('Could not save repayment: ' + error.message); return }
       const newRepaid = repaid + amt
       const newStatus = newRepaid >= original ? 'cleared' : 'partial'
