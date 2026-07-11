@@ -83,22 +83,34 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
 
     // Shared → the brother owes me his share. Create one brother_ledger IOU
     // (only on create, to avoid duplicating on edit — edit keeps it simple).
+    // Every step is checked: the expense is already saved at this point, so a
+    // silent IOU failure would leave the brother's share untracked (P2-22).
     if (!isEdit && form.is_shared && theirShare > 0) {
-      const { data: other } = await supabase.from('profiles').select('id').neq('id', user!.id).single()
-      if (other) {
-        const { data: led } = await supabase.from('brother_ledger').insert({
-          from_user_id: user!.id,        // I paid → I'm owed
-          to_user_id: other.id,          // brother owes his share
-          amount: theirShare,
-          currency: form.currency as 'AED' | 'PKR',
-          category: 'shared_cost',
-          description: `Shared: ${form.description.trim()}`,
-          transaction_date: form.expense_date,
-          source_type: 'shared_split',
-          source_id: expenseId ?? null,
-          is_settled: false,
-        }).select('id').single()
-        if (led) await supabase.from('expenses').update({ ledger_entry_id: led.id }).eq('id', expenseId!)
+      const iouFail = (msg: string) => {
+        setSaving(false)
+        onSaved()   // refresh the list — the expense itself DID save
+        setError(`Expense saved, but the IOU for your brother could NOT be created (${msg}). Delete this expense and re-add it.`)
+      }
+      const { data: other, error: profErr } = await supabase.from('profiles').select('id').neq('id', user!.id).single()
+      if (profErr || !other) { iouFail(profErr?.message ?? 'brother profile not found'); return }
+      const { data: led, error: ledErr } = await supabase.from('brother_ledger').insert({
+        from_user_id: user!.id,        // I paid → I'm owed
+        to_user_id: other.id,          // brother owes his share
+        amount: theirShare,
+        currency: form.currency as 'AED' | 'PKR',
+        category: 'shared_cost',
+        description: `Shared: ${form.description.trim()}`,
+        transaction_date: form.expense_date,
+        source_type: 'shared_split',
+        source_id: expenseId ?? null,
+        is_settled: false,
+      }).select('id').single()
+      if (ledErr || !led) { iouFail(ledErr?.message ?? 'no row returned'); return }
+      const { error: linkErr } = await supabase.from('expenses').update({ ledger_entry_id: led.id }).eq('id', expenseId!)
+      if (linkErr) {
+        setSaving(false); onSaved()
+        setError(`Saved, but the expense could not be linked to its IOU (${linkErr.message}) — deleting this expense later will NOT remove the IOU automatically.`)
+        return
       }
     }
 

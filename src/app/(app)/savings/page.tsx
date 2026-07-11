@@ -5,6 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadError from '@/components/shared/LoadError'
 import { Plus, PiggyBank, MapPin, ArrowDownCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
 import SavingsForm from '@/components/savings/SavingsForm'
 import type { SavingsEntry } from '@/types/database.types'
@@ -14,6 +15,7 @@ export default function SavingsPage() {
   const [entries, setEntries] = useState<SavingsEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [formDefaults, setFormDefaults] = useState<{ account_name?: string; location?: string; currency?: string } | undefined>()
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -21,7 +23,15 @@ export default function SavingsPage() {
   async function load() {
     const { data, error } = await supabase.from('savings_entries')
       .select('*').order('entry_date', { ascending: false })
-    if (error) setTableMissing(true)
+    if (error) {
+      // Only a missing relation means "migration not run" — anything else is a
+      // transient failure and must show the retry banner, not a fake state (P2-20).
+      if (error.code === '42P01' || error.code === 'PGRST205') setTableMissing(true)
+      else setLoadError(true)
+      setLoading(false)
+      return
+    }
+    setLoadError(false)
     setEntries((data as any) ?? [])
     setLoading(false)
   }
@@ -48,6 +58,12 @@ export default function SavingsPage() {
     .reduce((t, s) => t + s.balance, 0)
 
   if (loading) return <LoadingSpinner />
+  if (loadError) return (
+    <div className="flex flex-col gap-4 animate-slide-up">
+      <ModuleHeader title="Savings" />
+      <LoadError onRetry={load} />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">

@@ -236,10 +236,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </form>
       </div>
 
-      {/* Stale exchange-rate warning */}
-      {ratesStale && sadakaOwedPkr > 0 && (
+      {/* Stale exchange-rate warning — shown whenever ANY PKR amount is being
+          folded at the cached rate, not just pending PKR sadaka (P2-28) */}
+      {ratesStale && (anyPkrFolded || sadakaOwedPkr > 0) && (
         <div className="rounded-xl px-4 py-2.5 text-xs" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B' }}>
-          ⚠ Exchange rates may be stale — PKR sadaka converted at last known rate. Refresh in Settings → Currencies.
+          ⚠ Exchange rates may be stale — PKR amounts converted at last known rate. Refresh in Settings → Currencies.
         </div>
       )}
 

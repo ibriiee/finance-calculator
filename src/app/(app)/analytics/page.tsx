@@ -63,8 +63,11 @@ export default function AnalyticsPage() {
     </div>
   )
 
-  const aed = (arr: any[], f: (x: any) => number) => arr.filter(x => x.currency === 'AED').reduce((s, x) => s + f(x), 0)
   const toAed = (amount: number, cur: string) => cur === 'PKR' ? amount * pkrToAed : cur === 'AED' ? amount : 0
+  // Sum an array folding PKR→AED. These tiles/donuts were previously AED-only,
+  // which zeroed out PKR sadaka (most Pakistan giving) while the Net Position
+  // card right below converted PKR properly (P2-25).
+  const sumAed = (arr: any[], f: (x: any) => number) => arr.reduce((s, x) => s + toAed(f(x), x.currency), 0)
 
   // ---- Period scoping ----
   const now = new Date()
@@ -76,11 +79,11 @@ export default function AnalyticsPage() {
   const periodIncome = income.filter(x => inPeriod(x.work_completed_date ?? x.created_at))
   const periodSadakaGiven = sadaka.filter(x => Number(x.amount_given) > 0 && inPeriod(x.date_given ?? x.created_at))
 
-  const earned = aed(periodIncome, x => Number(x.amount))
-  const received = aed(periodIncome.filter(x => x.status === 'received'), x => Number(x.amount))
-  const sadakaGiven = aed(periodSadakaGiven, x => Number(x.amount_given))
+  const earned = sumAed(periodIncome, x => Number(x.amount))
+  const received = sumAed(periodIncome.filter(x => x.status === 'received'), x => Number(x.amount))
+  const sadakaGiven = sumAed(periodSadakaGiven, x => Number(x.amount_given))
   // Pending is a "right now" number — always all-time net
-  const sadakaPending = Math.max(0, aed(sadaka, x => Number(x.amount_owed)) - aed(sadaka, x => Number(x.amount_given)))
+  const sadakaPending = Math.max(0, sumAed(sadaka, x => Number(x.amount_owed)) - sumAed(sadaka, x => Number(x.amount_given)))
   const givenPct = earned > 0 ? Math.round((sadakaGiven / earned) * 100) : 0
 
   // ---- Trend buckets ----
@@ -100,13 +103,13 @@ export default function AnalyticsPage() {
     const d = new Date(dateStr)
     return period === 'monthly' ? `${d.getFullYear()}-${d.getMonth()}` : `${d.getFullYear()}`
   }
-  income.filter(x => x.currency === 'AED').forEach(x => {
+  income.forEach(x => {
     const m = trend.find(mo => mo.key === bucket(x.work_completed_date ?? x.created_at))
-    if (m) m.earned += Number(x.amount)
+    if (m) m.earned += toAed(Number(x.amount), x.currency)
   })
-  sadaka.filter(x => x.currency === 'AED' && x.amount_given > 0).forEach(x => {
+  sadaka.filter(x => x.amount_given > 0).forEach(x => {
     const m = trend.find(mo => mo.key === bucket(x.date_given ?? x.created_at))
-    if (m) m.sadaka += Number(x.amount_given)
+    if (m) m.sadaka += toAed(Number(x.amount_given), x.currency)
   })
 
   // ---- Net position (loans & debts included → profit or loss?) ----
@@ -146,7 +149,7 @@ export default function AnalyticsPage() {
   const locColors: Record<string, string> = { UAE: '#C9A84C', Pakistan: '#10B981', other: '#7C6A2D' }
   const byLoc: Record<string, number> = {}
   sadaka.forEach(x => {
-    const v = aed([x], xx => Number(xx.amount_given))
+    const v = toAed(Number(x.amount_given), x.currency)
     if (v > 0) { const l = x.location ?? 'other'; byLoc[l] = (byLoc[l] ?? 0) + v }
   })
   const locSegments = Object.entries(byLoc).map(([label, value]) => ({ label, value, color: locColors[label] ?? '#7C6A2D' }))

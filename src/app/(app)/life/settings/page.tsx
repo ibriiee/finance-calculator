@@ -65,11 +65,12 @@ export default function LifeSettingsPage() {
   async function saveProfile() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').update({
       date_of_birth: dob || null,
       life_expectancy_years: years || 63,
     }).eq('id', user!.id)
     setSaving(false)
+    if (error) { alert('Could not save: ' + error.message); return }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -86,11 +87,10 @@ export default function LifeSettingsPage() {
       recurrence: form.recurrence,
       notes: form.notes.trim() || null,
     }
-    if (editingId) {
-      await supabase.from('life_events').update(payload).eq('id', editingId)
-    } else {
-      await supabase.from('life_events').insert({ owner_id: user!.id, ...payload })
-    }
+    const { error } = editingId
+      ? await supabase.from('life_events').update(payload).eq('id', editingId)
+      : await supabase.from('life_events').insert({ owner_id: user!.id, ...payload })
+    if (error) { setAdding(false); alert('Could not save event: ' + error.message); return }
     setForm(blank)
     setEditingId(null)
     await load()
@@ -99,7 +99,8 @@ export default function LifeSettingsPage() {
 
   async function deleteEvent(id: string) {
     if (!confirm('Delete this event?')) return
-    await supabase.from('life_events').delete().eq('id', id)
+    const { error } = await supabase.from('life_events').delete().eq('id', id)
+    if (error) { alert('Could not delete: ' + error.message); return }
     setEvents(e => e.filter(x => x.id !== id))
   }
 

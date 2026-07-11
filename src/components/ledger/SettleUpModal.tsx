@@ -13,35 +13,35 @@ interface Props {
 export default function SettleUpModal({ onClose, onSaved, userId, aedBalance, pkrBalance }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [method, setMethod] = useState<'cash' | 'bank_transfer' | 'goods'>('cash')
   const [notes, setNotes] = useState('')
 
+  // Returns an error string, or null on success. Both writes are checked —
+  // a failed settlement must never close the modal looking settled (P2-21).
+  async function settleCurrency(currency: 'AED' | 'PKR', balance: number) {
+    const { data: settlement, error: insErr } = await supabase.from('ledger_settlements').insert({
+      settled_by_id: userId, currency,
+      amount: Math.abs(balance), settlement_method: method,
+      settlement_date: new Date().toISOString().split('T')[0], notes,
+    }).select().single()
+    if (insErr || !settlement) return `Could not record the ${currency} settlement: ${insErr?.message ?? 'no row returned'}`
+    const { error: updErr } = await supabase.from('brother_ledger')
+      .update({ is_settled: true, settlement_id: settlement.id })
+      .eq('currency', currency).eq('is_settled', false)
+    if (updErr) return `${currency} settlement was recorded, but the ledger entries could not be marked settled: ${updErr.message}. Check the ledger before retrying — a retry would record a second settlement.`
+    return null
+  }
+
   async function settle() {
-    setSaving(true)
-    // Create settlement records for each currency with outstanding balance
+    setSaving(true); setError('')
     if (aedBalance !== 0) {
-      const { data: settlement } = await supabase.from('ledger_settlements').insert({
-        settled_by_id: userId, currency: 'AED',
-        amount: Math.abs(aedBalance), settlement_method: method,
-        settlement_date: new Date().toISOString().split('T')[0], notes,
-      }).select().single()
-      if (settlement) {
-        await supabase.from('brother_ledger')
-          .update({ is_settled: true, settlement_id: settlement.id })
-          .eq('currency', 'AED').eq('is_settled', false)
-      }
+      const err = await settleCurrency('AED', aedBalance)
+      if (err) { setSaving(false); setError(err); return }
     }
     if (pkrBalance !== 0) {
-      const { data: settlement } = await supabase.from('ledger_settlements').insert({
-        settled_by_id: userId, currency: 'PKR',
-        amount: Math.abs(pkrBalance), settlement_method: method,
-        settlement_date: new Date().toISOString().split('T')[0], notes,
-      }).select().single()
-      if (settlement) {
-        await supabase.from('brother_ledger')
-          .update({ is_settled: true, settlement_id: settlement.id })
-          .eq('currency', 'PKR').eq('is_settled', false)
-      }
+      const err = await settleCurrency('PKR', pkrBalance)
+      if (err) { setSaving(false); setError(err); return }
     }
     setSaving(false); onSaved(); onClose()
   }
@@ -76,6 +76,12 @@ export default function SettleUpModal({ onClose, onSaved, userId, aedBalance, pk
 
           <input placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)}
             className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+
+          {error && (
+            <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>
+              ⚠ {error}
+            </div>
+          )}
 
           <button onClick={settle} disabled={saving}
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"

@@ -37,7 +37,13 @@ export default function ExpensesPage() {
     // delete a SETTLED IOU, that would erase the record of a debt that was
     // actually paid. Only an open (unsettled) IOU dies with its expense.
     if (e.ledger_entry_id) {
-      const { data: ledgerEntry } = await supabase.from('brother_ledger').select('is_settled').eq('id', e.ledger_entry_id).single()
+      const { data: ledgerEntry, error: fetchErr } = await supabase.from('brother_ledger').select('is_settled').eq('id', e.ledger_entry_id).single()
+      // PGRST116 = zero rows (IOU already gone) — fine. Any other error means
+      // we can't KNOW the IOU state; deleting anyway would strand it (P2-24).
+      if (fetchErr && fetchErr.code !== 'PGRST116') {
+        alert('Could not check the linked ledger entry: ' + fetchErr.message + '\nNothing was deleted — try again.')
+        return
+      }
       if (ledgerEntry && !ledgerEntry.is_settled) {
         const { error: ledgerErr } = await supabase.from('brother_ledger').delete().eq('id', e.ledger_entry_id)
         if (ledgerErr) { alert('Could not delete linked ledger entry: ' + ledgerErr.message); return }

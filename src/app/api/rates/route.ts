@@ -79,11 +79,12 @@ async function fetchFxRates(): Promise<{ pkrToUsd: number; usdToAed: number } | 
   try {
     const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD', { next: { revalidate: 3600 } })
     const data = await res.json()
-    if (data.rates) {
-      return {
-        pkrToUsd: data.rates.PKR ? 1 / data.rates.PKR : FALLBACK_PKR_TO_USD,
-        usdToAed: data.rates.AED ?? FALLBACK_USD_TO_AED,
-      }
+    // Both keys must be real numbers from the API — substituting a hardcoded
+    // fallback here would get written with source:'api' and a fresh
+    // updated_at, the exact overwrite class FIX-01 step 4b bans (P2-19).
+    if (typeof data?.rates?.PKR === 'number' && data.rates.PKR > 0
+      && typeof data?.rates?.AED === 'number' && data.rates.AED > 0) {
+      return { pkrToUsd: 1 / data.rates.PKR, usdToAed: data.rates.AED }
     }
     return null
   } catch {

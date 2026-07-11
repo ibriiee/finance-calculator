@@ -24,7 +24,7 @@ export default function GoalForm({ onClose, onSaved }: Props) {
     if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('financial_goals').insert({
+    const { error: err } = await supabase.from('financial_goals').insert({
       owner_id: form.goal_type === 'individual' ? user!.id : null,
       goal_type: form.goal_type, name: form.name,
       target_amount: parseFloat(form.target_amount), currency: form.currency as any,
@@ -33,7 +33,9 @@ export default function GoalForm({ onClose, onSaved }: Props) {
       auto_pct: form.auto_pct ? parseFloat(form.auto_pct) / 100 : null,
       is_active: true,
     })
-    setSaving(false); onSaved(); onClose()
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onSaved(); onClose()
   }
 
   return (

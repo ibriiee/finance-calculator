@@ -26,17 +26,20 @@ export default function IncomePage() {
   const [showNet, setShowNet] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [visible, setVisible] = useState(50)
+  const [pkrToAed, setPkrToAed] = useState(0.0132)
   const supabase = createClient()
 
   useEffect(() => { setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
 
   async function load() {
-    const [{ data, error }, { data: sadaka }] = await Promise.all([
+    const [{ data, error }, { data: sadaka }, { data: rate }] = await Promise.all([
       supabase.from('income_projects').select('*').order('created_at', { ascending: false }),
       supabase.from('sadaka_entries').select('*'),
+      supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
     ])
     if (error) { setLoadError(true); setLoading(false); return }
     setLoadError(false)
+    if (rate?.rate_value) setPkrToAed(Number(rate.rate_value))
     setItems(data ?? [])
     // Resolve via the shared engine so per-income sadaka matches the Sadaka page exactly.
     const computed = computeSadaka((sadaka as any[]) ?? [])
@@ -91,8 +94,11 @@ export default function IncomePage() {
   const filtered = filter === 'all' ? items
     : items.filter(i => filter === 'pending' ? !isReceivedItem(i) : isReceivedItem(i))
 
-  const totalEarned = items.filter(i => i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
-  const totalPending = items.filter(i => !isReceivedItem(i) && i.currency === 'AED').reduce((s, i) => s + i.amount, 0)
+  // Fold PKR at the cached rate — these tiles were AED-only, silently dropping
+  // PKR income from the header totals (P2-25).
+  const toAed = (n: number, cur: string) => cur === 'PKR' ? n * pkrToAed : n
+  const totalEarned = items.reduce((s, i) => s + toAed(Number(i.amount), i.currency), 0)
+  const totalPending = items.filter(i => !isReceivedItem(i)).reduce((s, i) => s + toAed(Number(i.amount), i.currency), 0)
 
   if (loading) return <LoadingSpinner />
   if (loadError) return (
@@ -120,7 +126,7 @@ export default function IncomePage() {
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card p-3">
-          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Earned (AED)</p>
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Earned</p>
           <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
             {formatCurrency(totalEarned, 'AED', true)}
           </p>

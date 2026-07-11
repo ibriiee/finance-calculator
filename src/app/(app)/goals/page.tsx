@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency, shortDate, calcMonthsRemaining } from '@/lib/utils'
+import { formatCurrency, shortDate, calcMonthsRemaining, validateAmount } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
@@ -50,13 +50,16 @@ export default function GoalsPage() {
   useEffect(() => { load() }, [])
 
   async function addContribution(goalId: string) {
-    if (!contribAmount) return
-    await supabase.from('goal_contributions').insert({
+    const goal = goals.find(g => g.id === goalId)
+    const amtErr = validateAmount(contribAmount, goal?.currency)
+    if (amtErr) { alert(amtErr); return }
+    const { error } = await supabase.from('goal_contributions').insert({
       goal_id: goalId, contributor_id: userId,
       amount: parseFloat(contribAmount),
       contribution_date: new Date().toISOString().split('T')[0],
       source: 'manual',
     })
+    if (error) { alert('Could not save contribution: ' + error.message); return }
     setContributing(null); setContribAmount(''); load()
   }
 
