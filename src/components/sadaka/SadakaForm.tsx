@@ -91,6 +91,19 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     if (form.on_behalf === 'other' && !other) {
       setError('Your brother\'s profile isn\'t loaded yet.'); return
     }
+    // A payment linked to an income must match that income's obligation
+    // currency — the sadaka engine scopes by owner+currency, so a
+    // cross-currency link would never clear anything (P2-26).
+    const paymentIntent = form.status === 'given' || form.status === 'advance_given'
+      || (isEdit && Number(editItem.amount_owed) === 0 && Number(editItem.amount_given) > 0)
+    if (paymentIntent && form.from_income_id) {
+      const sameCur = outstanding.get(`${form.from_income_id}|${form.currency}`)
+      const anyRemaining = remainingForIncome(outstanding, form.from_income_id)
+      if (anyRemaining > 0 && (!sameCur || sameCur.remaining <= 0)) {
+        setError(`This income's sadaka is due in a different currency than ${form.currency} — switch the currency above or unlink the income.`)
+        return
+      }
+    }
     setSaving(true); setError('')
     const amount = parseFloat(form.amount_owed)
 
@@ -102,6 +115,15 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
       const wasPayment = Number(editItem.amount_owed) === 0 && Number(editItem.amount_given) > 0
       const statusChanged = form.status !== editItem.status
       const willBePayment = statusChanged ? (form.status === 'given' || form.status === 'advance_given') : wasPayment
+
+      if (statusChanged && willBePayment && !wasPayment) {
+        // Converting an obligation into a payment removes the owed amount AND
+        // adds a given amount — pending would drop by double the figure. The
+        // card's "Mark as Given" button is the correct flow (FIX-24).
+        setSaving(false)
+        setError('To record this obligation as given, use "Mark as Given" on its card — converting it here would double-count.')
+        return
+      }
 
       const payload: any = {
         currency: form.currency,
@@ -123,8 +145,15 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
         payload.date_given = editItem.date_given ?? new Date().toISOString().split('T')[0]
       } else {
         payload.amount_owed = amount
-        // amount_given / date_given deliberately omitted: an obligation-only
-        // edit must never touch what's already been paid toward it.
+        if (wasPayment && statusChanged) {
+          // Payment demoted to an obligation: the user is saying this money was
+          // never actually given — clear the payment facts too, or the row
+          // becomes a self-cancelling obligation (FIX-24).
+          payload.amount_given = 0
+          payload.date_given = null
+        }
+        // amount_given / date_given otherwise deliberately omitted: an
+        // obligation-only edit must never touch what's already been paid.
       }
 
       if (behalfTouched) {
