@@ -26,6 +26,7 @@ When paused, the app loads but shows no data / errors on login.
 
 | How often | Do this | Where |
 |-----------|---------|-------|
+| **Once — do it now** | Raise the database's "Max rows" API limit to **10000** (protects totals & backups as data grows over the years) | supabase.com → project → Settings → API → Max rows |
 | Every few days | Open the app (keeps Supabase awake) | the app |
 | Monthly | Export a data backup (JSON) | Settings → Data backup |
 | When PKR/gold/silver move a lot | Refresh exchange & metal rates | Settings → Currencies |

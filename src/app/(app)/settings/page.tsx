@@ -146,20 +146,39 @@ export default function SettingsPage() {
     'wasiyya_entries', 'joint_accounts', 'joint_account_txns', 'savings_entries', 'expenses', 'life_events',
   ]
 
+  // Fetch every row of a table, paged past PostgREST's max-rows cap (default
+  // 1000) so a big table can never silently truncate a backup. Throws on any
+  // error so a failed read can't masquerade as an empty table.
+  async function fetchAllRows(table: string) {
+    const PAGE = 1000
+    const rows: any[] = []
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase.from(table).select('*')
+        .order('id', { ascending: true }).range(from, from + PAGE - 1)
+      if (error) throw new Error(`${table}: ${error.message}`)
+      rows.push(...(data ?? []))
+      if ((data ?? []).length < PAGE) break
+    }
+    return rows
+  }
+
   async function exportData() {
     setBusy('export')
-    const backup: Record<string, any> = { exported_at: new Date().toISOString(), tables: {} }
-    for (const t of DATA_TABLES) {
-      const { data } = await supabase.from(t).select('*')
-      backup.tables[t] = data ?? []
+    try {
+      const backup: Record<string, any> = { exported_at: new Date().toISOString(), tables: {} }
+      for (const t of DATA_TABLES) {
+        backup.tables[t] = await fetchAllRows(t)
+      }
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      alert(`Backup failed — file NOT saved.\n${e.message}\nTry again in a moment.`)
     }
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
     setBusy(null)
   }
 
@@ -170,25 +189,28 @@ export default function SettingsPage() {
 
   async function exportExcel() {
     setBusy('excel')
-    let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>'
-    for (const t of DATA_TABLES) {
-      const { data } = await supabase.from(t).select('*')
-      const rows = (data as any[]) ?? []
-      html += `<h3>${t}</h3>`
-      if (rows.length === 0) { html += '<p>(no data)</p>'; continue }
-      const cols = Object.keys(rows[0])
-      html += '<table border="1"><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>'
-      rows.forEach(r => { html += '<tr>' + cols.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>' })
-      html += '</table><br/>'
+    try {
+      let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>'
+      for (const t of DATA_TABLES) {
+        const rows = await fetchAllRows(t)
+        html += `<h3>${t}</h3>`
+        if (rows.length === 0) { html += '<p>(no data)</p>'; continue }
+        const cols = Object.keys(rows[0])
+        html += '<table border="1"><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>'
+        rows.forEach(r => { html += '<tr>' + cols.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>' })
+        html += '</table><br/>'
+      }
+      html += '</body></html>'
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.xls`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      alert(`Backup failed — file NOT saved.\n${e.message}\nTry again in a moment.`)
     }
-    html += '</body></html>'
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.xls`
-    a.click()
-    URL.revokeObjectURL(url)
     setBusy(null)
   }
 
@@ -196,12 +218,18 @@ export default function SettingsPage() {
     const ok = prompt('This permanently deletes ALL financial data (income, sadaka, ledger, joint account, zakat, goals, loans, splits, wasiyya, recipients, life events). Your account & settings stay.\n\n⚠ Shared records (ledger, joint account, splits, shared sadaka) are deleted for BOTH of you — make sure your brother is okay with this and export a backup first.\n\nType DELETE to confirm.')
     if (ok !== 'DELETE') return
     setBusy('reset')
+    const failed: string[] = []
     for (const t of DATA_TABLES) {
       // delete every row the current policies allow this user to remove
-      await supabase.from(t).delete().not('id', 'is', null)
+      const { error } = await supabase.from(t).delete().not('id', 'is', null)
+      if (error) failed.push(`${t}: ${error.message}`)
     }
     setBusy(null)
-    alert('All test data cleared. You can now start with real data.')
+    if (failed.length) {
+      alert('Reset finished WITH ERRORS — these tables may still hold data:\n' + failed.join('\n'))
+    } else {
+      alert('All test data cleared. You can now start with real data.')
+    }
   }
 
   if (loading) return <LoadingSpinner />

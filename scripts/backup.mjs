@@ -73,17 +73,28 @@ async function main() {
 
   const dump = { _meta: { app: 'mizan', takenAt: new Date().toISOString(), projectUrl: url }, tables: {} }
   let total = 0
+  // PostgREST caps a single select at max-rows (default 1000) — page through
+  // every table so a big table (expenses after a few years) can't silently
+  // truncate the backup. Ordered by id so pages never overlap or skip.
+  const PAGE = 1000
   for (const t of TABLES) {
-    const { data, error } = await db.from(t).select('*')
+    const rows = []
+    let error = null
+    for (let from = 0; ; from += PAGE) {
+      const res = await db.from(t).select('*').order('id', { ascending: true }).range(from, from + PAGE - 1)
+      if (res.error) { error = res.error; break }
+      rows.push(...res.data)
+      if (res.data.length < PAGE) break
+    }
     if (error) {
       // A table missing just means that migration hasn't run — warn, don't abort.
       console.warn(`  ! ${t}: ${error.message} (skipped)`)
       dump.tables[t] = []
       continue
     }
-    dump.tables[t] = data
-    total += data.length
-    console.log(`  ✓ ${t}: ${data.length}`)
+    dump.tables[t] = rows
+    total += rows.length
+    console.log(`  ✓ ${t}: ${rows.length}`)
   }
 
   // id<->email map for restore remapping (profiles has both)
