@@ -6,23 +6,20 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Hourglass, Settings, Bell, X, CalendarDays, Pencil } from 'lucide-react'
+import { Hourglass, Settings, Bell, X, CalendarDays, Pencil, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react'
 import {
   deathDate, daysLeft, weeksLeft, monthsLeft, weeksLived, totalWeeks, percentLived,
   weekIndexOf, nextOccurrence, weekStartDate, ageAtWeek, weekOfYear,
 } from '@/lib/lifeMath'
-import { islamicHolidaysBetween, toHijri, fromHijri, hijriLabel, ISLAMIC_HOLIDAYS } from '@/lib/hijri'
+import { islamicHolidaysBetween, toHijri, fromHijri, hijriLabel, hijriDay, isWhiteDay, markCovers, ISLAMIC_HOLIDAYS, type HijriMark } from '@/lib/hijri'
 import type { LifeEvent } from '@/types/database.types'
 
-type View = 'all' | 'plain' | 'decades'
-const VIEWS: { key: View; label: string }[] = [
-  { key: 'all', label: 'Events' },
-  { key: 'plain', label: 'Plain' },
-  { key: 'decades', label: 'Decades' },
-]
+// View keys: 'all' | 'plain' | 'decades' | 'cat:<category>' (category lenses are data-driven).
 // Subtle per-decade palette for the "Decades" view (index = age / 10).
 const DECADE_COLORS = ['#C9A84C', '#D4A017', '#10B981', '#3B82F6', '#A855F7', '#EC4899', '#EF4444', '#14B8A6', '#F59E0B', '#8B5CF6', '#06B6D4', '#84CC16']
 const MS_DAY = 86_400_000
+// 6-digit hex + alpha suffix for period tints (event colours are hex swatches/picker output).
+const hexA = (c: string, a: string) => (c.length === 7 ? c + a : c)
 
 export default function LifePage() {
   const supabase = createClient()
@@ -31,7 +28,8 @@ export default function LifePage() {
   const [dob, setDob] = useState<string | null>(null)
   const [years, setYears] = useState(63)
   const [events, setEvents] = useState<LifeEvent[]>([])
-  const [view, setView] = useState<View>('all')
+  const [view, setView] = useState('all')
+  const [gridPrefs, setGridPrefs] = useState({ plain: true, decades: true })
   const [selected, setSelected] = useState<number | null>(null)
   const [yearExpanded, setYearExpanded] = useState(false)
   const [calMonth, setCalMonth] = useState(() => {
@@ -43,7 +41,10 @@ export default function LifePage() {
   })
   const [showIslamic, setShowIslamic] = useState(false)
 
-  useEffect(() => { setShowIslamic(localStorage.getItem('mizan_islamic_dates') !== '0') }, [])
+  useEffect(() => {
+    setShowIslamic(localStorage.getItem('mizan_islamic_dates') !== '0')
+    try { setGridPrefs(p => ({ ...p, ...JSON.parse(localStorage.getItem('mizan_life_views') ?? '{}') })) } catch {}
+  }, [])
 
   // Islamic markers across the whole lifespan: preset holidays (toggle) + any
   // Hijri-recurring events (e.g. a Zakat date) repeated on every lunar anniversary.
@@ -54,13 +55,20 @@ export default function LifePage() {
     const dobD = new Date(dob)
     const death = deathDate(dobD, years)
     const total = totalWeeks(years)
-    const push = (date: Date, label: string, color: string) => {
-      const wi = weekIndexOf(dobD, date)
+    const pushW = (wi: number, label: string, color: string) => {
       if (wi < 0 || wi >= total) return
       const arr = m.get(wi) ?? []
-      arr.push({ label, color }); m.set(wi, arr)
+      if (!arr.some(x => x.label === label)) arr.push({ label, color })
+      m.set(wi, arr)
     }
-    if (showIslamic) for (const h of islamicHolidaysBetween(dobD, death)) push(h.date, h.label, h.color)
+    const push = (date: Date, label: string, color: string) => pushW(weekIndexOf(dobD, date), label, color)
+    if (showIslamic) for (const h of islamicHolidaysBetween(dobD, death)) {
+      if (h.end) {
+        // Span (Ramadan, Dhul Hijjah 1–9, 9–10 Muharram): colour EVERY week it touches.
+        const w1 = weekIndexOf(dobD, new Date(h.end.getTime() - MS_DAY))
+        for (let wi = weekIndexOf(dobD, h.date); wi <= w1; wi++) pushW(wi, h.label, h.color)
+      } else push(h.date, h.label, h.color)
+    }
     for (const ev of events.filter(e => e.recurrence === 'hijri_yearly')) {
       const h = toHijri(new Date(ev.event_date))
       for (let y = toHijri(dobD).y; y <= toHijri(death).y; y++) push(fromHijri(y, h.m, h.day), ev.label, ev.color)
@@ -120,8 +128,9 @@ export default function LifePage() {
   const remainingCells = Math.max(0, total - lived)
 
   // Islamic holidays (if toggled) + Hijri-recurring events, as dated markers in a range.
-  function eventsBetween(start: Date, end: Date): { date: Date; label: string; color: string }[] {
-    const out: { date: Date; label: string; color: string }[] = []
+  // Islamic spans carry an exclusive `end` (Ramadan covers its whole month).
+  function eventsBetween(start: Date, end: Date): HijriMark[] {
+    const out: HijriMark[] = []
     if (showIslamic) out.push(...islamicHolidaysBetween(start, end))
     for (const ev of events.filter(e => e.recurrence === 'hijri_yearly')) {
       const h = toHijri(new Date(ev.event_date))
@@ -140,11 +149,38 @@ export default function LifePage() {
   // This calendar year progress
   const yearWeek = Math.min(52, weekOfYear(now))
 
-  // Map each event to its week-cell. Last write wins.
+  // Point events land on one week-cell (last write wins); events with an
+  // end_date are PERIODS spanning a run of weeks (course, job, city).
   const eventByWeek = new Map<number, LifeEvent>()
+  const periods: { ev: LifeEvent; w0: number; w1: number }[] = []
   for (const ev of events) {
     const wi = weekIndexOf(dobDate, new Date(ev.event_date))
-    if (wi < total) eventByWeek.set(wi, ev)
+    if (wi >= total) continue
+    if (ev.end_date) periods.push({ ev, w0: wi, w1: Math.min(total - 1, weekIndexOf(dobDate, new Date(ev.end_date))) })
+    else eventByWeek.set(wi, ev)
+  }
+
+  // Data-driven view tabs: Events, then one lens per category, then the
+  // settings-toggleable Plain/Decades. Unknown active view falls back to Events.
+  const cats = [...new Set(events.map(e => e.category).filter((c): c is string => !!c))]
+  const views: { key: string; label: string }[] = [
+    { key: 'all', label: 'Events' },
+    ...cats.map(c => ({ key: `cat:${c}`, label: c })),
+    ...(gridPrefs.plain ? [{ key: 'plain', label: 'Plain' }] : []),
+    ...(gridPrefs.decades ? [{ key: 'decades', label: 'Decades' }] : []),
+  ]
+  const activeView = views.some(v => v.key === view) ? view : 'all'
+  const activeCat = activeView.startsWith('cat:') ? activeView.slice(4) : undefined
+  const inLens = (e: LifeEvent) => !activeCat || e.category === activeCat
+
+  // Periods that contain today → live progress (the "course from date to date" tracker).
+  const activePeriods = periods.filter(p => {
+    const s = new Date(p.ev.event_date), e = new Date(p.ev.end_date!)
+    return s <= now && now <= new Date(e.getTime() + MS_DAY)
+  })
+  const periodPct = (ev: LifeEvent) => {
+    const s = new Date(ev.event_date).getTime(), e = new Date(ev.end_date!).getTime() + MS_DAY
+    return Math.min(100, Math.max(0, Math.round(((now.getTime() - s) / (e - s)) * 100)))
   }
 
   const upcoming = events
@@ -166,20 +202,25 @@ export default function LifePage() {
     const isNow = i === lived
     if (isNow) return { background: 'var(--gold)', outline: '1.5px solid var(--text-primary)', outlineOffset: '0px' }
 
-    if (view === 'plain') return { background: isLived ? 'var(--gold)' : 'var(--border)' }
+    if (activeView === 'plain') return { background: isLived ? 'var(--gold)' : 'var(--border)' }
 
-    if (view === 'decades') {
+    if (activeView === 'decades') {
       if (!isLived) return { background: 'var(--border)' }
       // One solid colour per 10-year band (matches the legend), not per year.
       return { background: DECADE_COLORS[Math.floor(ageAtWeek(i) / 10) % DECADE_COLORS.length] }
     }
 
-    // 'all' — events overlay, then Islamic markers
+    // 'all' / category lens — point events, then period tints, then Islamic markers.
     const ev = eventByWeek.get(i)
-    if (ev) return isLived ? { background: ev.color } : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${ev.color}` }
-    const mk = markersByWeek.get(i)?.[0]
-    if (mk) return { background: isLived ? mk.color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${mk.color}` }
-    return { background: isLived ? 'var(--gold)' : 'var(--border)' }
+    if (ev && inLens(ev)) return isLived ? { background: ev.color } : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${ev.color}` }
+    const per = periods.find(p => p.w0 <= i && i <= p.w1 && inLens(p.ev))?.ev
+    if (per) return { background: hexA(per.color, isLived ? '99' : '3A') }
+    if (!activeCat) {
+      const mk = markersByWeek.get(i)?.[0]
+      if (mk) return { background: isLived ? mk.color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${mk.color}` }
+    }
+    // In a category lens the base dims so that layer's colours pop.
+    return { background: isLived ? (activeCat ? 'var(--gold-dim)' : 'var(--gold)') : 'var(--border)' }
   }
 
   // Selected-week detail
@@ -246,20 +287,28 @@ export default function LifePage() {
           </div>
         ) : (() => {
           // Real month calendar: navigable, today highlighted, Islamic dates marked.
+          // Samsung-style dual calendar: small Hijri day under each Gregorian day.
           const y = calMonth.getFullYear(), m = calMonth.getMonth()
           const first = new Date(y, m, 1)
           const daysInMonth = new Date(y, m + 1, 0).getDate()
+          const last = new Date(y, m, daysInMonth)
           const lead = (first.getDay() + 6) % 7   // Mon-first offset
-          const monthMarks = eventsBetween(first, new Date(y, m, daysInMonth))
-          const markByDay = new Map<number, { label: string; color: string }>()
-          for (const mk of monthMarks) markByDay.set(mk.date.getDate(), mk)
+          const monthMarks = eventsBetween(first, last)
+          const dayMark = (d: Date) => monthMarks.find(mk => markCovers(mk, d))
+          const uniqMarks = [...new Map(monthMarks.map(mk => [mk.label, mk])).values()]
+          const hMonth = (d: Date) => new Intl.DateTimeFormat('en-US-u-ca-islamic', { month: 'long', year: 'numeric' }).format(d)
           return (
             <div className="mt-1">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1">
                 <button onClick={() => { const d = new Date(y, m - 1, 1); setCalMonth(d); localStorage.setItem('mizan_life_cal_month', d.toISOString()) }} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>◀</button>
                 <span className="text-sm font-semibold">{first.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
                 <button onClick={() => { const d = new Date(y, m + 1, 1); setCalMonth(d); localStorage.setItem('mizan_life_cal_month', d.toISOString()) }} className="px-2 py-1 rounded-lg" style={{ color: 'var(--text-secondary)' }}>▶</button>
               </div>
+              {showIslamic && (
+                <p className="text-center text-[10px] mb-2" style={{ color: 'var(--text-muted)' }}>
+                  {hMonth(first)}{hMonth(last) !== hMonth(first) ? ` – ${hMonth(last)}` : ''}
+                </p>
+              )}
               <div className="grid grid-cols-7 gap-1 mb-1">
                 {['M','T','W','T','F','S','S'].map((d, i) => (
                   <span key={i} className="text-center text-[10px]" style={{ color: 'var(--text-muted)' }}>{d}</span>
@@ -270,28 +319,44 @@ export default function LifePage() {
                 {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
                   const date = new Date(y, m, day)
                   const isToday = date.toDateString() === now.toDateString()
-                  const mk = markByDay.get(day)
+                  const mk = dayMark(date)
+                  const white = showIslamic && isWhiteDay(date)
                   return (
-                    <div key={day} title={mk?.label} className="aspect-square flex items-center justify-center rounded-lg text-[11px] relative"
+                    <div key={day} title={mk?.label ?? (white ? 'White day 13–15 Hijri (sunnah fast)' : undefined)}
+                      className="aspect-square flex flex-col items-center justify-center rounded-lg text-[11px] leading-none relative"
                       style={{
                         background: isToday ? 'var(--gold)' : 'var(--surface-2)',
                         color: isToday ? '#0a0a0a' : date < now ? 'var(--text-muted)' : 'var(--text-secondary)',
                         boxShadow: mk ? `inset 0 0 0 1.5px ${mk.color}` : undefined,
                       }}>
                       {day}
+                      {showIslamic && <span className="text-[7px] mt-[3px] opacity-70">{hijriDay(date)}</span>}
                       {mk && <span className="absolute bottom-0.5 w-1 h-1 rounded-full" style={{ background: mk.color }} />}
+                      {white && !isToday && <span className="absolute top-0.5 right-0.5 w-1 h-1 rounded-full" style={{ background: 'var(--gold)', opacity: 0.8 }} />}
                     </div>
                   )
                 })}
               </div>
-              {monthMarks.length > 0 && (
+              {showIslamic && (
+                <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                  Small number = Hijri day · gold corner dot = white day (13–15 Hijri, sunnah fast)
+                </p>
+              )}
+              {uniqMarks.length > 0 && (
                 <div className="flex flex-col gap-1 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-                  {monthMarks.map((mk, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: mk.color }} />
-                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{mk.date.getDate()} {first.toLocaleString('default', { month: 'short' })} · {mk.label}</span>
-                    </div>
-                  ))}
+                  {uniqMarks.map((mk, i) => {
+                    // Clamp span display to this month (Ramadan may start in the previous one).
+                    const s = mk.date < first ? first : mk.date
+                    const e = mk.end ? new Date(Math.min(mk.end.getTime() - MS_DAY, last.getTime())) : s
+                    return (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: mk.color }} />
+                        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                          {s.getDate()}{e.getDate() !== s.getDate() ? `–${e.getDate()}` : ''} {first.toLocaleString('default', { month: 'short' })} · {mk.label}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -330,6 +395,42 @@ export default function LifePage() {
         </div>
       )}
 
+      {/* In progress — periods containing today, with live progress (course tracker) */}
+      {activePeriods.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">In progress</h3>
+          </div>
+          <div className="flex flex-col gap-3">
+            {activePeriods.map(({ ev }) => {
+              const pct = periodPct(ev)
+              const dLeftP = Math.max(0, Math.ceil((new Date(ev.end_date!).getTime() - now.getTime()) / MS_DAY))
+              return (
+                <button key={ev.id} onClick={() => setSelected(weekIndexOf(dobDate, now))} className="text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: ev.color }} />
+                      <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{ev.label}</span>
+                      {ev.category && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{ev.category}</span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-semibold shrink-0 ml-2" style={{ color: 'var(--gold)' }}>{pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: ev.color }} />
+                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                    {new Date(ev.event_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} → {new Date(ev.end_date!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {dLeftP}d left
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Life in weeks — interactive grid */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
@@ -337,21 +438,21 @@ export default function LifePage() {
           <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{lived.toLocaleString()} / {total.toLocaleString()}</span>
         </div>
 
-        {/* View switcher */}
-        <div className="flex gap-1 p-1 rounded-xl mb-3" style={{ background: 'var(--surface-2)' }}>
-          {VIEWS.map(v => (
+        {/* View switcher — chips scroll (snap) once category lenses outgrow the row */}
+        <div className="flex gap-1 p-1 rounded-xl mb-3 overflow-x-auto snap-x" style={{ background: 'var(--surface-2)', scrollbarWidth: 'none' }}>
+          {views.map(v => (
             <button key={v.key} onClick={() => setView(v.key)}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={view === v.key
+              className="flex-1 shrink-0 snap-start px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all"
+              style={activeView === v.key
                 ? { background: 'var(--gold)', color: 'var(--background)' }
                 : { color: 'var(--text-muted)' }}>{v.label}</button>
           ))}
         </div>
 
         {/* Islamic dates toggle */}
-        {view === 'all' && (
+        {activeView === 'all' && (
           <label className="flex items-center justify-between mb-3 cursor-pointer">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Highlight Islamic dates (Ramadan, Eids, Muharram, Ashura)</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Highlight Islamic dates (full Ramadan, Eids, Dhul Hijjah & Arafah, Ashura)</span>
             <div className="relative">
               <input type="checkbox" className="sr-only peer" checked={showIslamic} onChange={e => toggleIslamic(e.target.checked)} />
               <div className="w-9 h-5 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
@@ -362,7 +463,7 @@ export default function LifePage() {
 
         <div className="grid gap-[2px]" style={{ gridTemplateColumns: 'repeat(52, minmax(0, 1fr))' }}>
           {Array.from({ length: total }).map((_, i) => {
-            const ev = view === 'all' ? eventByWeek.get(i) : undefined
+            const ev = activeView === 'plain' || activeView === 'decades' ? undefined : eventByWeek.get(i)
             return (
               <button key={i} onClick={() => setSelected(s => s === i ? null : i)}
                 className="aspect-square rounded-[1px] cursor-pointer"
@@ -372,79 +473,144 @@ export default function LifePage() {
           })}
         </div>
 
-        {/* Selected week detail */}
-        {sel !== null && selStart && selEnd && (
-          <div className="mt-3 p-3 rounded-xl relative" style={{ background: 'var(--surface-2)' }}>
-            <button onClick={() => setSelected(null)} aria-label="Close" className="absolute top-2 right-2 p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
-              <X size={14} />
-            </button>
-            <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-              Week {sel + 1} · age {ageAtWeek(sel)}
-            </p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              {selStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – {selEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </p>
-            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              {hijriLabel(selStart)} – {hijriLabel(selEnd)} (Hijri)
-            </p>
-            {/* 7-day row */}
-            <div className="flex gap-1 mt-2">
-              {['M','T','W','T','F','S','S'].map((d, i) => {
-                const day = new Date(selStart.getTime() + i * MS_DAY)
-                const isToday = day.toDateString() === now.toDateString()
-                const isPast = day < now
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                    <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{d}</span>
-                    <span className="text-[11px] w-6 h-6 flex items-center justify-center rounded-full font-medium"
-                      style={{
-                        background: isToday ? 'var(--gold)' : 'transparent',
-                        color: isToday ? '#0a0a0a' : isPast ? 'var(--text-secondary)' : 'var(--text-muted)',
-                      }}>{day.getDate()}</span>
-                  </div>
-                )
-              })}
-            </div>
-            {selEvent ? (
-              <div className="mt-2 flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0">
-                  <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
-                  <div className="min-w-0">
-                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selEvent.label}</p>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      {selEvent.kind}{selEvent.recurrence !== 'none' ? ` · ${selEvent.recurrence}` : ''}
-                    </p>
-                    {selEvent.notes && <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{selEvent.notes}</p>}
+        {/* Selected week — bottom-sheet popup, ◀ ▶ walks weeks, 7-day zoom with per-day dots */}
+        {sel !== null && selStart && selEnd && (() => {
+          const weekMarks = eventsBetween(selStart, selEnd)
+          const uniqWeekMarks = [...new Map(weekMarks.map(mk => [mk.label, mk])).values()]
+          const weekPeriods = periods.filter(p => p.w0 <= sel && sel <= p.w1)
+          const dayDots = (d: Date) => {
+            const dots: string[] = []
+            for (const mk of weekMarks) if (markCovers(mk, d)) dots.push(mk.color)
+            for (const e of events) if (!e.end_date && new Date(e.event_date).toDateString() === d.toDateString()) dots.push(e.color)
+            return dots.slice(0, 3)
+          }
+          return (
+            <>
+              <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setSelected(null)} />
+              <div className="fixed left-0 right-0 bottom-0 z-50 mx-auto w-full max-w-md p-4 rounded-t-2xl animate-slide-up"
+                style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', boxShadow: '0 -8px 30px rgba(0,0,0,0.5)', maxHeight: '70vh', overflowY: 'auto', paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                    Week {sel + 1} · age {ageAtWeek(sel)}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setSelected(s => Math.max(0, (s ?? 0) - 1))} aria-label="Previous week"
+                      className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)', background: 'var(--surface-2)' }}><ChevronLeft size={14} /></button>
+                    <button onClick={() => setSelected(s => Math.min(total - 1, (s ?? 0) + 1))} aria-label="Next week"
+                      className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)', background: 'var(--surface-2)' }}><ChevronRight size={14} /></button>
+                    <button onClick={() => setSelected(null)} aria-label="Close" className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                      <X size={14} />
+                    </button>
                   </div>
                 </div>
-                <Link href={`/life/settings?edit=${selEvent.id}`} className="p-1.5 rounded-lg shrink-0"
-                  style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
-                  <Pencil size={12} />
-                </Link>
-              </div>
-            ) : markersByWeek.get(sel)?.length ? (
-              <div className="mt-2 flex flex-col gap-1">
-                {markersByWeek.get(sel)!.map((mk, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: mk.color }} />
-                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mk.label}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  {selStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – {selEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  {hijriLabel(selStart)} – {hijriLabel(selEnd)} (Hijri)
+                </p>
+                {/* 7-day zoom: each day with its event / Islamic dots */}
+                <div className="flex gap-1 mt-2">
+                  {['M','T','W','T','F','S','S'].map((d, i) => {
+                    const day = new Date(selStart.getTime() + i * MS_DAY)
+                    const isToday = day.toDateString() === now.toDateString()
+                    const isPast = day < now
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{d}</span>
+                        <span className="text-[11px] w-6 h-6 flex items-center justify-center rounded-full font-medium"
+                          style={{
+                            background: isToday ? 'var(--gold)' : 'transparent',
+                            color: isToday ? '#0a0a0a' : isPast ? 'var(--text-secondary)' : 'var(--text-muted)',
+                          }}>{day.getDate()}</span>
+                        <span className="flex gap-0.5 h-1">
+                          {dayDots(day).map((c, j) => <span key={j} className="w-1 h-1 rounded-full" style={{ background: c }} />)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Periods covering this week — with live progress when ongoing */}
+                {weekPeriods.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    {weekPeriods.map(({ ev }) => {
+                      const s = new Date(ev.event_date), e = new Date(ev.end_date!)
+                      const totalD = Math.max(1, Math.round((e.getTime() - s.getTime()) / MS_DAY) + 1)
+                      const ongoing = s <= now && now <= new Date(e.getTime() + MS_DAY)
+                      const dayN = Math.min(totalD, Math.max(1, Math.floor((now.getTime() - s.getTime()) / MS_DAY) + 1))
+                      return (
+                        <div key={ev.id}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: hexA(ev.color, '99') }} />
+                              <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{ev.label}</p>
+                              {ev.category && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{ev.category}</span>
+                              )}
+                            </div>
+                            <Link href={`/life/settings?edit=${ev.id}`} className="p-1.5 rounded-lg shrink-0"
+                              style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                              <Pencil size={12} />
+                            </Link>
+                          </div>
+                          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            {s.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} → {e.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {ongoing ? ` · day ${dayN} of ${totalD} (${periodPct(ev)}%)` : e < now ? ` · completed · ${totalD}d` : ` · starts in ${Math.ceil((s.getTime() - now.getTime()) / MS_DAY)}d`}
+                          </p>
+                          {ongoing && (
+                            <div className="h-1 rounded-full overflow-hidden mt-1" style={{ background: 'var(--border)' }}>
+                              <div className="h-full rounded-full" style={{ width: `${periodPct(ev)}%`, background: ev.color }} />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
+                )}
+                {selEvent && (
+                  <div className="mt-3 flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
+                      <div className="min-w-0">
+                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selEvent.label}</p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          {selEvent.kind}{selEvent.category ? ` · ${selEvent.category}` : ''}{selEvent.recurrence !== 'none' ? ` · ${selEvent.recurrence}` : ''}
+                        </p>
+                        {selEvent.notes && <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{selEvent.notes}</p>}
+                      </div>
+                    </div>
+                    <Link href={`/life/settings?edit=${selEvent.id}`} className="p-1.5 rounded-lg shrink-0"
+                      style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                      <Pencil size={12} />
+                    </Link>
+                  </div>
+                )}
+                {uniqWeekMarks.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-1">
+                    {uniqWeekMarks.map((mk, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: mk.color }} />
+                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mk.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!selEvent && weekPeriods.length === 0 && uniqWeekMarks.length === 0 && (
+                  <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
+                    No event this week. <Link href="/life/settings" style={{ color: 'var(--gold)' }}>Add one →</Link>
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-                No event this week. <Link href="/life/settings" style={{ color: 'var(--gold)' }}>Add one →</Link>
-              </p>
-            )}
-          </div>
-        )}
+            </>
+          )
+        })()}
 
         <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
           Each square is one week — tap any to see its dates. {remainingCells.toLocaleString()} remain.
         </p>
 
         {/* Decades legend */}
-        {view === 'decades' && (
+        {activeView === 'decades' && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
             {DECADE_COLORS.slice(0, Math.ceil(years / 10)).map((color, i) => (
               <div key={i} className="flex items-center gap-1.5">
@@ -456,7 +622,7 @@ export default function LifePage() {
         )}
 
         {/* Islamic dates legend */}
-        {view === 'all' && showIslamic && (
+        {activeView === 'all' && showIslamic && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
             {ISLAMIC_HOLIDAYS.map(h => (
               <div key={h.label} className="flex items-center gap-1.5">
@@ -467,18 +633,22 @@ export default function LifePage() {
           </div>
         )}
 
-        {/* Legend (clickable → jumps to that week) */}
-        {view === 'all' && events.length > 0 && (
+        {/* Legend (clickable → jumps to that week); category lens shows only its layer */}
+        {(activeView === 'all' || activeCat) && events.some(inLens) && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-            {events.map(ev => (
-              <button key={ev.id} onClick={() => setSelected(weekIndexOf(dobDate, new Date(ev.event_date)))}
-                className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: ev.color }} />
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  {ev.label} <span style={{ color: 'var(--text-secondary)' }}>{new Date(ev.event_date).getFullYear()}</span>
-                </span>
-              </button>
-            ))}
+            {events.filter(inLens).map(ev => {
+              const y0 = new Date(ev.event_date).getFullYear()
+              const y1 = ev.end_date ? new Date(ev.end_date).getFullYear() : y0
+              return (
+                <button key={ev.id} onClick={() => setSelected(weekIndexOf(dobDate, new Date(ev.event_date)))}
+                  className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: ev.end_date ? hexA(ev.color, '99') : ev.color }} />
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {ev.label} <span style={{ color: 'var(--text-secondary)' }}>{y1 !== y0 ? `${y0}–${y1}` : y0}</span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>

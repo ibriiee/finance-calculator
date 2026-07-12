@@ -23,6 +23,8 @@ export interface LifeEvent {
   color: string
   recurrence: LifeRecurrence
   notes: string | null
+  category: string | null      // layer tag (Deen, Work, Study…) — becomes a grid tab
+  end_date: string | null      // set → event is a PERIOD spanning start→end
   created_at: string
 }
 

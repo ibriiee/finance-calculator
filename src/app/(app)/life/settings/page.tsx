@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { Hourglass, Loader2, Plus, Trash2, CalendarHeart, Pencil, Check, ChevronDown } from 'lucide-react'
+import { Hourglass, Loader2, Plus, Trash2, CalendarHeart, Pencil, Check, ChevronDown, LayoutGrid } from 'lucide-react'
 import type { LifeEvent, LifeEventKind, LifeRecurrence } from '@/types/database.types'
 
 const KINDS: { key: LifeEventKind; label: string; hint: string }[] = [
@@ -13,6 +13,8 @@ const KINDS: { key: LifeEventKind; label: string; hint: string }[] = [
   { key: 'reminder', label: 'Reminder', hint: 'A dated/recurring nudge in Upcoming' },
 ]
 const SWATCHES = ['#C9A84C', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#EC4899', '#F59E0B', '#14B8A6']
+// Suggested layer tags — every distinct category becomes its own tab on the life grid.
+const CATEGORY_PRESETS = ['Deen', 'Family', 'Work', 'Study', 'Health', 'Travel']
 const inputCls = 'w-full px-4 py-3 rounded-xl text-sm'
 const inputStyle = { background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' } as const
 
@@ -32,13 +34,22 @@ export default function LifeSettingsPage() {
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const blank = { label: '', event_date: '', kind: 'milestone' as LifeEventKind, color: SWATCHES[0], recurrence: 'none' as LifeRecurrence, notes: '' }
+  const blank = { label: '', event_date: '', end_date: '', kind: 'milestone' as LifeEventKind, color: SWATCHES[0], recurrence: 'none' as LifeRecurrence, notes: '', category: '' }
   const [form, setForm] = useState(blank)
   const F = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
+  // Which grid views are visible on the Life page (device-local, like the Islamic toggle).
+  const [gridViews, setGridViews] = useState({ plain: true, decades: true })
+  useEffect(() => {
+    try { setGridViews(v => ({ ...v, ...JSON.parse(localStorage.getItem('mizan_life_views') ?? '{}') })) } catch {}
+  }, [])
+  function toggleGridView(key: 'plain' | 'decades') {
+    setGridViews(v => { const n = { ...v, [key]: !v[key] }; localStorage.setItem('mizan_life_views', JSON.stringify(n)); return n })
+  }
+
   function startEdit(ev: LifeEvent) {
     setEditingId(ev.id)
-    setForm({ label: ev.label, event_date: ev.event_date, kind: ev.kind, color: ev.color, recurrence: ev.recurrence, notes: ev.notes ?? '' })
+    setForm({ label: ev.label, event_date: ev.event_date, end_date: ev.end_date ?? '', kind: ev.kind, color: ev.color, recurrence: ev.recurrence, notes: ev.notes ?? '', category: ev.category ?? '' })
     if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
   }
   function cancelEdit() { setEditingId(null); setForm(blank) }
@@ -77,15 +88,18 @@ export default function LifeSettingsPage() {
 
   async function saveEvent() {
     if (!form.label.trim() || !form.event_date) return
+    if (form.end_date && form.end_date < form.event_date) { alert('End date is before the start date.'); return }
     setAdding(true)
     const { data: { user } } = await supabase.auth.getUser()
     const payload = {
       label: form.label.trim(),
       event_date: form.event_date,
+      end_date: form.end_date || null,
       kind: form.kind,
       color: form.color,
       recurrence: form.recurrence,
       notes: form.notes.trim() || null,
+      category: form.category.trim() || null,
     }
     const { error } = editingId
       ? await supabase.from('life_events').update(payload).eq('id', editingId)
@@ -143,6 +157,30 @@ export default function LifeSettingsPage() {
         )}
       </div>
 
+      {/* Grid views — which tabs show on the life grid */}
+      <div className="card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <LayoutGrid size={15} style={{ color: 'var(--gold)' }} />
+          <h3 className="text-sm font-semibold">Grid views</h3>
+        </div>
+        {([['plain', 'Plain', 'Just lived vs remaining'], ['decades', 'Decades', 'One colour per 10-year band']] as const).map(([key, label, hint]) => (
+          <label key={key} className="flex items-center justify-between py-1.5 cursor-pointer">
+            <div>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+              <span className="text-[11px] ml-2" style={{ color: 'var(--text-muted)' }}>{hint}</span>
+            </div>
+            <div className="relative">
+              <input type="checkbox" className="sr-only peer" checked={gridViews[key]} onChange={() => toggleGridView(key)} />
+              <div className="w-9 h-5 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
+                style={{ background: gridViews[key] ? 'var(--gold)' : 'var(--border)' }} />
+            </div>
+          </label>
+        ))}
+        <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+          Events is always on. A tab per category (Deen, Work, Study…) appears automatically once an event carries that category.
+        </p>
+      </div>
+
       {/* Life events */}
       <div className="card p-4">
         <button className="flex items-center justify-between w-full" onClick={() => toggle('Life Events')}>
@@ -165,7 +203,8 @@ export default function LifeSettingsPage() {
                   <div className="min-w-0">
                     <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{ev.label}</p>
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      {new Date(ev.event_date).toLocaleDateString()} · {ev.kind}{ev.recurrence !== 'none' ? ` · ${ev.recurrence}` : ''}
+                      {new Date(ev.event_date).toLocaleDateString()}{ev.end_date ? ` → ${new Date(ev.end_date).toLocaleDateString()}` : ''} · {ev.kind}
+                      {ev.category ? ` · ${ev.category}` : ''}{ev.recurrence !== 'none' ? ` · ${ev.recurrence}` : ''}
                     </p>
                   </div>
                 </div>
@@ -186,7 +225,38 @@ export default function LifeSettingsPage() {
         <div className="flex flex-col gap-3">
           <input placeholder="Label (e.g. Married, First child, Hajj)" value={form.label}
             onChange={e => F('label', e.target.value)} className={inputCls} style={inputStyle} />
-          <input type="date" value={form.event_date} onChange={e => F('event_date', e.target.value)} className={inputCls} style={inputStyle} />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Date</label>
+              <input type="date" value={form.event_date} onChange={e => F('event_date', e.target.value)} className={inputCls} style={inputStyle} />
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>End date (optional)</label>
+              <input type="date" value={form.end_date} onChange={e => F('end_date', e.target.value)} className={inputCls} style={inputStyle} />
+            </div>
+          </div>
+          {form.end_date && (
+            <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
+              Period — tints every week from start to end on the grid, with a live progress bar while it&apos;s ongoing (a course, a job, a city).
+            </p>
+          )}
+
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Category (optional — becomes its own tab on the grid)</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {[...new Set([...CATEGORY_PRESETS, ...events.map(e => e.category).filter((c): c is string => !!c)])].map(c => (
+                <button key={c} type="button" onClick={() => F('category', form.category === c ? '' : c)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{
+                    background: form.category === c ? 'var(--gold-dim)' : 'var(--surface-2)',
+                    border: `1px solid ${form.category === c ? 'var(--gold)' : 'var(--border)'}`,
+                    color: form.category === c ? 'var(--gold)' : 'var(--text-muted)',
+                  }}>{c}</button>
+              ))}
+            </div>
+            <input placeholder="Or type your own (e.g. Quran, Business)" value={form.category}
+              onChange={e => F('category', e.target.value)} className={inputCls} style={inputStyle} />
+          </div>
 
           <div>
             <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Type</label>

@@ -42,27 +42,53 @@ export function fromHijri(y: number, m: number, day: number): Date {
   return guess
 }
 
-/** Fixed Islamic dates worth highlighting on the grid. */
-export const ISLAMIC_HOLIDAYS: { m: number; day: number; label: string; color: string }[] = [
+/** Fixed Islamic dates worth highlighting on the grid.
+ *  `until` = exclusive Hijri end → the entry is a SPAN (Ramadan colours fully
+ *  to Eid, not just its first week). Entries without `until` are single days. */
+export const ISLAMIC_HOLIDAYS: { m: number; day: number; until?: { m: number; day: number }; label: string; color: string }[] = [
   { m: 1,  day: 1,  label: 'Islamic New Year', color: '#14B8A6' },
-  { m: 1,  day: 10, label: 'Ashura',           color: '#06B6D4' },
-  { m: 9,  day: 1,  label: 'Ramadan begins',   color: '#A855F7' },
+  { m: 1,  day: 9,  until: { m: 1, day: 11 },  label: 'Tasu’a & Ashura (fast 9–10 Muharram)', color: '#06B6D4' },
+  { m: 9,  day: 1,  until: { m: 10, day: 1 },  label: 'Ramadan (obligatory fast)', color: '#A855F7' },
   { m: 10, day: 1,  label: 'Eid al-Fitr',      color: '#EC4899' },
+  { m: 12, day: 1,  until: { m: 12, day: 10 }, label: 'Dhul Hijjah 1–9 · Arafah fast on the 9th', color: '#10B981' },
   { m: 12, day: 10, label: 'Eid al-Adha',      color: '#F59E0B' },
 ]
 
-/** Every preset Islamic holiday falling between two Gregorian dates. */
-export function islamicHolidaysBetween(start: Date, end: Date) {
-  const out: { date: Date; label: string; color: string }[] = []
+export type HijriMark = { date: Date; end?: Date; label: string; color: string }
+
+/** Every preset Islamic holiday intersecting two Gregorian dates.
+ *  Spans carry an exclusive `end`; single days omit it. */
+export function islamicHolidaysBetween(start: Date, end: Date): HijriMark[] {
+  const out: HijriMark[] = []
   const hStart = toHijri(start).y
   const hEnd = toHijri(end).y
   for (let y = hStart; y <= hEnd; y++) {
     for (const h of ISLAMIC_HOLIDAYS) {
       const d = fromHijri(y, h.m, h.day)
-      if (d >= start && d <= end) out.push({ date: d, label: h.label, color: h.color })
+      if (h.until) {
+        const e = fromHijri(y, h.until.m, h.until.day)
+        if (d <= end && e > start) out.push({ date: d, end: e, label: h.label, color: h.color })
+      } else if (d >= start && d <= end) out.push({ date: d, label: h.label, color: h.color })
     }
   }
   return out
+}
+
+/** Does a mark cover this calendar day? (span: [date, end); single: same day) */
+export function markCovers(mk: HijriMark, day: Date): boolean {
+  if (mk.end) return day >= mk.date && day < mk.end
+  return day.toDateString() === mk.date.toDateString()
+}
+
+/** Hijri day-of-month, for dual-calendar day cells. */
+export function hijriDay(d: Date): number {
+  return toHijri(d).day
+}
+
+/** Ayyam al-Beed — the white days (13–15 of every Hijri month, sunnah fast). */
+export function isWhiteDay(d: Date): boolean {
+  const day = toHijri(d).day
+  return day >= 13 && day <= 15
 }
 
 /** Next time a Hijri month/day recurs on/after `now` (lunar anniversary). */

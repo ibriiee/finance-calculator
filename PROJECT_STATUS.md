@@ -14,8 +14,9 @@ Turbopack) + Supabase (auth, Postgres, RLS, realtime) + PWA. Deployed on Vercel 
 **All fixes from both audits are landed in code (2026-07-11).** Four items need
 **owner action**, not more code:
 1. **Run the pending SQL migrations** in Supabase SQL Editor: `supabase/fix-payment-row-triggers.sql`
-   (check the pre-flight SELECT first), `supabase/integrity-checks.sql`, and
-   `supabase/shared-income-visibility.sql` (migrations 18, 19 & 20).
+   (check the pre-flight SELECT first), `supabase/integrity-checks.sql`,
+   `supabase/shared-income-visibility.sql`, and `supabase/life-layers.sql` (migrations 18–21;
+   21 must run before saving any life event from the new form).
 2. **Enable the keepalive workflow**: add `SUPABASE_URL` + `SUPABASE_ANON_KEY` repo secrets on
    GitHub and confirm `.github/workflows/keepalive.yml` runs green (Actions tab → run manually once).
 3. **Raise Supabase "Max rows" to 10000** (project → Settings → API) so growing tables can't
@@ -52,7 +53,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Savings | `/savings` | ✅ | **Backup-money stashes** per account/place (AED Dubai, PKR Pakistan…), deposit/withdraw, totals per currency; dashboard Savings card = goals + stash |
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
-| Life Tracker | `/life` | ✅ v4 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life; **bottom tab icons hidden in Life** — only the room pill + top Settings, for a full-screen grid). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly/**hijri_yearly**) show in an **Upcoming** list. **Interactive grid** (tap cell → week dates + **Hijri range** + age + 7-day row + event/marker detail), **3 views** (Events/Plain/Decades + **Decades legend**), **you-are-here** pulse, **this-year** row that **expands to a month-by-month calendar**, **Hijri** today+age, clickable legend, event **edit**. **Islamic dates overlay** (toggle): preset holidays (Ramadan / Eid al-Fitr / Eid al-Adha / Islamic New Year / Ashura) + any `hijri_yearly` event (e.g. a Zakat date) marked on every lunar anniversary across the lifespan. Hijri math in `src/lib/hijri.ts` (Intl-based, no dep, +self-check); life math in `src/lib/lifeMath.ts` (+self-check). Reminder push delivery deferred (prefer .ics — see Roadmap) |
+| Life Tracker | `/life` | ✅ v5 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life; **bottom tab icons hidden in Life** — only the room pill + top Settings, for a full-screen grid). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly/**hijri_yearly**) show in an **Upcoming** list. **Interactive grid** (tap cell → week dates + **Hijri range** + age + 7-day row + event/marker detail), **3 views** (Events/Plain/Decades + **Decades legend**), **you-are-here** pulse, **this-year** row that **expands to a month-by-month calendar**, **Hijri** today+age, clickable legend, event **edit**. **Islamic dates overlay** (toggle): preset holidays (Ramadan / Eid al-Fitr / Eid al-Adha / Islamic New Year / Ashura) + any `hijri_yearly` event (e.g. a Zakat date) marked on every lunar anniversary across the lifespan. Hijri math in `src/lib/hijri.ts` (Intl-based, no dep, +self-check); life math in `src/lib/lifeMath.ts` (+self-check). **v5 layer system** (migration 21): events carry optional `category` (each distinct one auto-becomes a grid tab/lens — Deen, Work, Study…; Plain/Decades toggleable off in Life Settings, prefs in localStorage `mizan_life_views`) and optional `end_date` (event becomes a **period** — tinted week-span with live progress; "In progress" card = course tracker). Islamic overlay is **span-aware**: full Ramadan month, Dhul Hijjah 1–9 + Arafah, Tasu'a+Ashura 9–10 Muharram. Week detail is a **bottom-sheet popup** (◀ ▶ walks weeks, per-day event/Islamic dots). Month calendar is **dual-calendar** (small Hijri day under each date, Hijri month header, white days 13–15 marked). Reminder push delivery deferred (prefer .ics — see Roadmap) |
 | Settings | `/settings` | ✅ | All sections **collapsible** (chevron; Profile open by default). Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset**. (Life Tracker DOB/age + events moved to `/life/settings`, also collapsible.) |
 
 ### Locking & data rules
@@ -100,6 +101,9 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
 20. `shared-income-visibility.sql` — SELECT-only RLS widening so a `shared` income is readable
     by BOTH brothers (dashboard 50% split, sadaka picker, income-name lookup all assumed this;
     writes stay owner-only). **⚠️ NOT YET RUN — owner action needed.** (2026-07-11 audit FIX-23)
+21. `life-layers.sql` — `category` + `end_date` on `life_events` for the Life room layer system
+    (category lenses as grid tabs; end_date turns an event into a period/span with progress).
+    **⚠️ MUST RUN before saving events from the new form** — inserts now send both columns.
 
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–16 all run as of 2026-06-30** — confirmed by Ibrahim.)
 
@@ -136,6 +140,20 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-12** — **Life room v5 — layer system.** New migration 21 `life-layers.sql`
+  (**owner must run before adding/editing life events**): `category` + `end_date` on `life_events`.
+  *Layers:* every distinct category becomes its own grid tab automatically (Deen/Work/Study… —
+  no fixed palette limit; lens dims the base grid so the layer pops); Plain/Decades views
+  toggleable from Life Settings. *Periods:* an event with an end date tints its whole week-span
+  and gets a live progress bar — "In progress" card doubles as a course/date-to-date tracker.
+  *Islamic overlay v2 (span-aware):* Ramadan now colours the FULL month (1 Ramadan → Eid),
+  Dhul Hijjah 1–9 with Arafah fast on the 9th, Tasu'a+Ashura (9–10 Muharram) built in; hijri.ts
+  self-check asserts Ramadan span = 29/30 days ending at Eid al-Fitr. *Week popup:* tap a cell →
+  bottom-sheet (no scroll hunt), ◀ ▶ walks weeks, 7-day zoom with per-day event/Islamic dots.
+  *Dual calendar (Samsung-style):* month view shows small Hijri day under each date, Hijri month
+  header, and white days (13–15 Hijri, sunnah fast) marked. View switcher scroll-snaps when
+  category tabs overflow. Deferred: photo-per-week (needs a Storage bucket), pinch-zoom.
+  Files: `life/page.tsx`, `life/settings/page.tsx`, `lib/hijri.ts(+test)`, `types/database.types.ts`.
 - **2026-07-11** — **Independent CTO audit #2 (`docs/CTO-AUDIT-2026-07-11.md`) + all its fixes landed.**
   Verified the entire 2026-07-05 batch against real diffs (18/19 claims correct), then found and
   fixed: *FIX-20 (P0)* — "Log Repayment" had **never worked**: the insert named a non-existent
