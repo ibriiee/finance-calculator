@@ -5,16 +5,27 @@ import { createClient } from '@/lib/supabase/client'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { Hourglass, Loader2, Plus, Trash2, CalendarHeart, Pencil, Check, ChevronDown, LayoutGrid } from 'lucide-react'
-import type { LifeEvent, LifeEventKind, LifeRecurrence } from '@/types/database.types'
+import type { LifeEvent, LifeEventKind, LifeRecurrence, LifeShape } from '@/types/database.types'
 
 const KINDS: { key: LifeEventKind; label: string; hint: string }[] = [
   { key: 'milestone', label: 'Milestone', hint: 'A past moment — colours its week on the grid' },
   { key: 'intention', label: 'Intention', hint: 'A future goal — outlines its week ahead' },
   { key: 'reminder', label: 'Reminder', hint: 'A dated/recurring nudge in Upcoming' },
 ]
-const SWATCHES = ['#C9A84C', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#EC4899', '#F59E0B', '#14B8A6']
+const SWATCHES = [
+  '#C9A84C', '#10B981', '#3B82F6', '#EF4444', '#A855F7', '#EC4899', '#F59E0B', '#14B8A6',
+  '#84CC16', '#06B6D4', '#F97316', '#E11D48', '#8B5CF6', '#0EA5E9', '#D946EF', '#64748B',
+]
 // Suggested layer tags — every distinct category becomes its own tab on the life grid.
 const CATEGORY_PRESETS = ['Deen', 'Family', 'Work', 'Study', 'Health', 'Travel']
+const SHAPES: LifeShape[] = ['square', 'circle', 'diamond', 'ring']
+// Mini preview of how a mark shape renders on the grid / legend.
+const shapePreview = (s: LifeShape, c: string): React.CSSProperties => ({
+  background: s === 'ring' ? 'transparent' : c,
+  boxShadow: s === 'ring' ? `inset 0 0 0 2px ${c}` : undefined,
+  borderRadius: s === 'circle' ? '50%' : 2,
+  transform: s === 'diamond' ? 'rotate(45deg)' : undefined,
+})
 const inputCls = 'w-full px-4 py-3 rounded-xl text-sm'
 const inputStyle = { background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' } as const
 
@@ -34,22 +45,26 @@ export default function LifeSettingsPage() {
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const blank = { label: '', event_date: '', end_date: '', kind: 'milestone' as LifeEventKind, color: SWATCHES[0], recurrence: 'none' as LifeRecurrence, notes: '', category: '' }
+  const blank = { label: '', event_date: '', end_date: '', kind: 'milestone' as LifeEventKind, color: SWATCHES[0], recurrence: 'none' as LifeRecurrence, notes: '', category: '', shape: 'square' as LifeShape }
   const [form, setForm] = useState(blank)
   const F = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
-  // Which grid views are visible on the Life page (device-local, like the Islamic toggle).
-  const [gridViews, setGridViews] = useState({ plain: true, decades: true })
+  // Which grid views are visible on the Life page (device-local, like the Islamic
+  // toggle). cats[name] === false hides that category's tab; missing = shown.
+  const [gridViews, setGridViews] = useState<{ plain: boolean; decades: boolean; cats: Record<string, boolean> }>({ plain: true, decades: true, cats: {} })
   useEffect(() => {
-    try { setGridViews(v => ({ ...v, ...JSON.parse(localStorage.getItem('mizan_life_views') ?? '{}') })) } catch {}
+    try {
+      const saved = JSON.parse(localStorage.getItem('mizan_life_views') ?? '{}')
+      setGridViews(v => ({ ...v, ...saved, cats: { ...(saved.cats ?? {}) } }))
+    } catch {}
   }, [])
-  function toggleGridView(key: 'plain' | 'decades') {
-    setGridViews(v => { const n = { ...v, [key]: !v[key] }; localStorage.setItem('mizan_life_views', JSON.stringify(n)); return n })
-  }
+  function saveGridViews(n: typeof gridViews) { setGridViews(n); localStorage.setItem('mizan_life_views', JSON.stringify(n)) }
+  const toggleGridView = (key: 'plain' | 'decades') => saveGridViews({ ...gridViews, [key]: !gridViews[key] })
+  const toggleCatView = (name: string) => saveGridViews({ ...gridViews, cats: { ...gridViews.cats, [name]: gridViews.cats[name] === false } })
 
   function startEdit(ev: LifeEvent) {
     setEditingId(ev.id)
-    setForm({ label: ev.label, event_date: ev.event_date, end_date: ev.end_date ?? '', kind: ev.kind, color: ev.color, recurrence: ev.recurrence, notes: ev.notes ?? '', category: ev.category ?? '' })
+    setForm({ label: ev.label, event_date: ev.event_date, end_date: ev.end_date ?? '', kind: ev.kind, color: ev.color, recurrence: ev.recurrence, notes: ev.notes ?? '', category: ev.category ?? '', shape: ev.shape ?? 'square' })
     if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
   }
   function cancelEdit() { setEditingId(null); setForm(blank) }
@@ -100,6 +115,7 @@ export default function LifeSettingsPage() {
       recurrence: form.recurrence,
       notes: form.notes.trim() || null,
       category: form.category.trim() || null,
+      shape: form.shape,
     }
     const { error } = editingId
       ? await supabase.from('life_events').update(payload).eq('id', editingId)
@@ -107,8 +123,8 @@ export default function LifeSettingsPage() {
     if (error) {
       setAdding(false)
       // Missing category/end_date columns = migration 21 not run yet — say so plainly.
-      alert(/category|end_date/.test(error.message) && /column|schema cache/.test(error.message)
-        ? 'Migration needed: run supabase/life-layers.sql (migration 21) in the Supabase SQL Editor, then save again.'
+      alert(/category|end_date|shape/.test(error.message) && /column|schema cache/.test(error.message)
+        ? 'Migration needed: run supabase/life-layers.sql (21) and life-shapes.sql (22) in the Supabase SQL Editor, then save again.'
         : 'Could not save event: ' + error.message)
       return
     }
@@ -183,8 +199,23 @@ export default function LifeSettingsPage() {
             </div>
           </label>
         ))}
+        {/* One toggle per category currently in use — hide any tab you don't want. */}
+        {[...new Set(events.map(e => e.category).filter((c): c is string => !!c))].map(cat => (
+          <label key={cat} className="flex items-center justify-between py-1.5 cursor-pointer">
+            <div>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{cat}</span>
+              <span className="text-[11px] ml-2" style={{ color: 'var(--text-muted)' }}>category tab</span>
+            </div>
+            <div className="relative">
+              <input type="checkbox" className="sr-only peer" checked={gridViews.cats[cat] !== false} onChange={() => toggleCatView(cat)} />
+              <div className="w-9 h-5 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
+                style={{ background: gridViews.cats[cat] !== false ? 'var(--gold)' : 'var(--border)' }} />
+            </div>
+          </label>
+        ))}
         <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-          Events is always on. A tab per category (Deen, Work, Study…) appears automatically once an event carries that category.
+          Events is always on. A tab per category (Deen, Work, Study…) appears automatically once an
+          event carries that category — switch any of them off here. Hiding a tab never deletes events.
         </p>
       </div>
 
@@ -316,6 +347,23 @@ export default function LifeSettingsPage() {
               ))}
               <input type="color" value={form.color} onChange={e => F('color', e.target.value)}
                 className="w-7 h-7 rounded-lg bg-transparent cursor-pointer" aria-label="Custom colour" />
+            </div>
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>Last swatch = any custom colour.</p>
+          </div>
+
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-muted)' }}>Mark shape (how it draws on the grid)</label>
+            <div className="flex gap-2">
+              {SHAPES.map(s => (
+                <button key={s} type="button" onClick={() => F('shape', s)} aria-label={s} title={s}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: form.shape === s ? 'var(--gold-dim)' : 'var(--surface-2)',
+                    border: `1px solid ${form.shape === s ? 'var(--gold)' : 'var(--border)'}`,
+                  }}>
+                  <span className="w-4 h-4 block" style={shapePreview(s, form.color)} />
+                </button>
+              ))}
             </div>
           </div>
 

@@ -12,6 +12,7 @@ export type GoalType = 'individual' | 'joint'
 export type WasiyyaCategory = 'asset' | 'debt' | 'instruction' | 'password' | 'contact' | 'message'
 export type LifeEventKind = 'milestone' | 'intention' | 'reminder'
 export type LifeRecurrence = 'none' | 'monthly' | 'yearly' | 'hijri_yearly'
+export type LifeShape = 'square' | 'circle' | 'diamond' | 'ring'
 export type ExpenseCategory = 'rent' | 'utilities' | 'petrol' | 'food_out' | 'groceries' | 'vape' | 'sent_home' | 'health' | 'gift' | 'subscription' | 'business' | 'other'
 
 export interface LifeEvent {
@@ -25,6 +26,7 @@ export interface LifeEvent {
   notes: string | null
   category: string | null      // layer tag (Deen, Work, Study…) — becomes a grid tab
   end_date: string | null      // set → event is a PERIOD spanning start→end
+  shape: LifeShape             // mark shape on the grid (default 'square')
   created_at: string
 }
 

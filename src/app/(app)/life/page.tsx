@@ -20,6 +20,15 @@ const DECADE_COLORS = ['#C9A84C', '#D4A017', '#10B981', '#3B82F6', '#A855F7', '#
 const MS_DAY = 86_400_000
 // 6-digit hex + alpha suffix for period tints (event colours are hex swatches/picker output).
 const hexA = (c: string, a: string) => (c.length === 7 ? c + a : c)
+// How a point event draws: shape × colour × filled (lived) / outline (future).
+function shapeStyle(shape: string | null | undefined, color: string, filled: boolean): React.CSSProperties {
+  const s: React.CSSProperties = filled && shape !== 'ring'
+    ? { background: color }
+    : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${color}` }
+  if (shape === 'circle') s.borderRadius = '50%'
+  if (shape === 'diamond') { s.transform = 'rotate(45deg) scale(0.75)'; s.borderRadius = '1px' }
+  return s
+}
 
 export default function LifePage() {
   const supabase = createClient()
@@ -29,7 +38,7 @@ export default function LifePage() {
   const [years, setYears] = useState(63)
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [view, setView] = useState('all')
-  const [gridPrefs, setGridPrefs] = useState({ plain: true, decades: true })
+  const [gridPrefs, setGridPrefs] = useState<{ plain: boolean; decades: boolean; cats: Record<string, boolean> }>({ plain: true, decades: true, cats: {} })
   const [selected, setSelected] = useState<number | null>(null)
   const [yearExpanded, setYearExpanded] = useState(false)
   const [calMonth, setCalMonth] = useState(() => {
@@ -43,7 +52,10 @@ export default function LifePage() {
 
   useEffect(() => {
     setShowIslamic(localStorage.getItem('mizan_islamic_dates') !== '0')
-    try { setGridPrefs(p => ({ ...p, ...JSON.parse(localStorage.getItem('mizan_life_views') ?? '{}') })) } catch {}
+    try {
+      const saved = JSON.parse(localStorage.getItem('mizan_life_views') ?? '{}')
+      setGridPrefs(p => ({ ...p, ...saved, cats: { ...(saved.cats ?? {}) } }))
+    } catch {}
   }, [])
 
   // Islamic markers across the whole lifespan: preset holidays (toggle) + any
@@ -165,7 +177,7 @@ export default function LifePage() {
   const cats = [...new Set(events.map(e => e.category).filter((c): c is string => !!c))]
   const views: { key: string; label: string }[] = [
     { key: 'all', label: 'Events' },
-    ...cats.map(c => ({ key: `cat:${c}`, label: c })),
+    ...cats.filter(c => gridPrefs.cats[c] !== false).map(c => ({ key: `cat:${c}`, label: c })),
     ...(gridPrefs.plain ? [{ key: 'plain', label: 'Plain' }] : []),
     ...(gridPrefs.decades ? [{ key: 'decades', label: 'Decades' }] : []),
   ]
@@ -202,23 +214,28 @@ export default function LifePage() {
     const isNow = i === lived
     if (isNow) return { background: 'var(--gold)', outline: '1.5px solid var(--text-primary)', outlineOffset: '0px' }
 
-    if (activeView === 'plain') return { background: isLived ? 'var(--gold)' : 'var(--border)' }
+    // Islamic dates + Hijri-recurring marks are an OVERLAY — they paint on top
+    // of every view (Plain, Decades, category lenses), not just Events.
+    const mk = markersByWeek.get(i)?.[0]
+    const markerCss: React.CSSProperties | undefined = mk
+      ? (isLived ? { background: mk.color } : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${mk.color}` })
+      : undefined
+
+    if (activeView === 'plain') return markerCss ?? { background: isLived ? 'var(--gold)' : 'var(--border)' }
 
     if (activeView === 'decades') {
+      if (markerCss) return markerCss
       if (!isLived) return { background: 'var(--border)' }
       // One solid colour per 10-year band (matches the legend), not per year.
       return { background: DECADE_COLORS[Math.floor(ageAtWeek(i) / 10) % DECADE_COLORS.length] }
     }
 
-    // 'all' / category lens — point events, then period tints, then Islamic markers.
+    // 'all' / category lens — point events (shape × colour), then period tints, then the overlay.
     const ev = eventByWeek.get(i)
-    if (ev && inLens(ev)) return isLived ? { background: ev.color } : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${ev.color}` }
+    if (ev && inLens(ev)) return shapeStyle(ev.shape, ev.color, isLived)
     const per = periods.find(p => p.w0 <= i && i <= p.w1 && inLens(p.ev))?.ev
     if (per) return { background: hexA(per.color, isLived ? '99' : '3A') }
-    if (!activeCat) {
-      const mk = markersByWeek.get(i)?.[0]
-      if (mk) return { background: isLived ? mk.color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${mk.color}` }
-    }
+    if (markerCss) return markerCss
     // In a category lens the base dims so that layer's colours pop.
     return { background: isLived ? (activeCat ? 'var(--gold-dim)' : 'var(--gold)') : 'var(--border)' }
   }
@@ -449,17 +466,15 @@ export default function LifePage() {
           ))}
         </div>
 
-        {/* Islamic dates toggle */}
-        {activeView === 'all' && (
-          <label className="flex items-center justify-between mb-3 cursor-pointer">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Highlight Islamic dates (full Ramadan, Eids, Dhul Hijjah & Arafah, Ashura)</span>
-            <div className="relative">
-              <input type="checkbox" className="sr-only peer" checked={showIslamic} onChange={e => toggleIslamic(e.target.checked)} />
-              <div className="w-9 h-5 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
-                style={{ background: showIslamic ? 'var(--gold)' : 'var(--border)' }} />
-            </div>
-          </label>
-        )}
+        {/* Islamic dates toggle — an overlay across EVERY view (Plain, Decades, lenses) */}
+        <label className="flex items-center justify-between mb-3 cursor-pointer">
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Islamic dates overlay (full Ramadan, Eids, Dhul Hijjah & Arafah, Ashura) — on any view</span>
+          <div className="relative">
+            <input type="checkbox" className="sr-only peer" checked={showIslamic} onChange={e => toggleIslamic(e.target.checked)} />
+            <div className="w-9 h-5 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
+              style={{ background: showIslamic ? 'var(--gold)' : 'var(--border)' }} />
+          </div>
+        </label>
 
         <div className="grid gap-[2px]" style={{ gridTemplateColumns: 'repeat(52, minmax(0, 1fr))' }}>
           {Array.from({ length: total }).map((_, i) => {
@@ -570,7 +585,7 @@ export default function LifePage() {
                 {selEvent && (
                   <div className="mt-3 flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2 min-w-0">
-                      <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={{ background: selEvent.color }} />
+                      <span className="w-3 h-3 rounded-sm mt-0.5 shrink-0" style={shapeStyle(selEvent.shape, selEvent.color, true)} />
                       <div className="min-w-0">
                         <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selEvent.label}</p>
                         <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -622,7 +637,7 @@ export default function LifePage() {
         )}
 
         {/* Islamic dates legend */}
-        {activeView === 'all' && showIslamic && (
+        {showIslamic && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
             {ISLAMIC_HOLIDAYS.map(h => (
               <div key={h.label} className="flex items-center gap-1.5">
@@ -642,7 +657,7 @@ export default function LifePage() {
               return (
                 <button key={ev.id} onClick={() => setSelected(weekIndexOf(dobDate, new Date(ev.event_date)))}
                   className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: ev.end_date ? hexA(ev.color, '99') : ev.color }} />
+                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={ev.end_date ? { background: hexA(ev.color, '99') } : shapeStyle(ev.shape, ev.color, true)} />
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                     {ev.label} <span style={{ color: 'var(--text-secondary)' }}>{y1 !== y0 ? `${y0}–${y1}` : y0}</span>
                   </span>

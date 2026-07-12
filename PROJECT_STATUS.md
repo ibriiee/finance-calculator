@@ -15,8 +15,8 @@ Turbopack) + Supabase (auth, Postgres, RLS, realtime) + PWA. Deployed on Vercel 
 **owner action**, not more code:
 1. **Run the pending SQL migrations** in Supabase SQL Editor: `supabase/fix-payment-row-triggers.sql`
    (check the pre-flight SELECT first), `supabase/integrity-checks.sql`,
-   `supabase/shared-income-visibility.sql`, and `supabase/life-layers.sql` (migrations 18–21;
-   21 must run before saving any life event from the new form).
+   `supabase/shared-income-visibility.sql` (migrations 18–20), and `supabase/life-shapes.sql`
+   (22 — must run before saving any life event; 21 already run 2026-07-12).
 2. **Enable the keepalive workflow**: add `SUPABASE_URL` + `SUPABASE_ANON_KEY` repo secrets on
    GitHub and confirm `.github/workflows/keepalive.yml` runs green (Actions tab → run manually once).
 3. **Raise Supabase "Max rows" to 10000** (project → Settings → API) so growing tables can't
@@ -103,7 +103,9 @@ All are safe to re-run (idempotent). Files live in `supabase/`.
     writes stay owner-only). **⚠️ NOT YET RUN — owner action needed.** (2026-07-11 audit FIX-23)
 21. `life-layers.sql` — `category` + `end_date` on `life_events` for the Life room layer system
     (category lenses as grid tabs; end_date turns an event into a period/span with progress).
-    **⚠️ MUST RUN before saving events from the new form** — inserts now send both columns.
+    **Run 2026-07-12** — confirmed (category tabs live on prod).
+22. `life-shapes.sql` — `shape` on `life_events` (square | circle | diamond | ring), the second
+    visual dial next to colour. **⚠️ MUST RUN before saving events — the form now sends `shape`.**
 
 (`RUN-ME-run-all-pending.sql` = 10–13 combined into one paste; **migrations 1–16 all run as of 2026-06-30** — confirmed by Ibrahim.)
 
@@ -140,6 +142,14 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-12 (b)** — **Life room v5.1 — overlay + shapes + per-category toggles** (user feedback
+  on v5). *Islamic dates = true overlay:* toggle now visible in every view and its marks paint on
+  top of Plain, Decades, and category lenses (Health + Islamic together, etc.). *Category tabs
+  toggleable:* Grid views in Life Settings now lists every category in use with its own on/off
+  switch (`mizan_life_views.cats`); hiding a tab never deletes events. *Shapes:* migration 22
+  `life-shapes.sql` (**owner must run**) adds `shape` (square/circle/diamond/ring) — picker in the
+  event form, rendered on grid + legend + week popup; swatches expanded 8 → 16 (+ custom picker
+  hint). Migration-missing save alert now names both pending migrations.
 - **2026-07-12** — **Life room v5 — layer system.** New migration 21 `life-layers.sql`
   (**owner must run before adding/editing life events**): `category` + `end_date` on `life_events`.
   *Layers:* every distinct category becomes its own grid tab automatically (Deen/Work/Study… —
