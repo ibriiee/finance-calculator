@@ -104,7 +104,14 @@ export default function LifeSettingsPage() {
     const { error } = editingId
       ? await supabase.from('life_events').update(payload).eq('id', editingId)
       : await supabase.from('life_events').insert({ owner_id: user!.id, ...payload })
-    if (error) { setAdding(false); alert('Could not save event: ' + error.message); return }
+    if (error) {
+      setAdding(false)
+      // Missing category/end_date columns = migration 21 not run yet — say so plainly.
+      alert(/category|end_date/.test(error.message) && /column|schema cache/.test(error.message)
+        ? 'Migration needed: run supabase/life-layers.sql (migration 21) in the Supabase SQL Editor, then save again.'
+        : 'Could not save event: ' + error.message)
+      return
+    }
     setForm(blank)
     setEditingId(null)
     await load()

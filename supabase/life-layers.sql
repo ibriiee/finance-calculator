@@ -11,3 +11,7 @@
 
 ALTER TABLE public.life_events ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE public.life_events ADD COLUMN IF NOT EXISTS end_date DATE;
+
+-- Force PostgREST to pick up the new columns immediately (avoids
+-- "Could not find the 'category' column ... in the schema cache").
+NOTIFY pgrst, 'reload schema';
