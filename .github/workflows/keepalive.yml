@@ -8,5 +8,17 @@ jobs:
     steps:
       - name: Ping database (counts as DB activity)
         run: |
-          curl -sf "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" > /dev/null
+          # -f swallowed the real HTTP status behind an opaque curl exit code,
+          # making a bad secret indistinguishable from a bad URL. Print the
+          # actual status + body instead (secret values are auto-masked by
+          # GitHub in this output, so nothing sensitive leaks).
+          HTTP_CODE=$(curl -s --max-time 15 -o /tmp/resp.json -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}")
+          BODY=$(head -c 300 /tmp/resp.json 2>/dev/null)
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Keepalive ping failed — HTTP $HTTP_CODE. Response: $BODY"
+            exit 1
+          fi
