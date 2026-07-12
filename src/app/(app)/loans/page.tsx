@@ -7,7 +7,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import LoanForm from '@/components/loans/LoanForm'
 import { validateAmount } from '@/lib/utils'
 import type { Loan } from '@/types/database.types'
@@ -96,6 +96,15 @@ export default function LoansPage() {
       return `${loan.original_amount}g silver = AED ${val.toLocaleString()}`
     }
     return formatCurrency(loan.original_amount, loan.currency_type)
+  }
+
+  async function deleteLoan(id: string) {
+    // loan_repayments has ON DELETE CASCADE on loan_id (schema.sql), so this
+    // cleanly removes any logged repayments too — no orphaned rows.
+    if (!confirm('Delete this loan? Any repayments logged against it are deleted too. This cannot be undone.')) return
+    const { error } = await supabase.from('loans').delete().eq('id', id)
+    if (error) { alert('Could not delete: ' + error.message); return }
+    load()
   }
 
   function LoanCard({ loan, mine }: { loan: Loan; mine: boolean }) {
@@ -209,6 +218,13 @@ export default function LoansPage() {
               </div>
             )}
           </div>
+        )}
+        {canEdit && (
+          <button onClick={() => deleteLoan(loan.id)}
+            className="mt-2 w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+            style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+            <Trash2 size={13} /> Delete
+          </button>
         )}
       </div>
     )
