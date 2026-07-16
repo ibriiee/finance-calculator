@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "tsx src/lib/sadaka.test.ts && tsx src/lib/lifeMath.test.ts && tsx src/lib/hijri.test.ts",
     "backup": "node scripts/backup.mjs",
-    "restore": "node scripts/restore.mjs"
+    "restore": "node scripts/restore.mjs",
+    "snapshot": "node scripts/snapshot.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.12",

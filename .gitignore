@@ -25,6 +25,7 @@ supabase/.temp
 
 # Data backups — contain real financial data, NEVER commit
 backups/
+snapshot.md
 
 # OS
 .DS_Store
