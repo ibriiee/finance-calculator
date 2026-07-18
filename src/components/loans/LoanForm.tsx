@@ -4,22 +4,32 @@ import { createClient } from '@/lib/supabase/client'
 import { X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import { validateAmount } from '@/lib/utils'
-import type { LoanType, LoanCurrencyType } from '@/types/database.types'
+import type { LoanType, LoanCurrencyType, Loan } from '@/types/database.types'
 
-interface Props { onClose: () => void; onSaved: () => void }
+interface Props {
+  onClose: () => void
+  onSaved: () => void
+  editLoan?: Loan | null
+  // total already repaid against editLoan — used to recompute status if the amount changes
+  repaidTotal?: number
+}
 
-export default function LoanForm({ onClose, onSaved }: Props) {
+export default function LoanForm({ onClose, onSaved, editLoan, repaidTotal = 0 }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(!!editLoan)
   const [me, setMe] = useState('')
   const [people, setPeople] = useState<{ id: string; name: string }[]>([])
-  const [ownerId, setOwnerId] = useState('')
+  const [ownerId, setOwnerId] = useState(editLoan?.owner_id ?? '')
   const [form, setForm] = useState({
-    counterparty_name: '', loan_type: 'i_owe' as LoanType,
-    currency_type: 'AED' as LoanCurrencyType, original_amount: '',
-    date_taken: new Date().toISOString().split('T')[0], due_date: '', notes: '',
+    counterparty_name: editLoan?.counterparty_name ?? '',
+    loan_type: (editLoan?.loan_type ?? 'i_owe') as LoanType,
+    currency_type: (editLoan?.currency_type ?? 'AED') as LoanCurrencyType,
+    original_amount: editLoan ? String(editLoan.original_amount) : '',
+    date_taken: editLoan?.date_taken ?? new Date().toISOString().split('T')[0],
+    due_date: editLoan?.due_date ?? '',
+    notes: editLoan?.notes ?? '',
   })
   const F = (f: string, v: string) => setForm(p => ({ ...p, [f]: v }))
   const isGold = ['gold_grams', 'silver_grams'].includes(form.currency_type)
@@ -27,7 +37,8 @@ export default function LoanForm({ onClose, onSaved }: Props) {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setMe(user!.id); setOwnerId(user!.id)
+      setMe(user!.id)
+      if (!editLoan) setOwnerId(user!.id)
       const { data: profs } = await supabase.from('profiles').select('id, display_name')
       setPeople((profs ?? []).map((p: any) => ({ id: p.id, name: p.display_name ?? 'User' })))
     })()
@@ -39,10 +50,26 @@ export default function LoanForm({ onClose, onSaved }: Props) {
     if (amtErr) { setError(amtErr); return }
     if (!me) return
     setSaving(true); setError('')
+    const amount = parseFloat(form.original_amount)
+    if (editLoan) {
+      // status must track the new amount vs what's already repaid
+      const status = repaidTotal >= amount ? 'cleared' : repaidTotal > 0 ? 'partial' : 'outstanding'
+      const { error: err } = await supabase.from('loans').update({
+        owner_id: ownerId || me, counterparty_name: form.counterparty_name,
+        loan_type: form.loan_type, currency_type: form.currency_type,
+        original_amount: amount,
+        date_taken: form.date_taken, due_date: form.due_date || null,
+        notes: form.notes || null, status,
+      }).eq('id', editLoan.id)
+      setSaving(false)
+      if (err) { setError(err.message); return }
+      onSaved(); onClose()
+      return
+    }
     const row = {
       owner_id: ownerId || me, counterparty_name: form.counterparty_name,
       loan_type: form.loan_type, currency_type: form.currency_type,
-      original_amount: parseFloat(form.original_amount),
+      original_amount: amount,
       date_taken: form.date_taken, due_date: form.due_date || null,
       status: 'outstanding' as const, notes: form.notes || null, joint_ibrahim_pct: 0.5,
     }
@@ -60,7 +87,7 @@ export default function LoanForm({ onClose, onSaved }: Props) {
   return (
     <FormSheet onClose={onClose}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold">Add Loan</h2>
+          <h2 className="text-base font-bold">{editLoan ? 'Edit Loan' : 'Add Loan'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}><X size={16} /></button>
         </div>
 
@@ -154,7 +181,7 @@ export default function LoanForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Save Loan'}
+            {saving ? 'Saving…' : editLoan ? 'Save Changes' : 'Save Loan'}
           </button>
         </div>
     </FormSheet>

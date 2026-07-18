@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, ArrowLeftRight, ArrowUpRight, ArrowDownLeft, CheckCircle2, RotateCcw, Trash2 } from 'lucide-react'
+import { Plus, ArrowLeftRight, ArrowUpRight, ArrowDownLeft, CheckCircle2, RotateCcw, Trash2, Pencil } from 'lucide-react'
 import LedgerForm from '@/components/ledger/LedgerForm'
 import SettleUpModal from '@/components/ledger/SettleUpModal'
 import type { BrotherLedgerEntry, Profile } from '@/types/database.types'
@@ -18,6 +18,7 @@ export default function LedgerPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editEntry, setEditEntry] = useState<BrotherLedgerEntry | null>(null)
   const [showSettle, setShowSettle] = useState(false)
   const [filter, setFilter] = useState<'unsettled' | 'all'>('unsettled')
   const supabase = createClient()
@@ -150,10 +151,12 @@ export default function LedgerPage() {
               <div key={entry.id} className={`card p-4 ${entry.is_settled ? 'opacity-50' : ''}`} style={{ borderLeft: `3px solid ${borderColor}` }}>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3 flex-1 mr-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isPayer ? 'bg-red-500/15' : 'bg-emerald-500/15'}`}>
+                    {/* Colors follow the DEBT (who owes whom), matching the balance card:
+                        green = they owe you, red = you owe them. Arrow = cash direction. */}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isPayer ? 'bg-emerald-500/15' : 'bg-red-500/15'}`}>
                       {isPayer
-                        ? <ArrowUpRight size={14} className="text-red-400" />
-                        : <ArrowDownLeft size={14} className="text-emerald-400" />}
+                        ? <ArrowUpRight size={14} className="text-emerald-400" />
+                        : <ArrowDownLeft size={14} className="text-red-400" />}
                     </div>
                     <div>
                       <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{entry.description}</p>
@@ -164,14 +167,20 @@ export default function LedgerPage() {
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1">
-                    <p className={`text-base font-bold ${isPayer ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {isPayer ? '-' : '+'}{formatCurrency(entry.amount, entry.currency)}
+                    <p className={`text-base font-bold ${isPayer ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {isPayer ? '+' : '−'}{formatCurrency(entry.amount, entry.currency)}
                     </p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {isPayer ? `you → ${otherUser?.display_name}` : `${otherUser?.display_name} → you`}
+                      {isPayer ? `${otherUser?.display_name} owes you` : `you owe ${otherUser?.display_name}`}
                     </p>
                     {!entry.is_settled && (
                       <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => { setEditEntry(entry); setShowForm(true) }}
+                          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg"
+                          style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                          <Pencil size={10} /> Edit
+                        </button>
                         <button
                           onClick={async () => {
                             if (!confirm('Reverse this entry? Creates an equal opposite transaction.')) return
@@ -214,7 +223,7 @@ export default function LedgerPage() {
         </div>
       )}
 
-      {showForm && <LedgerForm onClose={() => setShowForm(false)} onSaved={load} userId={userId} otherUser={otherUser} />}
+      {showForm && <LedgerForm onClose={() => { setShowForm(false); setEditEntry(null) }} onSaved={load} userId={userId} otherUser={otherUser} editEntry={editEntry} />}
       {showSettle && <SettleUpModal onClose={() => setShowSettle(false)} onSaved={load} userId={userId} aedBalance={aedBalance} pkrBalance={pkrBalance} />}
     </div>
   )

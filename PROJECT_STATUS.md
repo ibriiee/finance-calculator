@@ -142,6 +142,23 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-18 (b)** — **P0 Batch 1: CRUD + direction parity across ALL modules** (UPGRADES
+  items 1–12; full-app rule: every creatable record is editable & deletable). *Goals:* goal
+  edit/delete + brand-new contribution history list with inline edit/delete (was: contributions
+  invisible & permanent); deleting a goal warns about its contributions (FK cascade). *Ledger:*
+  entry edit (unsettled only) + colors unified on the DEBT perspective — rows now green "+ X owes
+  you" / red "− you owe X" matching the balance card (was contradictory cash-flow coloring); form
+  direction buttons green/red with live "X will owe you…" preview. *Loans:* loan edit (owner/adder,
+  status recomputed vs repaid), repayment history expandable with edit/delete (gated to who logged
+  it, matching RLS `paid_by_id`), loan status auto-syncs after any repayment change. *Savings:*
+  entry edit + full green/red form treatment. *Recipients:* edit + smart delete (hard delete if
+  unused; archive `is_active=false` if payment history exists — FK has no cascade, history
+  protected). *Zakat:* snapshot delete. *Joint:* account edit (rename/bank/currency with
+  no-conversion warning) + archive; **latent bug fixed** — Joint page never filtered
+  `is_active`, archived accounts would have kept showing. Wasiyya CRUD deliberately deferred to
+  its rethink. **New `UPGRADE-PLAN.md`**: phased execution plan + model policy (Fable 5/Opus for
+  all money/multi-file work; Sonnet/Haiku only for spec'd mechanical items S-1…S-8/H-1…H-3 under
+  a 120%-certainty rule). Verified: tsc clean, npm test green, next build passes.
 - **2026-07-18** — **Joint Account: txn edit/delete + direction clarity** (user-reported: no way
   to change/delete a joint txn even in Developer Mode, and the Add Transaction form gave no
   deposit-vs-withdraw signal). *Edit/delete:* Pencil/Trash on every txn row (both users — shared
@@ -476,8 +493,10 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 - ✅ **All migrations 1–13 run in Supabase** (Ibrahim ran `RUN-ME-run-all-pending.sql`).
 
 ## Roadmap / TODO
-- [ ] **See `UPGRADES.md` (2026-07-18)** — 100-item prioritized roadmap from the full-app audit +
-      top-app research. Next up: **P0 Batch 1** (items 1–12, CRUD + direction parity everywhere).
+- [x] ~~P0 Batch 1 (UPGRADES items 1–12)~~ — done 2026-07-18 (b).
+- [ ] **See `UPGRADES.md` + `UPGRADE-PLAN.md`** — roadmap + phased execution plan with model
+      assignments. Next up: **Phase 2** (nav hub, pick-your-tabs, quick-add FAB, entry speed —
+      Fable 5), then Phase 5 delegated items (Sonnet/Haiku per specs S-1…S-8, H-1…H-3).
 - [x] ~~Run migrations 10–13 in Supabase SQL Editor~~ — done 2026-06-11 via
       `RUN-ME-run-all-pending.sql`.
 - [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars.

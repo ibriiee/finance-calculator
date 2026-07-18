@@ -5,7 +5,7 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Scale, CheckCircle2, XCircle, Info } from 'lucide-react'
+import { Scale, CheckCircle2, XCircle, Info, Trash2 } from 'lucide-react'
 import type { ZakatSnapshot } from '@/types/database.types'
 
 const NISAB_GOLD_GRAMS = 87.48
@@ -291,12 +291,24 @@ export default function ZakatPage() {
             {snapshots.map(s => (
               <div key={s.id} className="py-2" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <button aria-label="Delete snapshot"
+                      onClick={async () => {
+                        if (!confirm(`Delete the year ${s.snapshot_year} snapshot? You can recalculate and save it again any time.`)) return
+                        const { error } = await supabase.from('zakat_snapshots').delete().eq('id', s.id)
+                        if (error) { alert(`Could not delete: ${error.message}`); return }
+                        load()
+                      }}
+                      className="p-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                      <Trash2 size={12} />
+                    </button>
+                    <div>
                     <p className="text-sm font-medium">Islamic Year {s.snapshot_year}</p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       Snapshot {shortDate(s.snapshot_date)}
                       {(s as any).due_date && ` · pay by ${shortDate((s as any).due_date)}`}
                     </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className={`text-sm font-bold ${s.is_wajib ? 'text-red-400' : 'text-emerald-400'}`}>

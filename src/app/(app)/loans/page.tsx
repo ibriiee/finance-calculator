@@ -7,16 +7,19 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { Plus, CreditCard, UserRound, ArrowLeftRight, Loader2, ChevronDown, ChevronUp, Trash2, Pencil, Check, X } from 'lucide-react'
 import LoanForm from '@/components/loans/LoanForm'
 import { validateAmount } from '@/lib/utils'
 import type { Loan } from '@/types/database.types'
 
 const RATES_DEFAULTS = { gold_aed_gram: 472, silver_aed_gram: 5.9 }
 
+interface Repayment { id: string; loan_id: string; amount: number; paid_by_id: string | null; payment_date: string | null }
+
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
-  const [repays, setRepays] = useState<{ loan_id: string; amount: number }[]>([])
+  const [repays, setRepays] = useState<Repayment[]>([])
+  const [editLoan, setEditLoan] = useState<Loan | null>(null)
   const [names, setNames] = useState<Record<string, string>>({})
   const [userId, setUserId] = useState('')
   const [ledgerDebt, setLedgerDebt] = useState<{ currency: string; amount: number; toName: string }[]>([])
@@ -35,7 +38,7 @@ export default function LoansPage() {
       supabase.from('loans').select('*').order('created_at', { ascending: false }),
       supabase.from('rates_cache').select('*'),
       supabase.from('profiles').select('id, display_name'),
-      supabase.from('loan_repayments').select('loan_id, amount'),
+      supabase.from('loan_repayments').select('id, loan_id, amount, paid_by_id, payment_date'),
       supabase.from('brother_ledger').select('from_user_id, to_user_id, amount, currency').eq('is_settled', false),
     ])
     if (error) { setLoadError(true); setLoading(false); return }
@@ -113,6 +116,10 @@ export default function LoansPage() {
     const [repayDate, setRepayDate] = useState(new Date().toISOString().split('T')[0])
     const [repaying, setRepaying] = useState(false)
     const [repayError, setRepayError] = useState('')
+    const [showHistory, setShowHistory] = useState(false)
+    const [editingRepay, setEditingRepay] = useState<Repayment | null>(null)
+    const [editRepayAmount, setEditRepayAmount] = useState('')
+    const [editRepayDate, setEditRepayDate] = useState('')
     const isOverdue = loan.due_date && new Date(loan.due_date) < new Date() && loan.status !== 'cleared'
     const isGold = ['gold_grams', 'silver_grams'].includes(loan.currency_type)
     const addedBy = (loan as any).added_by_id as string | null
@@ -139,6 +146,34 @@ export default function LoansPage() {
       setRepaying(false)
       if (statusErr) { setRepayError('Repayment saved, but the card status could not update: ' + statusErr.message); return }
       setRepayAmount(''); setShowRepay(false); load()
+    }
+
+    // Keep loans.status honest whenever repayments change
+    async function syncStatus(newRepaidTotal: number) {
+      const newStatus = newRepaidTotal >= original ? 'cleared' : newRepaidTotal > 0 ? 'partial' : 'outstanding'
+      if (newStatus === loan.status) return
+      const { error } = await supabase.from('loans').update({ status: newStatus }).eq('id', loan.id)
+      if (error) alert('Repayment saved, but the loan status could not update: ' + error.message)
+    }
+
+    async function saveRepayEdit(rep: Repayment) {
+      const amtErr = validateAmount(editRepayAmount, loan.currency_type)
+      if (amtErr) { alert(amtErr); return }
+      const amt = parseFloat(editRepayAmount)
+      const { error } = await supabase.from('loan_repayments')
+        .update({ amount: amt, payment_date: editRepayDate })
+        .eq('id', rep.id)
+      if (error) { alert('Could not save: ' + error.message); return }
+      await syncStatus(repaid - Number(rep.amount) + amt)
+      setEditingRepay(null); load()
+    }
+
+    async function deleteRepay(rep: Repayment) {
+      if (!confirm(`Delete this ${formatCurrency(Number(rep.amount), loan.currency_type)} repayment? The loan's remaining balance goes back up.`)) return
+      const { error } = await supabase.from('loan_repayments').delete().eq('id', rep.id)
+      if (error) { alert('Could not delete: ' + error.message); return }
+      await syncStatus(repaid - Number(rep.amount))
+      load()
     }
 
     // green = cleared, red = still outstanding (needs action)
@@ -178,9 +213,61 @@ export default function LoansPage() {
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${repaidPct}%`, background: repaidPct === 100 ? '#10B981' : 'var(--gold)' }} />
             </div>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            <button onClick={() => setShowHistory(h => !h)}
+              className="text-[11px] mt-1 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+              {showHistory ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {formatCurrency(repaid, loan.currency_type, true)} of {formatCurrency(original, loan.currency_type, true)} repaid
-            </p>
+            </button>
+            {showHistory && (
+              <div className="flex flex-col mt-1">
+                {repays.filter(r => r.loan_id === loan.id)
+                  .sort((a, b) => (b.payment_date ?? '').localeCompare(a.payment_date ?? ''))
+                  .map(rep => (
+                  <div key={rep.id} className="flex items-center justify-between py-1.5 px-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                    {editingRepay?.id === rep.id ? (
+                      <div className="flex items-center gap-1.5 w-full">
+                        <input type="number" value={editRepayAmount} onChange={e => setEditRepayAmount(e.target.value)}
+                          className="w-24 px-2 py-1.5 rounded-lg text-xs"
+                          style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
+                        <input type="date" value={editRepayDate} onChange={e => setEditRepayDate(e.target.value)}
+                          className="flex-1 px-2 py-1.5 rounded-lg text-xs"
+                          style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                        <button onClick={() => saveRepayEdit(rep)} aria-label="Save"
+                          className="p-1.5 rounded-lg" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+                          <Check size={12} />
+                        </button>
+                        <button onClick={() => setEditingRepay(null)} aria-label="Cancel"
+                          className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                          {formatCurrency(Number(rep.amount), loan.currency_type, true)}
+                          {rep.payment_date && ` · ${shortDate(rep.payment_date)}`}
+                          {rep.paid_by_id && ` · ${rep.paid_by_id === userId ? 'you' : (names[rep.paid_by_id] ?? 'other')}`}
+                        </span>
+                        {/* RLS: only whoever logged the repayment can change it */}
+                        {rep.paid_by_id === userId && (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setEditingRepay(rep); setEditRepayAmount(String(rep.amount)); setEditRepayDate(rep.payment_date ?? new Date().toISOString().split('T')[0]) }}
+                              aria-label="Edit repayment"
+                              className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                              <Pencil size={11} />
+                            </button>
+                            <button onClick={() => deleteRepay(rep)} aria-label="Delete repayment"
+                              className="p-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -220,11 +307,18 @@ export default function LoansPage() {
           </div>
         )}
         {canEdit && (
-          <button onClick={() => deleteLoan(loan.id)}
-            className="mt-2 w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
-            style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-            <Trash2 size={13} /> Delete
-          </button>
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => { setEditLoan(loan); setShowForm(true) }}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+              <Pencil size={13} /> Edit
+            </button>
+            <button onClick={() => deleteLoan(loan.id)}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+              style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+              <Trash2 size={13} /> Delete
+            </button>
+          </div>
         )}
       </div>
     )
@@ -319,7 +413,8 @@ export default function LoansPage() {
         </div>
       )}
 
-      {showForm && <LoanForm onClose={() => setShowForm(false)} onSaved={load} />}
+      {showForm && <LoanForm onClose={() => { setShowForm(false); setEditLoan(null) }} onSaved={load}
+        editLoan={editLoan} repaidTotal={editLoan ? repaidFor(editLoan.id) : 0} />}
     </div>
   )
 }

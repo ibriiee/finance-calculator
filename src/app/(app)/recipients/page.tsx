@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, Users, Share2, Check, AlertTriangle } from 'lucide-react'
+import { Plus, Users, Share2, Check, AlertTriangle, Pencil, Trash2 } from 'lucide-react'
 import RecipientForm from '@/components/sadaka/RecipientForm'
 
 interface Recipient { id: string; name: string; relation: string | null; location: string | null; contact: string | null; notes: string | null }
@@ -25,6 +25,7 @@ export default function RecipientsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editRecipient, setEditRecipient] = useState<Recipient | null>(null)
   const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState(50)
 
@@ -41,6 +42,21 @@ export default function RecipientsPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  async function deleteRecipient(r: Recipient, paymentCount: number) {
+    if (paymentCount > 0) {
+      // Sadaka entries reference this recipient (FK blocks a hard delete) —
+      // archive instead so the giving history stays intact.
+      if (!confirm(`${r.name} has ${paymentCount} sadaka payment${paymentCount === 1 ? '' : 's'} recorded, so the record can't be fully deleted. Archive instead? They disappear from this list but the history stays.`)) return
+      const { error } = await supabase.from('sadaka_recipients').update({ is_active: false }).eq('id', r.id)
+      if (error) { alert(`Could not archive: ${error.message}`); return }
+    } else {
+      if (!confirm(`Delete ${r.name}? No payments are recorded against them.`)) return
+      const { error } = await supabase.from('sadaka_recipients').delete().eq('id', r.id)
+      if (error) { alert(`Could not delete: ${error.message}`); return }
+    }
+    load()
+  }
 
   function stats(r: Recipient) {
     const paid = entries.filter(e => e.recipient_id === r.id)
@@ -146,11 +162,23 @@ export default function RecipientsPage() {
                   </p>
                 </div>
               </div>
-              {s.months !== null && (
-                <p className="text-[11px] mt-2" style={{ color: s.overdue ? '#F59E0B' : 'var(--text-muted)' }}>
-                  {s.count} payment{s.count !== 1 ? 's' : ''} · last given {s.months === 0 ? 'this month' : `${s.months} month${s.months !== 1 ? 's' : ''} ago`}
-                </p>
-              )}
+              <div className="flex items-center justify-between mt-2">
+                {s.months !== null ? (
+                  <p className="text-[11px]" style={{ color: s.overdue ? '#F59E0B' : 'var(--text-muted)' }}>
+                    {s.count} payment{s.count !== 1 ? 's' : ''} · last given {s.months === 0 ? 'this month' : `${s.months} month${s.months !== 1 ? 's' : ''} ago`}
+                  </p>
+                ) : <span />}
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setEditRecipient(r); setShowForm(true) }} aria-label="Edit recipient"
+                    className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                    <Pencil size={12} />
+                  </button>
+                  <button onClick={() => deleteRecipient(r, s.count)} aria-label="Delete recipient"
+                    className="p-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
           {ranked.length > visible && (
@@ -163,7 +191,7 @@ export default function RecipientsPage() {
         </div>
       )}
 
-      {showForm && <RecipientForm onClose={() => setShowForm(false)} onSaved={load} />}
+      {showForm && <RecipientForm onClose={() => { setShowForm(false); setEditRecipient(null) }} onSaved={load} editRecipient={editRecipient} />}
     </div>
   )
 }

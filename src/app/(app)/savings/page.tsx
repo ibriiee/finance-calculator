@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, PiggyBank, MapPin, ArrowDownCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
+import { Plus, PiggyBank, MapPin, ArrowDownCircle, ArrowUpCircle, Trash2, Pencil } from 'lucide-react'
 import SavingsForm from '@/components/savings/SavingsForm'
 import type { SavingsEntry } from '@/types/database.types'
 
@@ -18,6 +18,7 @@ export default function SavingsPage() {
   const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [formDefaults, setFormDefaults] = useState<{ account_name?: string; location?: string; currency?: string } | undefined>()
+  const [editEntry, setEditEntry] = useState<SavingsEntry | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   async function load() {
@@ -151,11 +152,15 @@ export default function SavingsPage() {
                             <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{shortDate(e.entry_date)}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold ${isDep ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <div className="flex items-center gap-1">
+                          <span className={`text-xs font-bold mr-1 ${isDep ? 'text-emerald-400' : 'text-red-400'}`}>
                             {isDep ? '+' : '-'}{formatCurrency(e.amount, e.currency, true)}
                           </span>
-                          <button onClick={() => deleteEntry(e.id)} className="p-1.5 rounded-lg"
+                          <button onClick={() => { setEditEntry(e); setShowForm(true) }} aria-label="Edit entry"
+                            className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                            <Pencil size={11} />
+                          </button>
+                          <button onClick={() => deleteEntry(e.id)} aria-label="Delete entry" className="p-1.5 rounded-lg"
                             style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
                             <Trash2 size={11} />
                           </button>
@@ -170,7 +175,7 @@ export default function SavingsPage() {
         </div>
       )}
 
-      {showForm && <SavingsForm onClose={() => setShowForm(false)} onSaved={load} defaults={formDefaults} />}
+      {showForm && <SavingsForm onClose={() => { setShowForm(false); setEditEntry(null) }} onSaved={load} defaults={formDefaults} editEntry={editEntry} />}
     </div>
   )
 }

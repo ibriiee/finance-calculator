@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, Target, TrendingUp } from 'lucide-react'
+import { Plus, Target, TrendingUp, Pencil, Trash2, Check, X } from 'lucide-react'
 import GoalForm from '@/components/goals/GoalForm'
 import type { FinancialGoal, GoalContribution } from '@/types/database.types'
 
@@ -20,9 +20,14 @@ export default function GoalsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editGoal, setEditGoal] = useState<FinancialGoal | null>(null)
   const [contributing, setContributing] = useState<string | null>(null)
   const [contribAmount, setContribAmount] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
+  const [historyFor, setHistoryFor] = useState<string | null>(null)
+  const [editingContrib, setEditingContrib] = useState<GoalContribution | null>(null)
+  const [editContribAmount, setEditContribAmount] = useState('')
+  const [editContribDate, setEditContribDate] = useState('')
   const supabase = createClient()
 
   async function load() {
@@ -61,6 +66,38 @@ export default function GoalsPage() {
     })
     if (error) { alert('Could not save contribution: ' + error.message); return }
     setContributing(null); setContribAmount(''); load()
+  }
+
+  async function deleteGoal(goal: GoalWithProgress) {
+    const n = goal.contributions.length
+    const detail = n > 0 ? ` Its ${n} contribution${n === 1 ? '' : 's'} (${formatCurrency(goal.saved, goal.currency, true)} saved) will be removed with it.` : ''
+    if (!confirm(`Delete goal "${goal.name}"?${detail}`)) return
+    const { error } = await supabase.from('financial_goals').delete().eq('id', goal.id)
+    if (error) { alert(`Could not delete: ${error.message}`); return }
+    load()
+  }
+
+  function startEditContrib(c: GoalContribution) {
+    setEditingContrib(c)
+    setEditContribAmount(String(c.amount))
+    setEditContribDate(c.contribution_date ?? new Date().toISOString().split('T')[0])
+  }
+
+  async function saveContribEdit(goal: GoalWithProgress) {
+    const amtErr = validateAmount(editContribAmount, goal.currency)
+    if (amtErr) { alert(amtErr); return }
+    const { error } = await supabase.from('goal_contributions')
+      .update({ amount: parseFloat(editContribAmount), contribution_date: editContribDate })
+      .eq('id', editingContrib!.id)
+    if (error) { alert(`Could not save: ${error.message}`); return }
+    setEditingContrib(null); load()
+  }
+
+  async function deleteContrib(c: GoalContribution, goal: GoalWithProgress) {
+    if (!confirm(`Delete this ${formatCurrency(c.amount, goal.currency)} contribution?`)) return
+    const { error } = await supabase.from('goal_contributions').delete().eq('id', c.id)
+    if (error) { alert(`Could not delete: ${error.message}`); return }
+    load()
   }
 
   if (loading) return <LoadingSpinner />
@@ -116,9 +153,21 @@ export default function GoalsPage() {
                       </p>
                     )}
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold" style={{ color }}>{goal.pct}%</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>complete</p>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <div className="text-right">
+                      <p className="text-lg font-bold" style={{ color }}>{goal.pct}%</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>complete</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => { setEditGoal(goal); setShowForm(true) }} aria-label="Edit goal"
+                        className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                        <Pencil size={12} />
+                      </button>
+                      <button onClick={() => deleteGoal(goal)} aria-label="Delete goal"
+                        className="p-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -158,6 +207,67 @@ export default function GoalsPage() {
                   </p>
                 )}
 
+                {/* Contribution history — every saved amount stays editable */}
+                {goal.contributions.length > 0 && (
+                  <div className="mb-3">
+                    <button onClick={() => setHistoryFor(historyFor === goal.id ? null : goal.id)}
+                      className="text-xs w-full text-center py-2 rounded-lg"
+                      style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                      {historyFor === goal.id ? 'Hide' : `Show ${goal.contributions.length} contribution${goal.contributions.length === 1 ? '' : 's'}`}
+                    </button>
+                    {historyFor === goal.id && (
+                      <div className="flex flex-col mt-2">
+                        {[...goal.contributions]
+                          .sort((a, b) => (b.contribution_date ?? '').localeCompare(a.contribution_date ?? ''))
+                          .map(c => (
+                          <div key={c.id} className="flex items-center justify-between py-2 px-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                            {editingContrib?.id === c.id ? (
+                              <div className="flex items-center gap-1.5 w-full">
+                                <input type="number" value={editContribAmount} onChange={e => setEditContribAmount(e.target.value)}
+                                  className="w-24 px-2 py-1.5 rounded-lg text-xs"
+                                  style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
+                                <input type="date" value={editContribDate} onChange={e => setEditContribDate(e.target.value)}
+                                  className="flex-1 px-2 py-1.5 rounded-lg text-xs"
+                                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                                <button onClick={() => saveContribEdit(goal)} aria-label="Save"
+                                  className="p-1.5 rounded-lg" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+                                  <Check size={12} />
+                                </button>
+                                <button onClick={() => setEditingContrib(null)} aria-label="Cancel"
+                                  className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div>
+                                  <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                                    +{formatCurrency(c.amount, goal.currency, true)}
+                                  </p>
+                                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                                    {c.contributor_id ? `${names[c.contributor_id] ?? 'User'}${c.contributor_id === userId ? ' (you)' : ''} · ` : ''}
+                                    {c.contribution_date ? shortDate(c.contribution_date) : ''}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => startEditContrib(c)} aria-label="Edit contribution"
+                                    className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button onClick={() => deleteContrib(c, goal)} aria-label="Delete contribution"
+                                    className="p-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Contribute */}
                 {goal.pct < 100 && (
                   contributing === goal.id ? (
@@ -192,7 +302,7 @@ export default function GoalsPage() {
         </div>
       )}
 
-      {showForm && <GoalForm onClose={() => setShowForm(false)} onSaved={load} />}
+      {showForm && <GoalForm onClose={() => { setShowForm(false); setEditGoal(null) }} onSaved={load} editGoal={editGoal} />}
     </div>
   )
 }

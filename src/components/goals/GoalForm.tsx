@@ -4,17 +4,22 @@ import { createClient } from '@/lib/supabase/client'
 import { validateAmount } from '@/lib/utils'
 import { X, Loader2 } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
+import type { FinancialGoal } from '@/types/database.types'
 
-interface Props { onClose: () => void; onSaved: () => void }
+interface Props { onClose: () => void; onSaved: () => void; editGoal?: FinancialGoal | null }
 
-export default function GoalForm({ onClose, onSaved }: Props) {
+export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    name: '', goal_type: 'joint' as 'individual' | 'joint',
-    target_amount: '', currency: 'AED', target_date: '',
-    contribution_method: 'manual', auto_pct: '',
+    name: editGoal?.name ?? '',
+    goal_type: (editGoal?.goal_type ?? 'joint') as 'individual' | 'joint',
+    target_amount: editGoal ? String(editGoal.target_amount) : '',
+    currency: editGoal?.currency ?? 'AED',
+    target_date: editGoal?.target_date ?? '',
+    contribution_method: editGoal?.contribution_method ?? 'manual',
+    auto_pct: '',
   })
   const F = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }))
 
@@ -24,15 +29,21 @@ export default function GoalForm({ onClose, onSaved }: Props) {
     if (amtErr) { setError(amtErr); return }
     setSaving(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
-    const { error: err } = await supabase.from('financial_goals').insert({
+    // owner_id must track goal_type: individual = mine, joint = nobody's (RLS goals_auth)
+    const payload = {
       owner_id: form.goal_type === 'individual' ? user!.id : null,
       goal_type: form.goal_type, name: form.name,
       target_amount: parseFloat(form.target_amount), currency: form.currency as any,
       target_date: form.target_date || null,
       contribution_method: form.contribution_method as any,
-      auto_pct: form.auto_pct ? parseFloat(form.auto_pct) / 100 : null,
-      is_active: true,
-    })
+    }
+    const { error: err } = editGoal
+      ? await supabase.from('financial_goals').update(payload).eq('id', editGoal.id)
+      : await supabase.from('financial_goals').insert({
+          ...payload,
+          auto_pct: form.auto_pct ? parseFloat(form.auto_pct) / 100 : null,
+          is_active: true,
+        })
     setSaving(false)
     if (err) { setError(err.message); return }
     onSaved(); onClose()
@@ -41,7 +52,7 @@ export default function GoalForm({ onClose, onSaved }: Props) {
   return (
     <FormSheet onClose={onClose}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold">New Goal</h2>
+          <h2 className="text-base font-bold">{editGoal ? 'Edit Goal' : 'New Goal'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}><X size={16} /></button>
         </div>
 
@@ -85,7 +96,7 @@ export default function GoalForm({ onClose, onSaved }: Props) {
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
-            {saving ? 'Saving…' : 'Create Goal'}
+            {saving ? 'Saving…' : editGoal ? 'Save Changes' : 'Create Goal'}
           </button>
         </div>
     </FormSheet>

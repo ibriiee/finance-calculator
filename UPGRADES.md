@@ -13,7 +13,7 @@ upgrade · **P2** = nice-to-have · ⚠ = needs a dependency or external service
 
 ---
 
-## A. Consistency & trust — every record must be editable (P0)
+## A. Consistency & trust — every record must be editable (P0) — ✅ DONE 2026-07-18 (except #10 wasiyya, deferred to its rethink; see UPGRADE-PLAN.md Phase 1)
 
 The Joint Account bug fixed today (no edit/delete on transactions) exists in the same form in
 half the modules. Rule going forward: **every row a user can create, they can edit and delete**,
@@ -30,7 +30,7 @@ with received/given locking where it exists today.
 9. **P0 Joint: edit + deactivate an account** — rename a joint account, fix its bank name, or archive it when closed.
 10. **P0 Wasiyya: full CRUD pass** — module is flagged "user wants rethink"; whatever the rethink is, it must ship with edit/delete from day one.
 
-## B. Direction clarity — no ambiguous money movement (P0/P1)
+## B. Direction clarity — no ambiguous money movement (P0/P1) — ✅ #11–12 DONE 2026-07-18 (13–15 in Phase 5 / rolling)
 
 Same idea as today's green/red TxnForm fix, applied everywhere money has a direction.
 

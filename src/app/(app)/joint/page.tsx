@@ -23,6 +23,7 @@ export default function JointAccountPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [showAccountForm, setShowAccountForm] = useState(false)
+  const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [txnFor, setTxnFor] = useState<Account | null>(null)
   const [editTxn, setEditTxn] = useState<{ acc: Account; txn: Txn } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -39,7 +40,7 @@ export default function JointAccountPage() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
     const [{ data: accs, error }, { data: tx }, { data: profs }, { data: rate }] = await Promise.all([
-      supabase.from('joint_accounts').select('*').order('created_at', { ascending: true }),
+      supabase.from('joint_accounts').select('*').eq('is_active', true).order('created_at', { ascending: true }),
       supabase.from('joint_account_txns').select('*').order('txn_date', { ascending: false }),
       supabase.from('profiles').select('id, display_name'),
       supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
@@ -130,11 +131,17 @@ export default function JointAccountPage() {
                     </p>
                   )}
                 </div>
-                <button onClick={() => setTxnFor(acc)}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
-                  style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
-                  <Plus size={12} /> Txn
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => { setEditAccount(acc); setShowAccountForm(true) }} aria-label="Edit account"
+                    className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                    <Pencil size={12} />
+                  </button>
+                  <button onClick={() => setTxnFor(acc)}
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
+                    style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                    <Plus size={12} /> Txn
+                  </button>
+                </div>
               </div>
 
               {/* Balance */}
@@ -218,7 +225,7 @@ export default function JointAccountPage() {
         })
       )}
 
-      {showAccountForm && <AccountForm onClose={() => setShowAccountForm(false)} onSaved={load} />}
+      {showAccountForm && <AccountForm onClose={() => { setShowAccountForm(false); setEditAccount(null) }} onSaved={load} editAccount={editAccount} />}
       {txnFor && <TxnForm onClose={() => setTxnFor(null)} onSaved={load} accountId={txnFor.id} accountCurrency={txnFor.currency} />}
       {editTxn && <TxnForm onClose={() => setEditTxn(null)} onSaved={load} accountId={editTxn.acc.id} accountCurrency={editTxn.acc.currency} editTxn={editTxn.txn} />}
     </div>
