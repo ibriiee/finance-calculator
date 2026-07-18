@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, Landmark, ArrowDownCircle, ArrowUpCircle, Building2 } from 'lucide-react'
+import { Plus, Landmark, ArrowDownCircle, ArrowUpCircle, Building2, Pencil, Trash2 } from 'lucide-react'
 import AccountForm from '@/components/joint/AccountForm'
 import TxnForm from '@/components/joint/TxnForm'
 
@@ -24,7 +24,16 @@ export default function JointAccountPage() {
   const [loadError, setLoadError] = useState(false)
   const [showAccountForm, setShowAccountForm] = useState(false)
   const [txnFor, setTxnFor] = useState<Account | null>(null)
+  const [editTxn, setEditTxn] = useState<{ acc: Account; txn: Txn } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+
+  async function deleteTxn(txn: Txn, currency: string) {
+    const label = txn.txn_type === 'deposit' ? 'deposit' : 'expense'
+    if (!confirm(`Delete this ${label} of ${formatCurrency(Number(txn.amount), currency)}? Both of you will see it removed.`)) return
+    const { error } = await supabase.from('joint_account_txns').delete().eq('id', txn.id)
+    if (error) { alert(`Could not delete: ${error.message}`); return }
+    load()
+  }
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -186,9 +195,19 @@ export default function JointAccountPage() {
                             </p>
                           </div>
                         </div>
-                        <span className={`text-xs font-bold ${isDep ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {isDep ? '+' : '-'}{formatCurrency(x.amount, acc.currency, true)}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className={`text-xs font-bold mr-1 ${isDep ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {isDep ? '+' : '-'}{formatCurrency(x.amount, acc.currency, true)}
+                          </span>
+                          <button onClick={() => setEditTxn({ acc, txn: x })} aria-label="Edit transaction"
+                            className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                            <Pencil size={12} />
+                          </button>
+                          <button onClick={() => deleteTxn(x, acc.currency)} aria-label="Delete transaction"
+                            className="p-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     )
                   })}
@@ -201,6 +220,7 @@ export default function JointAccountPage() {
 
       {showAccountForm && <AccountForm onClose={() => setShowAccountForm(false)} onSaved={load} />}
       {txnFor && <TxnForm onClose={() => setTxnFor(null)} onSaved={load} accountId={txnFor.id} accountCurrency={txnFor.currency} />}
+      {editTxn && <TxnForm onClose={() => setEditTxn(null)} onSaved={load} accountId={editTxn.acc.id} accountCurrency={editTxn.acc.currency} editTxn={editTxn.txn} />}
     </div>
   )
 }

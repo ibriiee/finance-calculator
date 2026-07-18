@@ -45,7 +45,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Sadaka | `/sadaka` | ✅ v2 | Auto-obligation from income, advance netting, AED/PKR + joint totals, on-behalf w/ attribution. **Export record** card: CSV + printable PDF of sadaka given, scoped all-time or by month (`src/lib/sadakaExport.ts`). **Smart income linking** (`src/lib/sadaka.ts`): the "pay toward which income" picker hides streams whose sadaka chapter is fully given (settled), shows "X due" per open stream, and warns when a payment overpays a linked stream (excess → advance) |
 | Recipients | `/recipients` | ✅ | Directory of sadaka recipients; total received, last paid, overdue→prioritise flags, **WhatsApp export**. Linked from Sadaka + selectable in SadakaForm |
 | Brother Ledger | `/ledger` | ✅ | IOU between brothers; fixed profile-read RLS hang |
-| Joint Account | `/joint` | ✅ | House account: deposits/withdrawals, balance, equal-share fairness, AED↔PKR, realtime |
+| Joint Account | `/joint` | ✅ | House account: deposits/withdrawals, balance, equal-share fairness, AED↔PKR, realtime. **Txn edit/delete** (both users), green/red deposit-vs-withdraw form language |
 | Zakat | `/zakat` | ✅ | Silver nisab active (+gold ref), assets−liabilities, pay-by date, yearly paid log |
 | Goals | `/goals` | ✅ basic | Individual/joint goals, contributions |
 | Loans | `/loans` | ✅ v2 | Qard Hasan tracking; **both brothers see all loans**, "Added by X" tag, "You owe — by person" breakdown (incl. ledger debt), repayments shown, on-behalf entry |
@@ -142,6 +142,15 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-18** — **Joint Account: txn edit/delete + direction clarity** (user-reported: no way
+  to change/delete a joint txn even in Developer Mode, and the Add Transaction form gave no
+  deposit-vs-withdraw signal). *Edit/delete:* Pencil/Trash on every txn row (both users — shared
+  RLS is already `FOR ALL`), TxnForm gained edit mode (update vs insert). *Direction clarity:*
+  form is now green (deposit) / red (withdraw) throughout — type buttons with in/out icons,
+  signed `+/− CUR` chip, accent-colored amount border, live "goes IN / comes OUT" preview line,
+  submit button colored+labeled by type. Also: **full app audit** — same edit/delete gap exists
+  in Goals/Ledger/Loans/Savings/Recipients/Zakat (not yet fixed); findings + research distilled
+  into **`UPGRADES.md`** (100-item prioritized roadmap; P0 batch = CRUD parity everywhere).
 - **2026-07-12 (b)** — **Life room v5.1 — overlay + shapes + per-category toggles** (user feedback
   on v5). *Islamic dates = true overlay:* toggle now visible in every view and its marks paint on
   top of Plain, Decades, and category lenses (Health + Islamic together, etc.). *Category tabs
@@ -467,6 +476,8 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 - ✅ **All migrations 1–13 run in Supabase** (Ibrahim ran `RUN-ME-run-all-pending.sql`).
 
 ## Roadmap / TODO
+- [ ] **See `UPGRADES.md` (2026-07-18)** — 100-item prioritized roadmap from the full-app audit +
+      top-app research. Next up: **P0 Batch 1** (items 1–12, CRUD + direction parity everywhere).
 - [x] ~~Run migrations 10–13 in Supabase SQL Editor~~ — done 2026-06-11 via
       `RUN-ME-run-all-pending.sql`.
 - [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars.
