@@ -45,26 +45,40 @@ UPGRADES items 1–12 (except #10 wasiyya — see note):
 - **Joint account** — account edit (rename/bank/currency with no-conversion warning) + archive; Joint page now correctly hides archived accounts (`is_active` filter was missing — latent bug found & fixed).
 - *#10 Wasiyya deferred deliberately*: module is flagged "user wants rethink" in PROJECT_STATUS — building CRUD on a shape that will be replaced is waste. CRUD ships as part of the rethink (Phase 4, Fable 5).
 
-### Phase 2 — Navigation & entry speed (Fable 5) — NEXT
-Order of execution, one session:
-1. **#16 "All modules" hub** — new `/modules` page: tappable grid of every enabled module with live one-line stat per card (reuses dashboard queries, trimmed). Add compass icon to bottom nav's Home row? No — hub becomes the 5th tab replacing nothing: nav stays Home + 3 + Settings; hub link goes in ModuleHeader of dashboard ("All →") + quick-links row.
-2. **#17 Pick-your-3 nav tabs** — Settings section writing `profiles.enabled_modules` order → `ROOMS.finance.tabs` sorted by stored preference before `slice(0,3)` in BottomNav.
-3. **#18 Global quick-add FAB** — dashboard-only floating button opening a FormSheet with 5 shortcuts (Expense/Income/Sadaka/Joint txn/IOU), each deep-links to the module with its form open via `?add=1` param each page already reads `showForm` state — add a `useSearchParams` open-on-mount.
-4. **#22 last-used defaults** + **#24 duplicate-last** — localStorage per form (`mizan_last_expense` etc.), applied as initial state; "same as last" chip in ExpenseForm.
-5. **#25 recurring expenses** — `is_recurring` column migration + on-load synthesis of "due this month" pending rows (confirm-to-create, no cron).
+### Phase 2 — Navigation & entry speed (✅ shipped 2026-07-19, Fable 5)
+- **#16 "All modules" hub** — new `/modules` page (static grid, every enabled module, 2 taps from Home); "All modules" card on dashboard. Live per-card stats skipped — dashboard already shows stats (YAGNI).
+- **#17 Pick-your-3 nav tabs** — Settings → Bottom Navigation card; per-device localStorage `mizan_nav_tabs` (tap order = bar order); BottomNav honors it. No schema change needed.
+- **#18 Quick-add FAB** — dashboard floating +, 5 shortcuts deep-linking with `?add=1`; expenses/income/sadaka/ledger open their form on arrival, joint opens the first account's TxnForm.
+- **#22/#24 entry speed** — ExpenseForm remembers last category/currency and offers a one-tap "Same as last: Petrol · AED 50" chip (localStorage `mizan_last_expense`).
+- **#25 recurring expenses** — DEFERRED (needs owner-run migration; spec: `is_recurring` column + on-load "due this month" confirm-to-create rows, no cron). → next Fable session.
 
-### Phase 3 — Dashboard insight & household (Fable 5)
-#31 category mini-breakdown, #32 MoM deltas, #33 sadaka streak, #34 obligations strip,
-#50 activity feed, #52 one-tap settle-up on fairness banner, #53 expense→joint+IOU combined action,
-#55 attribution everywhere, #67 manual-rate override surface.
+### Phase 3 — Dashboard insight & household (✅ shipped 2026-07-19, Fable 5)
+- **#31 Spending this month** card — top-4 category bars (labels reused from ExpenseForm), your-share AED-folded.
+- **#32 MoM delta** — "↑/↓ N% vs last month" on the spending card.
+- **#34 Obligations strip** — horizontal chips: zakat countdown, loan due, goal deadline, nisab hint.
+- **#50 Recent activity** feed — joint txns + unsettled IOUs merged, newest 6, names + signed amounts.
+- **#52 "Chip in now"** — fairness banner button pre-fills the equalizing deposit (TxnForm `defaultAmount`).
+- **#55 attribution** — joint expense rows show "by you/Abu Bakar" (`created_by_id`). Ledger has no author column — not retrofittable without a migration; skipped.
+- **#67 manual rate override** — found ALREADY BUILT in Settings → Exchange Rates; no work needed.
+- **#33 sadaka streak** — DEFERRED (month-bucketing of obligations needs care with `computeSadaka`; do it properly next Fable session, on the Sadaka page).
+- **#53 expense→joint combined action** — CUT (advisor): the Expenses "split with brother" toggle already covers the real case; a joint-account variant is speculative. Revisit only if you actually hit the workflow.
 
-### Phase 4 — Islamic core (Fable 5)
-#39 hawl-aware zakat per asset, #40 zakat countdown chip, #41 per-stream sadaka %,
-#42 Ramadan mode, #43 qard hasan repayment intents, #47 wasiyya rethink (incl. its CRUD),
-#44 nisab-crossing alert.
+### Phase 4 — Islamic core (✅ trimmed & shipped 2026-07-19, Fable 5)
+- **#42 Ramadan mode** — gold dashboard banner during Ramadan (via `hijri.ts`), links to Sadaka.
+- **#40 Zakat countdown** — "Zakat in Nd" chip from `hawl_start_date + 354d`, red inside 30 days.
+- **#44 Nisab awareness** — savings+stash vs silver nisab; "set your hawl date" chip when above with no hawl set.
+- **#39 per-asset hawl** — CUT (advisor): real fiqh nuance, but a per-asset anniversary engine for 2 users whose zakat is one yearly sitting is over-engineering. The snapshot + hawl date model is correct enough. Revisit only if a scholar you follow requires per-asset hawl.
+- **#41 per-stream sadaka %** — DEFERRED: requires changing the DB trigger (`sadaka-trigger-v2.sql`) + migration; money-math, Fable 5 only, own session.
+- **#43 qard hasan intents** — CUT (already covered): loans have due dates + overdue states today.
+- **#47 wasiyya rethink** — SKIPPED by owner decision (2026-07-19). All context for the future session: current module `src/app/(app)/wasiyya/page.tsx` + `src/components/wasiyya/WasiyyaForm.tsx` (basic vault, no CRUD — the last module without edit/delete); requirements gathered so far in `PROJECT_STATUS.md` (Modules table row "Wasiyya", Roadmap "Wasiyya rethink"); design direction in `UPGRADES.md` item 47 (guided faraid-aware flow: assets → debts → bequests ≤⅓ → witnesses → print/PDF) + related items 98 (faraid calculator) and 10 (CRUD must ship with it). Fable 5 only.
 
-### Phase 5 — Delegated simple items (Sonnet/Haiku, specs below)
-Run AFTER Phase 2 so patterns are stable. Batch all Sonnet items in one session, Haiku items in another (or same). **Every item: run `npx tsc --noEmit` + `npm run build` before commit; if either fails and the fix isn't obvious in 2 minutes → stop and leave for Fable 5.**
+### Phase 5 — Delegated simple items (Sonnet/Haiku, specs below) — NEXT
+Batch all Sonnet items in one session, Haiku in the same or another. **Every item: run `npx tsc --noEmit` + `npm run build` before commit; if either fails and the fix isn't obvious in 2 minutes → stop and leave for Fable 5.**
+
+### Phase 6 — Deferred Fable-5 work (after Phase 5)
+In order: **#25 recurring expenses** (migration + confirm-to-create), **#33 sadaka streak**,
+**#41 per-stream sadaka %** (trigger change), then Phase L bets on demand (#91 budgets, #92 receipts, #54 monthly statement).
+**#47 wasiyya rethink** stays parked until owner asks for it.
 
 ---
 

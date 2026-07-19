@@ -62,7 +62,10 @@ export default function SadakaPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load(); setDevMode(localStorage.getItem('mizan_dev_mode') === '1') }, [])
+  useEffect(() => {
+    load(); setDevMode(localStorage.getItem('mizan_dev_mode') === '1')
+    if (new URLSearchParams(window.location.search).get('add')) setShowForm(true)
+  }, [])
 
   function totalsFor(list: SadakaEntry[], cur: string) {
     const owed = list.filter(e => e.currency === cur).reduce((s, e) => s + Number(e.amount_owed), 0)

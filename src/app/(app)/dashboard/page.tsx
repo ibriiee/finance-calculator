@@ -1,9 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate, ownershipForEmail } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Receipt, ScrollText, Landmark, BarChart3, Hourglass } from 'lucide-react'
+import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Receipt, ScrollText, Landmark, BarChart3, Hourglass, LayoutGrid, Moon } from 'lucide-react'
+import { EXPENSE_CATEGORIES } from '@/components/expenses/ExpenseForm'
 import StatusBadge from '@/components/shared/StatusBadge'
+import QuickAdd from '@/components/shared/QuickAdd'
 import { daysLeft } from '@/lib/lifeMath'
+import { toHijri } from '@/lib/hijri'
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const supabase = await createClient()
@@ -54,7 +57,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .eq('owner_id', user!.id)
       .eq('is_joint', false),
     supabase.from('brother_ledger')
-      .select('from_user_id, to_user_id, amount, currency')
+      .select('from_user_id, to_user_id, amount, currency, description, transaction_date')
       .eq('is_settled', false),
     supabase.from('income_projects')
       .select('id, name, amount, currency, expected_payment_date, work_completed_date')
@@ -74,19 +77,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .eq('is_active', true)
       .limit(3),
     supabase.from('loans')
-      .select('id, loan_type, currency_type, original_amount, status')
+      .select('id, loan_type, currency_type, original_amount, status, due_date, counterparty_name')
       .eq('owner_id', user!.id)
       .neq('status', 'cleared'),
     supabase.from('joint_accounts').select('id, name, currency').eq('is_active', true),
-    supabase.from('joint_account_txns').select('account_id, txn_type, contributor_id, amount'),
+    supabase.from('joint_account_txns').select('account_id, txn_type, contributor_id, amount, description, category, txn_date, created_by_id'),
     supabase.from('savings_entries').select('currency, txn_type, amount').eq('owner_id', user!.id),
     supabase.from('expenses')
-      .select('amount, currency, my_pct, expense_date')
+      .select('amount, currency, my_pct, expense_date, category')
       .eq('owner_id', user!.id),
-    supabase.from('rates_cache').select('rate_value, updated_at').eq('rate_type', 'pkr_to_aed').single(),
+    supabase.from('rates_cache').select('rate_type, rate_value, updated_at'),
   ]) as any[]
-  const pkrToAed = Number(pkrRate?.rate_value) || 0.0132
-  const ratesStale = !pkrRate?.updated_at || (Date.now() - new Date(pkrRate.updated_at).getTime() > 24 * 60 * 60 * 1000)
+  const rateMap: Record<string, { value: number; updated_at: string | null }> = {}
+  ;((pkrRate ?? []) as any[]).forEach(r => { rateMap[r.rate_type] = { value: Number(r.rate_value), updated_at: r.updated_at } })
+  const pkrToAed = rateMap.pkr_to_aed?.value || 0.0132
+  const silverAedGram = rateMap.silver_aed_gram?.value || 5.9
+  const ratesStale = !rateMap.pkr_to_aed?.updated_at || (Date.now() - new Date(rateMap.pkr_to_aed.updated_at!).getTime() > 24 * 60 * 60 * 1000)
   const otherProfile = (profiles as Array<{ id: string; display_name: string | null }> | null)
     ?.find(p => p.id !== user!.id)
 
@@ -212,6 +218,70 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const enabledModules: Record<string, boolean> = (profile as any)?.enabled_modules ?? {}
   const enabled = (key: string) => enabledModules[key] !== false
 
+  const nameMap: Record<string, string> = {}
+  ;(profiles as any[] ?? []).forEach(p => { nameMap[p.id] = p.display_name ?? 'User' })
+
+  // This month's spending by category (your share, folded to AED) + vs last month
+  const lastMonthStart = new Date(monthStart); lastMonthStart.setMonth(lastMonthStart.getMonth() - 1)
+  const inLastMonth = (d?: string | null) => !!d && new Date(d) >= lastMonthStart && new Date(d) < monthStart
+  const byCategory: Record<string, number> = {}
+  let expThisMonth = 0, expLastMonth = 0
+  ;(expensesData ?? []).forEach((e: any) => {
+    const share = toAed(Number(e.amount) * Number(e.my_pct ?? 1), e.currency)
+    if (inMonth(e.expense_date)) {
+      expThisMonth += share
+      byCategory[e.category ?? 'other'] = (byCategory[e.category ?? 'other'] ?? 0) + share
+    } else if (inLastMonth(e.expense_date)) expLastMonth += share
+  })
+  const topCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 4)
+  const maxCat = topCategories[0]?.[1] ?? 0
+  const momPct = expLastMonth > 0 ? Math.round(((expThisMonth - expLastMonth) / expLastMonth) * 100) : null
+
+  // Household activity feed — joint txns + unsettled IOUs, newest first
+  const accCurrency: Record<string, string> = {}
+  ;(jointAccounts as any[] ?? []).forEach(a => { accCurrency[a.id] = a.currency })
+  const feed = [
+    ...(jointTxns ?? []).map((t: any) => ({
+      date: t.txn_date as string,
+      label: t.description ?? (t.txn_type === 'deposit' ? 'Deposit' : (t.category ?? 'Expense')),
+      sub: t.txn_type === 'deposit'
+        ? `${nameMap[t.contributor_id] ?? 'Someone'} chipped in`
+        : `house expense${t.created_by_id ? ` · by ${nameMap[t.created_by_id] ?? '?'}` : ''}`,
+      amount: Number(t.amount), currency: accCurrency[t.account_id] ?? 'PKR',
+      sign: t.txn_type === 'deposit' ? 1 : -1, href: '/joint',
+    })),
+    ...(ledgerEntries ?? []).map((e: any) => ({
+      date: e.transaction_date as string,
+      label: e.description ?? 'IOU',
+      sub: `owed to ${nameMap[e.from_user_id] ?? '?'} by ${nameMap[e.to_user_id] ?? '?'}`,
+      amount: Number(e.amount), currency: e.currency, sign: e.from_user_id === user!.id ? 1 : -1, href: '/ledger',
+    })),
+  ].filter(f => !!f.date).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6)
+
+  // Upcoming obligations — one strip, everything with a date or amount due
+  const today = new Date().toISOString().split('T')[0]
+  const hawlStartDate = (profile as any)?.hawl_start_date as string | null
+  let zakatDue: { date: string; days: number } | null = null
+  if (hawlStartDate) {
+    const due = new Date(hawlStartDate); due.setDate(due.getDate() + 354)
+    const days = Math.ceil((due.getTime() - Date.now()) / 86400000)
+    if (days >= 0) zakatDue = { date: due.toISOString().split('T')[0], days }
+  }
+  const nextLoanDue = (loansData as any[] ?? [])
+    .filter(l => l.loan_type === 'i_owe' && l.due_date && l.due_date >= today)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null
+  const nextGoalDue = (goalProgress ?? [])
+    .filter(g => g.target_date && g.target_date >= today && g.pct < 100)
+    .sort((a, b) => a.target_date!.localeCompare(b.target_date!))[0] ?? null
+
+  // Islamic context: Ramadan card + nisab awareness
+  const hijriToday = toHijri(new Date())
+  const isRamadan = hijriToday.m === 9
+  const stashAedForNisab = stash('AED') + stash('PKR') * pkrToAed
+  const wealthAed = stashAedForNisab + totalSavingsAed
+  const nisabSilverAed = 612.36 * silverAedGram
+  const aboveNisabNoHawl = wealthAed >= nisabSilverAed && !hawlStartDate
+
   // Life Tracker — days remaining to projected term (only if DOB set)
   const lifeDob = (profile as any)?.date_of_birth as string | null
   const lifeYears = (profile as any)?.life_expectancy_years ?? 63
@@ -256,6 +326,49 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <ArrowRight size={14} className="shrink-0" style={{ color: '#F59E0B' }} />
         </Link>
       ))}
+
+      {/* Ramadan — the giving month */}
+      {isRamadan && enabled('sadaka') && (
+        <Link href="/sadaka" className="rounded-xl px-4 py-3 flex items-center justify-between"
+          style={{ background: 'var(--gold-dim)', border: '1px solid var(--gold)' }}>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--gold)' }}>
+            <span className="font-semibold flex items-center gap-1.5"><Moon size={13} /> Ramadan Mubarak</span>
+            Rewards are multiplied — give a little sadaka every day.
+          </p>
+          <ArrowRight size={14} className="shrink-0" style={{ color: 'var(--gold)' }} />
+        </Link>
+      )}
+
+      {/* Upcoming obligations — everything with a deadline, one strip */}
+      {(zakatDue || nextLoanDue || nextGoalDue || aboveNisabNoHawl) && (
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+          {zakatDue && enabled('zakat') && (
+            <Link href="/zakat" className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: zakatDue.days <= 30 ? 'rgba(239,68,68,0.12)' : 'var(--surface-2)', border: '1px solid var(--border)',
+                color: zakatDue.days <= 30 ? '#EF4444' : 'var(--text-secondary)' }}>
+              ⚖ Zakat in {zakatDue.days}d · {shortDate(zakatDue.date)}
+            </Link>
+          )}
+          {aboveNisabNoHawl && enabled('zakat') && (
+            <Link href="/settings" className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#F59E0B' }}>
+              ⚖ Savings above nisab — set your hawl date
+            </Link>
+          )}
+          {nextLoanDue && enabled('loans') && (
+            <Link href="/loans" className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+              💳 {nextLoanDue.counterparty_name} · due {shortDate(nextLoanDue.due_date)}
+            </Link>
+          )}
+          {nextGoalDue && enabled('goals') && (
+            <Link href="/goals" className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+              🎯 {nextGoalDue.name} · {shortDate(nextGoalDue.target_date)}
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* This month — Yours to Keep as hero, waterfall in collapsible */}
       {enabled('income') && (
@@ -393,6 +506,67 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </Link>
       </div>
+
+      {/* This month's spending — where the money actually went */}
+      {enabled('expenses') && topCategories.length > 0 && (
+        <Link href="/expenses" className="card p-4 block">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Receipt size={16} style={{ color: 'var(--gold)' }} />
+              <span className="text-sm font-semibold">Spending this month</span>
+            </div>
+            <div className="text-right">
+              <span className="font-display text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {formatCurrency(expThisMonth, 'AED', true)}
+              </span>
+              {momPct !== null && (
+                <p className="text-[11px]" style={{ color: momPct > 0 ? '#EF4444' : 'var(--emerald)' }}>
+                  {momPct > 0 ? '↑' : '↓'} {Math.abs(momPct)}% vs last month
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {topCategories.map(([cat, amt]) => (
+              <div key={cat}>
+                <div className="flex items-center justify-between text-xs mb-0.5">
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {EXPENSE_CATEGORIES.find(c => c.value === cat)?.label ?? cat}
+                  </span>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatCurrency(amt, 'AED', true)}</span>
+                </div>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${maxCat > 0 ? Math.round((amt / maxCat) * 100) : 0}%`, background: 'var(--gold)' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Link>
+      )}
+
+      {/* Household activity — what you both did lately */}
+      {feed.length > 0 && (enabled('joint_account') || enabled('ledger')) && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ArrowLeftRight size={16} style={{ color: 'var(--gold)' }} />
+            <span className="text-sm font-semibold">Recent activity</span>
+          </div>
+          <div className="flex flex-col">
+            {feed.map((f, i) => (
+              <Link key={i} href={f.href} className="flex items-center justify-between py-2"
+                style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                <div className="min-w-0 mr-3">
+                  <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{f.label}</p>
+                  <p className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{f.sub} · {shortDate(f.date)}</p>
+                </div>
+                <span className={`text-xs font-bold shrink-0 ${f.sign > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {f.sign > 0 ? '+' : '−'}{formatCurrency(f.amount, f.currency, true)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Brother Ledger */}
       {enabled('ledger') && (
@@ -568,6 +742,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
       </Link>
 
+      {/* All modules hub */}
+      <Link href="/modules" className="card p-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <LayoutGrid size={15} style={{ color: 'var(--gold)' }} />
+          <span className="text-sm font-semibold">All modules</span>
+        </div>
+        <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
+      </Link>
+
       {/* Quick links — gated by module toggles */}
       <div className="grid grid-cols-4 gap-2">
         {[
@@ -584,6 +767,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         ))}
       </div>
 
+      <QuickAdd />
     </div>
   )
 }

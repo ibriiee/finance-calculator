@@ -27,6 +27,16 @@ export default function JointAccountPage() {
   const [txnFor, setTxnFor] = useState<Account | null>(null)
   const [editTxn, setEditTxn] = useState<{ acc: Account; txn: Txn } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [wantAdd, setWantAdd] = useState(false)
+  const [equalize, setEqualize] = useState<{ acc: Account; amount: number } | null>(null)
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('add')) setWantAdd(true)
+  }, [])
+  // Quick-add lands before accounts load — open the form once they're in
+  useEffect(() => {
+    if (wantAdd && accounts.length > 0) { setTxnFor(accounts[0]); setWantAdd(false) }
+  }, [wantAdd, accounts])
 
   async function deleteTxn(txn: Txn, currency: string) {
     const label = txn.txn_type === 'deposit' ? 'deposit' : 'expense'
@@ -170,9 +180,16 @@ export default function JointAccountPage() {
               </div>
               {behind.length > 0 ? (
                 behind.map(b => (
-                  <p key={b.id} className="text-xs mt-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
-                    {b.id === userId ? 'You owe' : `${b.name} owes`} {formatCurrency(b.owes, acc.currency)} to be equal
-                  </p>
+                  <div key={b.id} className="flex items-center justify-between gap-2 text-xs mt-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
+                    <span>{b.id === userId ? 'You owe' : `${b.name} owes`} {formatCurrency(b.owes, acc.currency)} to be equal</span>
+                    {b.id === userId && (
+                      <button onClick={() => setEqualize({ acc, amount: b.owes })}
+                        className="shrink-0 px-2 py-1 rounded-lg font-semibold"
+                        style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+                        Chip in now
+                      </button>
+                    )}
+                  </div>
                 ))
               ) : (
                 s.totalIn > 0 && <p className="text-xs mt-1.5 text-emerald-400">Contributions are equal ✓</p>
@@ -199,6 +216,7 @@ export default function JointAccountPage() {
                             </p>
                             <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                               {isDep && x.contributor_id ? `${names[x.contributor_id] ?? 'User'} · ` : ''}{shortDate(x.txn_date)}
+                              {!isDep && x.created_by_id ? ` · by ${x.created_by_id === userId ? 'you' : (names[x.created_by_id] ?? 'other')}` : ''}
                             </p>
                           </div>
                         </div>
@@ -228,6 +246,7 @@ export default function JointAccountPage() {
       {showAccountForm && <AccountForm onClose={() => { setShowAccountForm(false); setEditAccount(null) }} onSaved={load} editAccount={editAccount} />}
       {txnFor && <TxnForm onClose={() => setTxnFor(null)} onSaved={load} accountId={txnFor.id} accountCurrency={txnFor.currency} />}
       {editTxn && <TxnForm onClose={() => setEditTxn(null)} onSaved={load} accountId={editTxn.acc.id} accountCurrency={editTxn.acc.currency} editTxn={editTxn.txn} />}
+      {equalize && <TxnForm onClose={() => setEqualize(null)} onSaved={load} accountId={equalize.acc.id} accountCurrency={equalize.acc.currency} defaultAmount={equalize.amount} />}
     </div>
   )
 }

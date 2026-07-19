@@ -54,6 +54,7 @@ track **who** received sadaka, when, and who is overdue → manage **joint** hou
 | Wasiyya | `/wasiyya` | ✅ basic | Digital will vault (user wants rethink) |
 | Analytics | `/analytics` | ✅ v2 | **Monthly/Yearly toggle**, **Net Position card** (savings + owed-to-you − loans − ledger = surplus/loss), sadaka donut, trend bars, location donut |
 | Life Tracker | `/life` | ✅ v5 | Memento mori, lives in its own **Life room** (nav toggle Finance ⇄ Life; **bottom tab icons hidden in Life** — only the room pill + top Settings, for a full-screen grid). Per-user DOB + life-expectancy age (default **63**, age of Prophet ﷺ) on `profiles`. Days/weeks/months left, % lived, "life in weeks" grid. **Life events** (`life_events` table): milestones colour their week, intentions outline a future week, reminders (none/monthly/yearly/**hijri_yearly**) show in an **Upcoming** list. **Interactive grid** (tap cell → week dates + **Hijri range** + age + 7-day row + event/marker detail), **3 views** (Events/Plain/Decades + **Decades legend**), **you-are-here** pulse, **this-year** row that **expands to a month-by-month calendar**, **Hijri** today+age, clickable legend, event **edit**. **Islamic dates overlay** (toggle): preset holidays (Ramadan / Eid al-Fitr / Eid al-Adha / Islamic New Year / Ashura) + any `hijri_yearly` event (e.g. a Zakat date) marked on every lunar anniversary across the lifespan. Hijri math in `src/lib/hijri.ts` (Intl-based, no dep, +self-check); life math in `src/lib/lifeMath.ts` (+self-check). **v5 layer system** (migration 21): events carry optional `category` (each distinct one auto-becomes a grid tab/lens — Deen, Work, Study…; Plain/Decades toggleable off in Life Settings, prefs in localStorage `mizan_life_views`) and optional `end_date` (event becomes a **period** — tinted week-span with live progress; "In progress" card = course tracker). Islamic overlay is **span-aware**: full Ramadan month, Dhul Hijjah 1–9 + Arafah, Tasu'a+Ashura 9–10 Muharram. Week detail is a **bottom-sheet popup** (◀ ▶ walks weeks, per-day event/Islamic dots). Month calendar is **dual-calendar** (small Hijri day under each date, Hijri month header, white days 13–15 marked). Reminder push delivery deferred (prefer .ics — see Roadmap) |
+| Modules hub | `/modules` | ✅ | Grid of every enabled module (2 taps from Home); linked from dashboard "All modules" card |
 | Settings | `/settings` | ✅ | All sections **collapsible** (chevron; Profile open by default). Currency, nisab basis, module toggles, sadaka %, hawl, notifications, **test mode**, **data backup (JSON export) + reset**. (Life Tracker DOB/age + events moved to `/life/settings`, also collapsible.) |
 
 ### Locking & data rules
@@ -142,6 +143,21 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-19** — **Phases 2–4 shipped in one pass** (see `UPGRADE-PLAN.md` for full per-item
+  status incl. advisor cuts). *Navigation:* new **`/modules` hub** (every enabled module, 2 taps
+  from Home; "All modules" card on dashboard); **pick-your-3 bottom tabs** (Settings → Bottom
+  Navigation; per-device localStorage `mizan_nav_tabs`, tap order = bar order); **quick-add FAB**
+  on dashboard (5 shortcuts via `?add=1` — expenses/income/sadaka/ledger auto-open their form,
+  joint opens first account's TxnForm). *Entry speed:* ExpenseForm remembers last category/
+  currency + "Same as last" one-tap chip. *Dashboard:* **Spending this month** card (top-4
+  category bars + ↑↓% vs last month), **obligations strip** (zakat countdown from hawl+354d,
+  above-nisab-no-hawl nudge vs silver nisab, next loan due, next goal deadline), **Recent
+  activity** household feed (joint txns + unsettled IOUs, newest 6), **Ramadan banner** (hijri).
+  *Joint:* "Chip in now" on the fairness banner pre-fills the equalizing deposit; expense rows
+  show who added them. Rates query now feeds silver too. *Advisor cuts:* #39 per-asset hawl,
+  #43 (already covered), #53 (covered by expense split); *deferred:* #25 recurring (migration),
+  #33 streak, #41 per-stream % (trigger change); *skipped by owner:* #47 wasiyya rethink —
+  context + file links preserved in UPGRADE-PLAN.md Phase 4. Verified: tsc, tests, build.
 - **2026-07-18 (b)** — **P0 Batch 1: CRUD + direction parity across ALL modules** (UPGRADES
   items 1–12; full-app rule: every creatable record is editable & deletable). *Goals:* goal
   edit/delete + brand-new contribution history list with inline edit/delete (was: contributions
@@ -494,9 +510,12 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 
 ## Roadmap / TODO
 - [x] ~~P0 Batch 1 (UPGRADES items 1–12)~~ — done 2026-07-18 (b).
-- [ ] **See `UPGRADES.md` + `UPGRADE-PLAN.md`** — roadmap + phased execution plan with model
-      assignments. Next up: **Phase 2** (nav hub, pick-your-tabs, quick-add FAB, entry speed —
-      Fable 5), then Phase 5 delegated items (Sonnet/Haiku per specs S-1…S-8, H-1…H-3).
+- [x] ~~Phases 2–4 (nav hub, custom tabs, FAB, entry speed, dashboard insight, activity feed,
+      Ramadan/zakat/nisab)~~ — done 2026-07-19.
+- [ ] **NEXT SESSION → Phase 5 (Sonnet, with Haiku items batched in):** mechanical specs
+      S-1…S-8 + H-1…H-3 in `UPGRADE-PLAN.md`. No money math, no improvisation, escalate on doubt.
+- [ ] **AFTER → Phase 6 (Fable 5):** #25 recurring expenses (migration), #33 sadaka streak,
+      #41 per-stream sadaka % (trigger change). Wasiyya rethink (#47) parked until owner asks.
 - [x] ~~Run migrations 10–13 in Supabase SQL Editor~~ — done 2026-06-11 via
       `RUN-ME-run-all-pending.sql`.
 - [ ] **Get a free goldapi.io key** → set `GOLD_API_KEY` in `.env.local` AND Vercel env vars.

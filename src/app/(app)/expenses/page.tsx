@@ -29,7 +29,10 @@ export default function ExpensesPage() {
     setItems((data as Expense[]) ?? [])
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    if (new URLSearchParams(window.location.search).get('add')) setShowForm(true)
+  }, [])
 
   async function deleteItem(e: Expense) {
     if (!confirm('Delete this expense?')) return

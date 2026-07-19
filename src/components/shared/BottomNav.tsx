@@ -80,7 +80,21 @@ export default function BottomNav() {
   const room = ROOMS[activeRoom]
 
   // Home (first) + up to 3 enabled module tabs + Settings (last) = max 5.
-  const moduleTabs = room.tabs.filter(t => t.key === null || modules?.[t.key] !== false).slice(0, 3)
+  // Settings → Bottom Navigation stores a per-device pick+order in localStorage.
+  const enabledTabs = room.tabs.filter(t => t.key === null || modules?.[t.key] !== false)
+  let moduleTabs = enabledTabs.slice(0, 3)
+  if (activeRoom === 'finance') {
+    try {
+      const picked: string[] = JSON.parse(localStorage.getItem('mizan_nav_tabs') ?? 'null')
+      if (Array.isArray(picked) && picked.length > 0) {
+        const chosen = picked
+          .map(k => enabledTabs.find(t => t.key === k))
+          .filter((t): t is Tab => !!t)
+          .slice(0, 3)
+        if (chosen.length > 0) moduleTabs = chosen
+      }
+    } catch {}
+  }
   const navItems: Tab[] = [room.home, ...moduleTabs, room.settings]
 
   return (

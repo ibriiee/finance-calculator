@@ -111,6 +111,23 @@ export default function SettingsPage() {
   }
 
   const [pkrOverride, setPkrOverride] = useState('')
+  // Bottom-nav tab picker — per-device (localStorage), tap order = display order
+  const NAV_CHOICES: { key: string; label: string }[] = [
+    { key: 'income', label: 'Income' }, { key: 'expenses', label: 'Expenses' },
+    { key: 'sadaka', label: 'Sadaka' }, { key: 'ledger', label: 'Ledger' },
+    { key: 'joint_account', label: 'Joint' }, { key: 'goals', label: 'Goals' },
+  ]
+  const [navTabs, setNavTabs] = useState<string[]>([])
+  useEffect(() => {
+    try { setNavTabs(JSON.parse(localStorage.getItem('mizan_nav_tabs') ?? 'null') ?? ['income', 'expenses', 'sadaka']) } catch {}
+  }, [])
+  function toggleNavTab(key: string) {
+    setNavTabs(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key].slice(-3)
+      try { localStorage.setItem('mizan_nav_tabs', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
   const [savingPkr, setSavingPkr] = useState(false)
   const [pkrResult, setPkrResult] = useState<string | null>(null)
   async function saveManualPkr() {
@@ -419,6 +436,42 @@ export default function SettingsPage() {
                 </p>
               )}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom navigation picker — per-device */}
+      <div className="card p-4">
+        <button className="flex items-center justify-between w-full" onClick={() => toggle('Bottom Navigation')}>
+          <div className="flex items-center gap-2">
+            <LayoutGrid size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Bottom Navigation</h3>
+          </div>
+          <ChevronDown size={15} style={{ color: 'var(--text-muted)', transform: open.has('Bottom Navigation') ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
+        {open.has('Bottom Navigation') && (
+          <div className="mt-3">
+            <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+              Pick up to 3 tabs for the bottom bar (this phone only). Tap order = bar order. Everything else stays reachable from Home → All modules.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {NAV_CHOICES.map(c => {
+                const idx = navTabs.indexOf(c.key)
+                const active = idx >= 0
+                return (
+                  <button key={c.key} onClick={() => toggleNavTab(c.key)}
+                    className="py-2.5 px-2 rounded-xl text-xs font-medium"
+                    style={{ background: active ? 'var(--gold-dim)' : 'var(--surface-2)',
+                      border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                      color: active ? 'var(--gold)' : 'var(--text-muted)' }}>
+                    {active ? `${idx + 1}. ` : ''}{c.label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+              Change takes effect next page load.
+            </p>
           </div>
         )}
       </div>

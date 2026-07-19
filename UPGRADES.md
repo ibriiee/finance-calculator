@@ -40,7 +40,7 @@ Same idea as today's green/red TxnForm fix, applied everywhere money has a direc
 14. **P1 Income form: green framing for inflow** — same.
 15. **P1 Signed, colored amounts everywhere** — every list row app-wide shows +green / −red consistently (audit found most do; make it a rule, catch stragglers).
 
-## C. Navigation & structure (P1)
+## C. Navigation & structure (P1) — ✅ #16, #17, #18 DONE 2026-07-19 (see UPGRADE-PLAN.md Phase 2)
 
 16. **P1 "All modules" hub screen** — nav caps at 3 module tabs + Home + Settings; Joint, Ledger, Goals, Loans, Savings, Zakat, Wasiyya, Analytics, Recipients hang off dashboard cards only. One tappable grid screen (a la banking apps' "More") makes everything reachable in 2 taps, always.
 17. **P1 Choose your own 3 nav tabs** — Settings picker for which finance modules sit in the bottom bar (the ROOMS structure already supports it; today the first 3 enabled win silently).
@@ -49,7 +49,7 @@ Same idea as today's green/red TxnForm fix, applied everywhere money has a direc
 20. **P2 Back-to-top + pull-to-refresh** on long lists (income, sadaka histories).
 21. **P2 Remove dead `/splits` page from the bundle** — deprecated and unlinked; data stays in DB, page file moves to an archive folder (keeps history, trims bundle).
 
-## D. Entry speed & intelligence (P1)
+## D. Entry speed & intelligence (P1) — ✅ #22, #24 DONE 2026-07-19 · #25 deferred (migration; UPGRADE-PLAN.md Phase 6)
 
 What Copilot/Tricount get right: adding a record takes < 5 seconds.
 
@@ -63,7 +63,7 @@ What Copilot/Tricount get right: adding a record takes < 5 seconds.
 29. **P2 Voice note on any record** — attach a short audio memo (Supabase storage) for context that's faster spoken than typed.
 30. **P2 Bulk import CSV** — paste bank-statement rows into a mapping screen for backfilling history.
 
-## E. Dashboard & insight (P1)
+## E. Dashboard & insight (P1) — ✅ #31, #32, #34 DONE 2026-07-19 · #33 deferred (Phase 6)
 
 31. **P1 Spending by category this month** — the dashboard shows totals but not *where* money went; a 5-bar mini breakdown (rent/food/transport/…) answers the #1 finance-app question.
 32. **P1 Month-over-month deltas** — "Expenses ↑ 12% vs last month" one-liners on the hero card (Monarch's most-loved surface).
@@ -74,7 +74,7 @@ What Copilot/Tricount get right: adding a record takes < 5 seconds.
 37. **P2 Configurable card order** — drag dashboard cards into your own order (localStorage).
 38. **P2 "This week" digest view** — 7-day activity feed across all modules (what got added/paid, by whom).
 
-## F. Islamic core — deepen the differentiator (P1)
+## F. Islamic core — deepen the differentiator (P1) — ✅ #40, #42, #44 DONE 2026-07-19 · #39/#43 advisor-cut, #41 deferred, #47 skipped by owner (details + links: UPGRADE-PLAN.md Phase 4)
 
 Research note: Zoya/Musaffa win by making the Islamic layer *primary*, not bolted on. Mizan's
 sadaka engine already beats anything on the market for this use case; these extend that lead.
@@ -91,7 +91,7 @@ sadaka engine already beats anything on the market for this use case; these exte
 48. **P2 Dua/intention field on goals** — a goal can carry its niyyah; shown on completion.
 49. **P2 Hijri-first date display option** — app-wide toggle: show hijri dates as primary with Gregorian secondary (all math exists in hijri.ts).
 
-## G. Two-person / household features (P1)
+## G. Two-person / household features (P1) — ✅ #50, #52, #55(joint) DONE 2026-07-19 · #53 advisor-cut (see UPGRADE-PLAN.md Phase 3)
 
 Splitwise/Tricount research: the killer features are activity feeds, comments, and settle-up flows.
 

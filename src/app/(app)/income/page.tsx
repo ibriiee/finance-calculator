@@ -76,7 +76,10 @@ export default function IncomePage() {
     load()
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    if (new URLSearchParams(window.location.search).get('add')) setShowForm(true)
+  }, [])
 
   function toggleExpand(id: string) {
     setExpandedIds(prev => {

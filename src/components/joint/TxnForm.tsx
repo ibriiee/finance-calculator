@@ -21,12 +21,14 @@ interface Props {
   accountId: string
   accountCurrency: string
   editTxn?: EditableTxn | null
+  /** Pre-fill amount (e.g. "chip in to be equal" from the fairness banner) */
+  defaultAmount?: number
 }
 
 const GREEN = '#10B981'
 const RED = '#EF4444'
 
-export default function TxnForm({ onClose, onSaved, accountId, accountCurrency, editTxn }: Props) {
+export default function TxnForm({ onClose, onSaved, accountId, accountCurrency, editTxn, defaultAmount }: Props) {
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -34,7 +36,7 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency, 
   const [people, setPeople] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({
     txn_type: (editTxn?.txn_type ?? 'deposit') as 'deposit' | 'withdrawal',
-    amount: editTxn ? String(editTxn.amount) : '',
+    amount: editTxn ? String(editTxn.amount) : defaultAmount ? String(Math.round(defaultAmount * 100) / 100) : '',
     description: editTxn?.description ?? '',
     category: editTxn?.category ?? 'house_expense',
     contributor_id: editTxn?.contributor_id ?? '',

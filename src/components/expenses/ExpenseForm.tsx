@@ -23,9 +23,15 @@ export const EXPENSE_CATEGORIES: { value: string; label: string }[] = [
   { value: 'other', label: '• Other' },
 ]
 
+// Last saved expense (this device) — powers "same as last" + smarter defaults
+function lastExpense(): { description: string; category: string; amount: string; currency: string } | null {
+  try { return JSON.parse(localStorage.getItem('mizan_last_expense') ?? 'null') } catch { return null }
+}
+
 export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
   const supabase = createClient()
   const isEdit = !!editItem
+  const last = !isEdit ? lastExpense() : null
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -34,10 +40,10 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
   )
   const [form, setForm] = useState({
     description: editItem?.description ?? '',
-    category: editItem?.category ?? 'groceries',
+    category: editItem?.category ?? (last && EXPENSE_CATEGORIES.some(c => c.value === last.category) ? last.category : 'groceries'),
     custom_category: editItem && !EXPENSE_CATEGORIES.some(c => c.value === editItem.category) ? editItem.category : '',
     amount: editItem?.amount ? String(editItem.amount) : '',
-    currency: editItem?.currency ?? 'AED',
+    currency: editItem?.currency ?? last?.currency ?? 'AED',
     expense_date: editItem?.expense_date ?? new Date().toISOString().split('T')[0],
     is_shared: editItem?.is_shared ?? false,
     my_pct: editItem?.my_pct != null ? Math.round(editItem.my_pct * 100) : 50,
@@ -69,6 +75,14 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
       is_shared: form.is_shared,
       my_pct: myPct,
       notes: form.notes.trim() || null,
+    }
+
+    if (!isEdit) {
+      try {
+        localStorage.setItem('mizan_last_expense', JSON.stringify({
+          description: form.description.trim(), category, amount: form.amount, currency: form.currency,
+        }))
+      } catch {}
     }
 
     let expenseId = editItem?.id
@@ -154,6 +168,20 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
         {/* Description */}
         <input placeholder="What was it for?" value={form.description} onChange={e => F('description', e.target.value)}
           className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+
+        {/* One-tap repeat of the last expense (petrol, Du bill…) */}
+        {last && !form.description && !form.amount && (
+          <button type="button"
+            onClick={() => {
+              setCustomCat(false)
+              setForm(p => ({ ...p, description: last.description, amount: last.amount, currency: last.currency,
+                category: EXPENSE_CATEGORIES.some(c => c.value === last.category) ? last.category : p.category }))
+            }}
+            className="text-xs px-3 py-2 rounded-xl text-left"
+            style={{ background: 'var(--surface-2)', border: '1px dashed var(--border)', color: 'var(--text-muted)' }}>
+            ↻ Same as last: <span style={{ color: 'var(--text-secondary)' }}>{last.description} · {last.currency} {last.amount}</span>
+          </button>
+        )}
 
         {/* Date */}
         <input type="date" value={form.expense_date} onChange={e => F('expense_date', e.target.value)}

@@ -37,7 +37,10 @@ export default function LedgerPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    if (new URLSearchParams(window.location.search).get('add')) setShowForm(true)
+  }, [])
 
   const otherUser = profiles.find(p => p.id !== userId)
   const myProfile = profiles.find(p => p.id === userId)
