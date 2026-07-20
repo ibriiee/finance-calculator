@@ -211,7 +211,7 @@ export default function ZakatPage() {
           {fields.map(({ key, label }) => (
             <div key={key} className="grid grid-cols-2 gap-2 items-center">
               <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</label>
-              <input type="number" placeholder="0" value={(assets as any)[key]}
+              <input type="number" inputMode="decimal" placeholder="0" value={(assets as any)[key]}
                 onChange={e => F(key, e.target.value)}
                 className="px-3 py-2 rounded-lg text-sm text-right"
                 style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />

@@ -164,7 +164,7 @@ export default function LifeSettingsPage() {
             </div>
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Life expectancy (age)</label>
-              <input type="number" min={1} max={120} value={years}
+              <input type="number" inputMode="decimal" min={1} max={120} value={years}
                 onChange={e => setYears(parseInt(e.target.value) || 63)} className={inputCls} style={inputStyle} />
             </div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>

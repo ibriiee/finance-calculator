@@ -20,6 +20,7 @@ export default function ExpensesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Expense | null>(null)
   const [scope, setScope] = useState<'month' | 'all'>('month')
+  const [q, setQ] = useState('')
   const supabase = createClient()
 
   async function load() {
@@ -65,6 +66,8 @@ export default function ExpensesPage() {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
   }
   const scoped = scope === 'month' ? items.filter(inMonth) : items
+  // Search narrows the list only — the spent summary keeps using the full scoped array
+  const searched = q ? scoped.filter(e => (e.description ?? '').toLowerCase().includes(q.toLowerCase())) : scoped
 
   // My-share totals per currency (shared expenses only cost me my_pct).
   const myShare = (e: Expense) => Number(e.amount) * Number(e.my_pct ?? 1)
@@ -129,13 +132,24 @@ export default function ExpensesPage() {
         ))}
       </div>
 
+      {/* Search */}
+      <input placeholder="Search…" value={q} onChange={e => setQ(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+
       {/* List */}
       {scoped.length === 0 ? (
         <EmptyState icon={Wallet} title="No expenses yet"
-          description="Log petrol, food, bills, rent — so 'yours to keep' shows real cash" />
+          description="Log petrol, food, bills, rent — so 'yours to keep' shows real cash"
+          action={
+            <button onClick={() => { setEditItem(null); setShowForm(true) }}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              Add First Expense
+            </button>
+          } />
       ) : (
         <div className="flex flex-col gap-3">
-          {scoped.map(e => (
+          {searched.map(e => (
             <div key={e.id} className="card p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 mr-3">

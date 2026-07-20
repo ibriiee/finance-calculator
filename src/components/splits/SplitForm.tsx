@@ -69,7 +69,9 @@ export default function SplitForm({ onClose, onSaved }: Props) {
       }
       await supabase.from('shared_costs').update({ ledger_entry_created: true }).eq('id', inserted!.id)
     }
-    setSaving(false); onSaved(); onClose()
+    setSaving(false)
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
+    onSaved(); onClose()
   }
 
   return (
@@ -80,8 +82,11 @@ export default function SplitForm({ onClose, onSaved }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <input placeholder="What is this? (e.g. June house expenses)" value={form.name} onChange={e => F('name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Name</label>
+            <input placeholder="What is this? (e.g. June house expenses)" value={form.name} onChange={e => F('name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <select value={customCategory ? '__custom' : form.category}
@@ -107,18 +112,27 @@ export default function SplitForm({ onClose, onSaved }: Props) {
           </div>
 
           {customCategory && (
-            <input placeholder="Custom category (e.g. Islamic tuition, transportation)" value={form.custom_category}
-              onChange={e => F('custom_category', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Custom category</label>
+              <input placeholder="Custom category (e.g. Islamic tuition, transportation)" value={form.custom_category}
+                onChange={e => F('custom_category', e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
+            </div>
           )}
 
-          <input placeholder="Total amount" type="number" value={form.total_amount} onChange={e => F('total_amount', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Total amount</label>
+            <input placeholder="Total amount" type="number" inputMode="decimal" value={form.total_amount} onChange={e => F('total_amount', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           {/* Breakdown — one line per item, shown as bullets on the split card */}
-          <textarea placeholder={'Breakdown (optional) — one item per line:\n30,000 groceries\n10,000 Islamic tuition for both wives\n5,000 transport'}
-            value={form.breakdown} onChange={e => F('breakdown', e.target.value)} rows={3}
-            className="w-full px-4 py-3 rounded-xl text-sm resize-y" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Breakdown (optional)</label>
+            <textarea placeholder={'Breakdown (optional) — one item per line:\n30,000 groceries\n10,000 Islamic tuition for both wives\n5,000 transport'}
+              value={form.breakdown} onChange={e => F('breakdown', e.target.value)} rows={3}
+              className="w-full px-4 py-3 rounded-xl text-sm resize-y" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">

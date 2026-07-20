@@ -73,6 +73,7 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
     setSaving(false)
     if (err) { setError(err.message); return }
     try { localStorage.removeItem(DRAFT_KEY) } catch {}
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -92,8 +93,11 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <input placeholder="Project name" value={form.name} onChange={e => F('name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Project name</label>
+            <input placeholder="Project name" value={form.name} onChange={e => F('name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <select value={form.type} onChange={e => F('type', e.target.value)}
@@ -112,14 +116,17 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <select value={form.currency} onChange={e => F('currency', e.target.value)} disabled={sadakaLocked}
-              className="px-3 py-3 rounded-xl text-sm disabled:opacity-50" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="AED">AED</option>
-              <option value="PKR">PKR</option>
-            </select>
-            <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount</label>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={form.currency} onChange={e => F('currency', e.target.value)} disabled={sadakaLocked}
+                className="px-3 py-3 rounded-xl text-sm disabled:opacity-50" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="AED">AED</option>
+                <option value="PKR">PKR</option>
+              </select>
+              <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
           {sadakaLocked && (
             <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -162,8 +169,11 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
                   className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
               </div>
 
-              <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
-                className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Notes</label>
+                <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
+                  className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              </div>
             </div>
           )}
 

@@ -131,7 +131,14 @@ export default function RecipientsPage() {
 
       {recipients.length === 0 ? (
         <EmptyState icon={Users} title="No recipients yet"
-          description="Add people you give sadaka to (e.g. Norine Aunty) to track who's been paid and who's overdue." />
+          description="Add people you give sadaka to (e.g. Norine Aunty) to track who's been paid and who's overdue."
+          action={
+            <button onClick={() => setShowForm(true)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              Add First Recipient
+            </button>
+          } />
       ) : (
         <div className="flex flex-col gap-2">
           {ranked.slice(0, visible).map(({ r, s }) => (

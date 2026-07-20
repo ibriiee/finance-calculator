@@ -51,6 +51,7 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser, editEn
       : await supabase.from('brother_ledger').insert({ ...payload, source_type: 'manual', is_settled: false })
     setSaving(false)
     if (insErr) { setError(insErr.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -86,14 +87,17 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser, editEn
             ))}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <select value={form.currency} onChange={e => F('currency', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="AED">AED</option>
-              <option value="PKR">PKR</option>
-            </select>
-            <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount</label>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={form.currency} onChange={e => F('currency', e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="AED">AED</option>
+                <option value="PKR">PKR</option>
+              </select>
+              <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
 
           <select value={form.category} onChange={e => F('category', e.target.value)}
@@ -106,8 +110,11 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser, editEn
             <option value="other">Other</option>
           </select>
 
-          <input placeholder="What was it for?" value={form.description} onChange={e => F('description', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Description</label>
+            <input placeholder="What was it for?" value={form.description} onChange={e => F('description', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           <input type="date" value={form.transaction_date} onChange={e => F('transaction_date', e.target.value)}
             className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />

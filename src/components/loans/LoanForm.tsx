@@ -63,6 +63,7 @@ export default function LoanForm({ onClose, onSaved, editLoan, repaidTotal = 0 }
       }).eq('id', editLoan.id)
       setSaving(false)
       if (err) { setError(err.message); return }
+      if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
       onSaved(); onClose()
       return
     }
@@ -81,6 +82,7 @@ export default function LoanForm({ onClose, onSaved, editLoan, repaidTotal = 0 }
     }
     setSaving(false)
     if (err) { setError(err.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -92,8 +94,11 @@ export default function LoanForm({ onClose, onSaved, editLoan, repaidTotal = 0 }
         </div>
 
         <div className="flex flex-col gap-3">
-          <input placeholder="Person / Organisation name" value={form.counterparty_name} onChange={e => F('counterparty_name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Person / Organisation</label>
+            <input placeholder="Person / Organisation name" value={form.counterparty_name} onChange={e => F('counterparty_name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           {/* Whose loan — recorded with "Added by you" so the other brother sees who reported it */}
           {people.length > 1 && (
@@ -129,17 +134,20 @@ export default function LoanForm({ onClose, onSaved, editLoan, repaidTotal = 0 }
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <select value={form.currency_type} onChange={e => F('currency_type', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="AED">AED (cash)</option>
-              <option value="PKR">PKR (cash)</option>
-              <option value="USD">USD (cash)</option>
-              <option value="gold_grams">Gold (grams)</option>
-              <option value="silver_grams">Silver (grams)</option>
-            </select>
-            <input placeholder={isGold ? 'Grams' : 'Amount'} type="number" value={form.original_amount} onChange={e => F('original_amount', e.target.value)}
-              className="px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>{isGold ? 'Grams' : 'Amount'}</label>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={form.currency_type} onChange={e => F('currency_type', e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="AED">AED (cash)</option>
+                <option value="PKR">PKR (cash)</option>
+                <option value="USD">USD (cash)</option>
+                <option value="gold_grams">Gold (grams)</option>
+                <option value="silver_grams">Silver (grams)</option>
+              </select>
+              <input placeholder={isGold ? 'Grams' : 'Amount'} type="number" inputMode="decimal" value={form.original_amount} onChange={e => F('original_amount', e.target.value)}
+                className="px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
 
           {/* ── ADVANCED TOGGLE ── */}
@@ -170,8 +178,11 @@ export default function LoanForm({ onClose, onSaved, editLoan, repaidTotal = 0 }
                 </div>
               </div>
 
-              <input placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Notes</label>
+                <input placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              </div>
             </div>
           )}
 

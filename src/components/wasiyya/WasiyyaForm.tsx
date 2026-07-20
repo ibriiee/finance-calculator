@@ -29,7 +29,9 @@ export default function WasiyyaForm({ onClose, onSaved }: Props) {
       beneficiary_contact: form.beneficiary_contact || null,
       is_sensitive: form.is_sensitive,
     })
-    setSaving(false); onSaved(); onClose()
+    setSaving(false)
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
+    onSaved(); onClose()
   }
 
   const cats: { key: typeof form.category; icon: string; label: string }[] = [
@@ -49,8 +51,11 @@ export default function WasiyyaForm({ onClose, onSaved }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <input placeholder="Title (e.g. Bank Account, Car Loan, Message to Family)" value={form.title} onChange={e => F('title', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Title</label>
+            <input placeholder="Title (e.g. Bank Account, Car Loan, Message to Family)" value={form.title} onChange={e => F('title', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           {/* Category */}
           <div className="grid grid-cols-3 gap-2">
@@ -67,25 +72,37 @@ export default function WasiyyaForm({ onClose, onSaved }: Props) {
             ))}
           </div>
 
-          <textarea placeholder="Description / instructions / details" value={form.description} onChange={e => F('description', e.target.value)} rows={3}
-            className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-
-          {/* Amount (optional) */}
-          <div className="grid grid-cols-3 gap-2">
-            <select value={form.currency} onChange={e => F('currency', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="AED">AED</option>
-              <option value="PKR">PKR</option>
-            </select>
-            <input placeholder="Amount (optional)" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Description</label>
+            <textarea placeholder="Description / instructions / details" value={form.description} onChange={e => F('description', e.target.value)} rows={3}
+              className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
 
-          <input placeholder="Beneficiary name (optional)" value={form.beneficiary_name} onChange={e => F('beneficiary_name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          {/* Amount (optional) */}
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount (optional)</label>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={form.currency} onChange={e => F('currency', e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="AED">AED</option>
+                <option value="PKR">PKR</option>
+              </select>
+              <input placeholder="Amount (optional)" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
+          </div>
 
-          <input placeholder="Beneficiary phone / email (optional)" value={form.beneficiary_contact} onChange={e => F('beneficiary_contact', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Beneficiary name</label>
+            <input placeholder="Beneficiary name (optional)" value={form.beneficiary_name} onChange={e => F('beneficiary_name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
+
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Beneficiary contact</label>
+            <input placeholder="Beneficiary phone / email (optional)" value={form.beneficiary_contact} onChange={e => F('beneficiary_contact', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           <label className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>

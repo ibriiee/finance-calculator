@@ -117,7 +117,14 @@ export default function JointAccountPage() {
 
       {accounts.length === 0 ? (
         <EmptyState icon={Landmark} title="No joint account yet"
-          description="Create a shared house account — both chip in, expenses come out, balance stays clear." />
+          description="Create a shared house account — both chip in, expenses come out, balance stays clear."
+          action={
+            <button onClick={() => setShowAccountForm(true)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              Create First Account
+            </button>
+          } />
       ) : (
         accounts.map(acc => {
           const s = accountStats(acc)

@@ -32,6 +32,7 @@ export default function SadakaPage() {
   const [showExport, setShowExport] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [visible, setVisible] = useState(50)
+  const [q, setQ] = useState('')
   const [sadakaRate, setSadakaRate] = useState(0.2)
   const [userId, setUserId] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
@@ -98,6 +99,10 @@ export default function SadakaPage() {
   const filtered = filter === 'all' ? entries
     : filter === 'pending' ? entries.filter(e => !isPayment(e) && remainingOf(e) > 0)
     : entries.filter(e => isPayment(e) || e.status === 'given' || Number(e.amount_given) > 0)
+  // Search narrows the list only (recipient or linked income name) — summary cards keep the full arrays
+  const searched = q ? filtered.filter(e =>
+    `${e.recipient_name ?? ''} ${e.source_income_id ? incomeNames[e.source_income_id] ?? '' : ''}`
+      .toLowerCase().includes(q.toLowerCase())) : filtered
 
   const allGiven = givenEntries(entries)
   const monthKeyOf = (e: SadakaEntry) => {
@@ -214,13 +219,24 @@ export default function SadakaPage() {
         ))}
       </div>
 
+      {/* Search */}
+      <input placeholder="Search…" value={q} onChange={e => setQ(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+
       {/* List */}
       {filtered.length === 0 ? (
         <EmptyState icon={HandHeart} title="No sadaka entries"
-          description="Add a sadaka entry manually or it auto-creates when income is received" />
+          description="Add a sadaka entry manually or it auto-creates when income is received"
+          action={
+            <button onClick={() => { setEditItem(null); setShowForm(true) }}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              Add First Sadaka
+            </button>
+          } />
       ) : (
         <div className="flex flex-col gap-3">
-          {filtered.slice(0, visible).map(entry => {
+          {searched.slice(0, visible).map(entry => {
             // green = given/cleared, red = still owed (needs action)
             const borderColor = (isPayment(entry) || remainingOf(entry) === 0) ? '#10B981' : '#EF4444'
             const a = alloc[entry.id]
@@ -374,11 +390,11 @@ export default function SadakaPage() {
               )}
             </div>
           )})}
-          {filtered.length > visible && (
+          {searched.length > visible && (
             <button onClick={() => setVisible(v => v + 50)}
               className="py-2.5 rounded-xl text-xs font-semibold"
               style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
-              Load more ({filtered.length - visible} more)
+              Load more ({searched.length - visible} more)
             </button>
           )}
         </div>

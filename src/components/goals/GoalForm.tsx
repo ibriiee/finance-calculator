@@ -46,6 +46,7 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
         })
     setSaving(false)
     if (err) { setError(err.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -57,8 +58,11 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <input placeholder="Goal name (e.g. Emergency Fund, Toyota Camry)" value={form.name} onChange={e => F('name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Goal name</label>
+            <input placeholder="Goal name (e.g. Emergency Fund, Toyota Camry)" value={form.name} onChange={e => F('name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             {(['individual', 'joint'] as const).map(t => (
@@ -74,14 +78,17 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
             ))}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <select value={form.currency} onChange={e => F('currency', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="AED">AED</option>
-              <option value="PKR">PKR</option>
-            </select>
-            <input placeholder="Target amount" type="number" value={form.target_amount} onChange={e => F('target_amount', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Target amount</label>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={form.currency} onChange={e => F('currency', e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="AED">AED</option>
+                <option value="PKR">PKR</option>
+              </select>
+              <input placeholder="Target amount" type="number" inputMode="decimal" value={form.target_amount} onChange={e => F('target_amount', e.target.value)}
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
 
           <div>

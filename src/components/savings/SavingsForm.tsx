@@ -52,6 +52,7 @@ export default function SavingsForm({ onClose, onSaved, defaults, editEntry }: P
       : await supabase.from('savings_entries').insert({ ...payload, owner_id: user!.id })
     setSaving(false)
     if (err) { setError(err.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -89,9 +90,12 @@ export default function SavingsForm({ onClose, onSaved, defaults, editEntry }: P
           })}
         </div>
 
-        <input placeholder="Where is it kept? (e.g. Meezan Bank PKR, ADIB Dubai)" value={form.account_name}
-          onChange={e => F('account_name', e.target.value)}
-          className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Where it's kept</label>
+          <input placeholder="Where is it kept? (e.g. Meezan Bank PKR, ADIB Dubai)" value={form.account_name}
+            onChange={e => F('account_name', e.target.value)}
+            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <select value={form.location} onChange={e => F('location', e.target.value)}
@@ -108,19 +112,48 @@ export default function SavingsForm({ onClose, onSaved, defaults, editEntry }: P
         </div>
 
         {/* Amount — sign + border follow the type */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="flex items-center justify-center gap-1 rounded-xl text-sm font-semibold"
-            style={{ background: accentBg, border: `1px solid ${accent}`, color: accent }}>
-            {isDeposit ? '+' : '−'} {form.currency}</div>
-          <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
-            className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: `1px solid ${accent}`, color: 'var(--text-primary)' }} />
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount</label>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex items-center justify-center gap-1 rounded-xl text-sm font-semibold"
+              style={{ background: accentBg, border: `1px solid ${accent}`, color: accent }}>
+              {isDeposit ? '+' : '−'} {form.currency}</div>
+            <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
+              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: `1px solid ${accent}`, color: 'var(--text-primary)' }} />
+          </div>
         </div>
 
+        {/* Quick-add chips — accumulate onto the current amount */}
+        <div className="grid grid-cols-4 gap-2">
+          {[100, 500, 1000, 5000].map(n => (
+            <button key={n} type="button" onClick={() => F('amount', String((parseFloat(form.amount) || 0) + n))}
+              className="py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              +{n >= 1000 ? `${n / 1000}k` : n}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={() => F('entry_date', new Date().toISOString().split('T')[0])}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            Today
+          </button>
+          <button type="button" onClick={() => F('entry_date', new Date(Date.now() - 86400000).toISOString().split('T')[0])}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            Yesterday
+          </button>
+        </div>
         <input type="date" value={form.entry_date} onChange={e => F('entry_date', e.target.value)}
           className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
 
-        <input placeholder="Note (optional — e.g. backup for slow months)" value={form.notes} onChange={e => F('notes', e.target.value)}
-          className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Note</label>
+          <input placeholder="Note (optional — e.g. backup for slow months)" value={form.notes} onChange={e => F('notes', e.target.value)}
+            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        </div>
 
         {/* Live preview of what this entry does to the stash */}
         {!isNaN(amt) && amt > 0 && (

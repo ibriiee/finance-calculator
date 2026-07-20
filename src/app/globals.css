@@ -166,6 +166,12 @@ body {
 @keyframes fill-bar { from { width: 0%; } }
 .animate-fill { animation: fill-bar 1s ease-out; }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up,
+  .animate-fill,
+  .animate-pulse-gold { animation: none; }
+}
+
 *:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* Bottom nav safe area */

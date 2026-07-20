@@ -26,6 +26,7 @@ export default function IncomePage() {
   const [showNet, setShowNet] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [visible, setVisible] = useState(50)
+  const [q, setQ] = useState('')
   const [pkrToAed, setPkrToAed] = useState(0.0132)
   const supabase = createClient()
 
@@ -96,6 +97,8 @@ export default function IncomePage() {
 
   const filtered = filter === 'all' ? items
     : items.filter(i => filter === 'pending' ? !isReceivedItem(i) : isReceivedItem(i))
+  // Search narrows the list only — summary tiles keep using the full array
+  const searched = q ? filtered.filter(i => i.name.toLowerCase().includes(q.toLowerCase())) : filtered
 
   // Fold PKR at the cached rate — these tiles were AED-only, silently dropping
   // PKR income from the header totals (P2-25).
@@ -158,6 +161,10 @@ export default function IncomePage() {
         </button>
       </div>
 
+      {/* Search */}
+      <input placeholder="Search…" value={q} onChange={e => setQ(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+
       {/* List */}
       {filtered.length === 0 ? (
         <EmptyState icon={Briefcase} title="No projects yet"
@@ -171,7 +178,7 @@ export default function IncomePage() {
           } />
       ) : (
         <div className="flex flex-col gap-3">
-          {filtered.slice(0, visible).map(item => {
+          {searched.slice(0, visible).map(item => {
             const received = isReceivedItem(item)
             const ongoing = (item as any).is_ongoing || !item.work_completed_date
             const lagDays = item.work_completed_date ? getLagDays(item.work_completed_date, item.actual_received_date) : 0
@@ -339,11 +346,11 @@ export default function IncomePage() {
               </div>
             )
           })}
-          {filtered.length > visible && (
+          {searched.length > visible && (
             <button onClick={() => setVisible(v => v + 50)}
               className="py-2.5 rounded-xl text-xs font-semibold"
               style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
-              Load more ({filtered.length - visible} more)
+              Load more ({searched.length - visible} more)
             </button>
           )}
         </div>

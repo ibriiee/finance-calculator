@@ -43,7 +43,9 @@ export default function SettleUpModal({ onClose, onSaved, userId, aedBalance, pk
       const err = await settleCurrency('PKR', pkrBalance)
       if (err) { setSaving(false); setError(err); return }
     }
-    setSaving(false); onSaved(); onClose()
+    setSaving(false)
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
+    onSaved(); onClose()
   }
 
   return (
@@ -74,8 +76,11 @@ export default function SettleUpModal({ onClose, onSaved, userId, aedBalance, pk
             ))}
           </div>
 
-          <input placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Notes</label>
+            <input placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
           {error && (
             <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>

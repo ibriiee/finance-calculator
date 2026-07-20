@@ -143,6 +143,20 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-20** — **Phase 5 shipped: all delegated polish items S-1…S-8 + H-1…H-3 in one pass**
+  (owner chose to run the whole batch on Fable 5 instead of Sonnet/Haiku; specs in
+  `UPGRADE-PLAN.md` followed verbatim, no money math touched). *Forms:* `inputMode="decimal"`
+  on all 17 amount inputs (decimal keypad on phones, #89); haptic tick `navigator.vibrate(10)`
+  on every successful save across all 13 form components (#60); persistent tiny labels above
+  every placeholder-only input/textarea, GoalForm pattern (#88); amount quick-chips
+  +100/+500/+1k/+5k and Today/Yesterday date chips in ExpenseForm, joint TxnForm, SavingsForm
+  (#23, #27). *Pages:* empty states in goals/ledger/joint/loans/recipients/expenses/sadaka got
+  gold "Add First …" action buttons matching the savings pattern (#79); client-side search box
+  on Income/Expenses/Sadaka histories — narrows the list only, summary totals untouched (#82).
+  *Platform:* `prefers-reduced-motion` disables slide-up/fill/pulse-gold animations (#86);
+  PWA `shortcuts` (Add Expense / Joint / Sadaka) in manifest.json (#58); `viewportFit: 'cover'`
+  added to the layout viewport export; backup-age tip line in Settings → Data & Backup
+  (#65-lite). Verified: tsc after every item, tests, build.
 - **2026-07-19** — **Phases 2–4 shipped in one pass** (see `UPGRADE-PLAN.md` for full per-item
   status incl. advisor cuts). *Navigation:* new **`/modules` hub** (every enabled module, 2 taps
   from Home; "All modules" card on dashboard); **pick-your-3 bottom tabs** (Settings → Bottom

@@ -226,7 +226,7 @@ export default function LoansPage() {
                   <div key={rep.id} className="flex items-center justify-between py-1.5 px-1 border-t" style={{ borderColor: 'var(--border)' }}>
                     {editingRepay?.id === rep.id ? (
                       <div className="flex items-center gap-1.5 w-full">
-                        <input type="number" value={editRepayAmount} onChange={e => setEditRepayAmount(e.target.value)}
+                        <input type="number" inputMode="decimal" value={editRepayAmount} onChange={e => setEditRepayAmount(e.target.value)}
                           className="w-24 px-2 py-1.5 rounded-lg text-xs"
                           style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
                         <input type="date" value={editRepayDate} onChange={e => setEditRepayDate(e.target.value)}
@@ -290,7 +290,7 @@ export default function LoansPage() {
             {showRepay && (
               <div className="flex flex-col gap-2 p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
                 <div className="grid grid-cols-2 gap-2">
-                  <input type="number" placeholder="Amount" value={repayAmount} onChange={e => setRepayAmount(e.target.value)}
+                  <input type="number" inputMode="decimal" placeholder="Amount" value={repayAmount} onChange={e => setRepayAmount(e.target.value)}
                     className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
                   <input type="date" value={repayDate} onChange={e => setRepayDate(e.target.value)}
                     className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
@@ -386,7 +386,14 @@ export default function LoansPage() {
 
       {loans.length === 0 ? (
         <EmptyState icon={CreditCard} title="No loans recorded"
-          description="Track loans you owe or are owed — with Islamic repayment rules" />
+          description="Track loans you owe or are owed — with Islamic repayment rules"
+          action={
+            <button onClick={() => setShowForm(true)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              Add First Loan
+            </button>
+          } />
       ) : (
         <div className="flex flex-col gap-3">
           {myLoans.slice(0, visibleMine).map(loan => <LoanCard key={loan.id} loan={loan} mine />)}

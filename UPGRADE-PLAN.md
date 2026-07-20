@@ -72,8 +72,12 @@ UPGRADES items 1–12 (except #10 wasiyya — see note):
 - **#43 qard hasan intents** — CUT (already covered): loans have due dates + overdue states today.
 - **#47 wasiyya rethink** — SKIPPED by owner decision (2026-07-19). All context for the future session: current module `src/app/(app)/wasiyya/page.tsx` + `src/components/wasiyya/WasiyyaForm.tsx` (basic vault, no CRUD — the last module without edit/delete); requirements gathered so far in `PROJECT_STATUS.md` (Modules table row "Wasiyya", Roadmap "Wasiyya rethink"); design direction in `UPGRADES.md` item 47 (guided faraid-aware flow: assets → debts → bequests ≤⅓ → witnesses → print/PDF) + related items 98 (faraid calculator) and 10 (CRUD must ship with it). Fable 5 only.
 
-### Phase 5 — Delegated simple items (Sonnet/Haiku, specs below) — NEXT
-Batch all Sonnet items in one session, Haiku in the same or another. **Every item: run `npx tsc --noEmit` + `npm run build` before commit; if either fails and the fix isn't obvious in 2 minutes → stop and leave for Fable 5.**
+### Phase 5 — Delegated simple items (✅ shipped 2026-07-20, Fable 5)
+All 11 items (S-1…S-8, H-1…H-3) done in one session — owner opted to run the batch on Fable 5
+directly instead of delegating. Specs below followed verbatim; tsc after every item, tests +
+build green before commit. Notes: S-3 income page already had its button (skipped); S-6 search
+matches sadaka entries on recipient name OR linked income name (the entry's displayed title);
+H-2 found `themeColor` already present, added only `viewportFit: 'cover'`.
 
 ### Phase 6 — Deferred Fable-5 work (after Phase 5)
 In order: **#25 recurring expenses** (migration + confirm-to-create), **#33 sadaka streak**,

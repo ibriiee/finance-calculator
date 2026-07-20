@@ -165,6 +165,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
       const { error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id)
       setSaving(false)
       if (err) { setError(err.message); return }
+      if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
       onSaved(); onClose()
       return
     }
@@ -216,6 +217,7 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     setSaving(false)
     if (err) { setError(err.message); return }
     try { localStorage.removeItem(DRAFT_KEY) } catch {}
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -228,14 +230,17 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
 
         <div className="flex flex-col gap-3">
           {/* ── PRIMARY FIELDS ── */}
-          <div className="grid grid-cols-3 gap-2">
-            <select value={form.currency} onChange={e => F('currency', e.target.value)}
-              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-              <option value="AED">AED</option>
-              <option value="PKR">PKR</option>
-            </select>
-            <input placeholder="Amount" type="number" value={form.amount_owed} onChange={e => F('amount_owed', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount</label>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={form.currency} onChange={e => F('currency', e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <option value="AED">AED</option>
+                <option value="PKR">PKR</option>
+              </select>
+              <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount_owed} onChange={e => F('amount_owed', e.target.value)}
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
 
           <select value={form.status} onChange={e => F('status', e.target.value)}
@@ -265,8 +270,11 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
           )}
 
           {!form.recipient_id && (
-            <input placeholder="Or type recipient name (optional)" value={form.recipient_name} onChange={e => F('recipient_name', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Recipient name</label>
+              <input placeholder="Or type recipient name (optional)" value={form.recipient_name} onChange={e => F('recipient_name', e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           )}
 
           {/* ── ADVANCED TOGGLE ── */}

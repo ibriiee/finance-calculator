@@ -75,6 +75,7 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency, 
       : await supabase.from('joint_account_txns').insert({ ...payload, account_id: accountId, created_by_id: me.id })
     setSaving(false)
     if (err) { setError(err.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -109,12 +110,26 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency, 
           </div>
 
           {/* Amount — sign + border follow the type */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="flex items-center justify-center gap-1 rounded-xl text-sm font-semibold"
-              style={{ background: accentBg, border: `1px solid ${accent}`, color: accent }}>
-              {isDeposit ? '+' : '−'} {accountCurrency}</div>
-            <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: `1px solid ${accent}`, color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount</label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex items-center justify-center gap-1 rounded-xl text-sm font-semibold"
+                style={{ background: accentBg, border: `1px solid ${accent}`, color: accent }}>
+                {isDeposit ? '+' : '−'} {accountCurrency}</div>
+              <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: `1px solid ${accent}`, color: 'var(--text-primary)' }} />
+            </div>
+          </div>
+
+          {/* Quick-add chips — accumulate onto the current amount */}
+          <div className="grid grid-cols-4 gap-2">
+            {[100, 500, 1000, 5000].map(n => (
+              <button key={n} type="button" onClick={() => F('amount', String((parseFloat(form.amount) || 0) + n))}
+                className="py-2 rounded-xl text-xs font-medium"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                +{n >= 1000 ? `${n / 1000}k` : n}
+              </button>
+            ))}
           </div>
 
           {/* Contributor (deposit only) */}
@@ -147,9 +162,24 @@ export default function TxnForm({ onClose, onSaved, accountId, accountCurrency, 
             </select>
           )}
 
-          <input placeholder={isDeposit ? 'Note (optional)' : 'What was it for?'} value={form.description} onChange={e => F('description', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>{isDeposit ? 'Note' : 'Description'}</label>
+            <input placeholder={isDeposit ? 'Note (optional)' : 'What was it for?'} value={form.description} onChange={e => F('description', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
 
+          <div className="flex gap-2">
+            <button type="button" onClick={() => F('txn_date', new Date().toISOString().split('T')[0])}
+              className="px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              Today
+            </button>
+            <button type="button" onClick={() => F('txn_date', new Date(Date.now() - 86400000).toISOString().split('T')[0])}
+              className="px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              Yesterday
+            </button>
+          </div>
           <input type="date" value={form.txn_date} onChange={e => F('txn_date', e.target.value)}
             className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
 

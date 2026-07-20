@@ -421,7 +421,7 @@ export default function SettingsPage() {
               </label>
               <div className="flex gap-2">
                 <input value={pkrOverride} onChange={e => setPkrOverride(e.target.value)}
-                  type="number" step="0.0001" placeholder="e.g. 0.0132"
+                  type="number" inputMode="decimal" step="0.0001" placeholder="e.g. 0.0132"
                   className="flex-1 px-3 py-2 rounded-xl text-sm"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
                 <button onClick={saveManualPkr} disabled={savingPkr}
@@ -540,6 +540,9 @@ export default function SettingsPage() {
             </div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Downloads every record to a file on your device. Keep it safe — that's your backup.
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Tip: export a backup every few months — this app runs unattended.
             </p>
             <button onClick={resetData} disabled={busy !== null}
               className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"

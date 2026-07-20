@@ -128,7 +128,9 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
       }
     }
 
-    setSaving(false); onSaved(); onClose()
+    setSaving(false)
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
+    onSaved(); onClose()
   }
 
   return (
@@ -140,14 +142,28 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
 
       <div className="flex flex-col gap-3">
         {/* Amount */}
-        <div className="grid grid-cols-3 gap-2">
-          <select value={form.currency} onChange={e => F('currency', e.target.value)}
-            className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-            <option value="AED">AED</option>
-            <option value="PKR">PKR</option>
-          </select>
-          <input placeholder="Amount" type="number" value={form.amount} onChange={e => F('amount', e.target.value)}
-            className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Amount</label>
+          <div className="grid grid-cols-3 gap-2">
+            <select value={form.currency} onChange={e => F('currency', e.target.value)}
+              className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="AED">AED</option>
+              <option value="PKR">PKR</option>
+            </select>
+            <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
+              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
+        </div>
+
+        {/* Quick-add chips — accumulate onto the current amount */}
+        <div className="grid grid-cols-4 gap-2">
+          {[100, 500, 1000, 5000].map(n => (
+            <button key={n} type="button" onClick={() => F('amount', String((parseFloat(form.amount) || 0) + n))}
+              className="py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              +{n >= 1000 ? `${n / 1000}k` : n}
+            </button>
+          ))}
         </div>
 
         {/* Category */}
@@ -161,13 +177,19 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
           <option value="__custom">✏️ Custom…</option>
         </select>
         {customCat && (
-          <input placeholder="Custom category" value={form.custom_category} onChange={e => F('custom_category', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Custom category</label>
+            <input placeholder="Custom category" value={form.custom_category} onChange={e => F('custom_category', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
+          </div>
         )}
 
         {/* Description */}
-        <input placeholder="What was it for?" value={form.description} onChange={e => F('description', e.target.value)}
-          className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Description</label>
+          <input placeholder="What was it for?" value={form.description} onChange={e => F('description', e.target.value)}
+            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        </div>
 
         {/* One-tap repeat of the last expense (petrol, Du bill…) */}
         {last && !form.description && !form.amount && (
@@ -184,6 +206,18 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
         )}
 
         {/* Date */}
+        <div className="flex gap-2">
+          <button type="button" onClick={() => F('expense_date', new Date().toISOString().split('T')[0])}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            Today
+          </button>
+          <button type="button" onClick={() => F('expense_date', new Date(Date.now() - 86400000).toISOString().split('T')[0])}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            Yesterday
+          </button>
+        </div>
         <input type="date" value={form.expense_date} onChange={e => F('expense_date', e.target.value)}
           className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
 
@@ -221,8 +255,11 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
               </div>
             )}
 
-            <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
-              className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Notes</label>
+              <textarea placeholder="Notes (optional)" value={form.notes} onChange={e => F('notes', e.target.value)} rows={2}
+                className="w-full px-4 py-3 rounded-xl text-sm resize-none" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
         )}
 

@@ -121,7 +121,14 @@ export default function GoalsPage() {
 
       {goals.length === 0 ? (
         <EmptyState icon={Target} title="No goals yet"
-          description="Set shared or individual financial goals with monthly targets" />
+          description="Set shared or individual financial goals with monthly targets"
+          action={
+            <button onClick={() => setShowForm(true)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+              Add First Goal
+            </button>
+          } />
       ) : (
         <div className="flex flex-col gap-4">
           {goals.map(goal => {
@@ -223,7 +230,7 @@ export default function GoalsPage() {
                           <div key={c.id} className="flex items-center justify-between py-2 px-1 border-t" style={{ borderColor: 'var(--border)' }}>
                             {editingContrib?.id === c.id ? (
                               <div className="flex items-center gap-1.5 w-full">
-                                <input type="number" value={editContribAmount} onChange={e => setEditContribAmount(e.target.value)}
+                                <input type="number" inputMode="decimal" value={editContribAmount} onChange={e => setEditContribAmount(e.target.value)}
                                   className="w-24 px-2 py-1.5 rounded-lg text-xs"
                                   style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }} />
                                 <input type="date" value={editContribDate} onChange={e => setEditContribDate(e.target.value)}
@@ -272,7 +279,7 @@ export default function GoalsPage() {
                 {goal.pct < 100 && (
                   contributing === goal.id ? (
                     <div className="flex gap-2">
-                      <input type="number" placeholder="Amount" value={contribAmount}
+                      <input type="number" inputMode="decimal" placeholder="Amount" value={contribAmount}
                         onChange={e => setContribAmount(e.target.value)}
                         className="flex-1 px-3 py-2 rounded-lg text-sm"
                         style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />

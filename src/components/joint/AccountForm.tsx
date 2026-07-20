@@ -32,6 +32,7 @@ export default function AccountForm({ onClose, onSaved, editAccount }: Props) {
       : await supabase.from('joint_accounts').insert({ ...payload, created_by_id: user!.id, is_active: true })
     setSaving(false)
     if (err) { setError(err.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -42,6 +43,7 @@ export default function AccountForm({ onClose, onSaved, editAccount }: Props) {
     const { error: err } = await supabase.from('joint_accounts').update({ is_active: false }).eq('id', editAccount.id)
     setSaving(false)
     if (err) { setError(err.message); return }
+    if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
     onSaved(); onClose()
   }
 
@@ -52,10 +54,16 @@ export default function AccountForm({ onClose, onSaved, editAccount }: Props) {
           <button onClick={onClose} className="p-1.5 rounded-lg" style={{ background: 'var(--surface-2)' }}><X size={16} /></button>
         </div>
         <div className="flex flex-col gap-3">
-          <input placeholder="Account name (e.g. House Expenses)" value={form.name} onChange={e => F('name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-          <input placeholder="Bank name (optional, e.g. Emirates NBD)" value={form.bank_name} onChange={e => F('bank_name', e.target.value)}
-            className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Account name</label>
+            <input placeholder="Account name (e.g. House Expenses)" value={form.name} onChange={e => F('name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Bank name</label>
+            <input placeholder="Bank name (optional, e.g. Emirates NBD)" value={form.bank_name} onChange={e => F('bank_name', e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
           <div>
             <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Account currency</p>
             <div className="grid grid-cols-2 gap-2">
