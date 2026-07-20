@@ -79,10 +79,25 @@ build green before commit. Notes: S-3 income page already had its button (skippe
 matches sadaka entries on recipient name OR linked income name (the entry's displayed title);
 H-2 found `themeColor` already present, added only `viewportFit: 'cover'`.
 
-### Phase 6 — Deferred Fable-5 work (after Phase 5)
-In order: **#25 recurring expenses** (migration + confirm-to-create), **#33 sadaka streak**,
-**#41 per-stream sadaka %** (trigger change), then Phase L bets on demand (#91 budgets, #92 receipts, #54 monthly statement).
-**#47 wasiyya rethink** stays parked until owner asks for it.
+### Phase 6 — Deferred Fable-5 work (partially shipped 2026-07-20)
+- **#33 sadaka streak** — ✅ **shipped 2026-07-20**. Dashboard card "N months giving in a row"
+  (gold, gated `enabled('sadaka')` + streak ≥ 2). New pure helper `sadakaStreak()` in `src/lib/sadaka.ts`
+  (consecutive gift-months by `date_given`, UTC-bucketed, one-month grace so an abandoned run reads 0);
+  giving-consistency, NOT obligation-clearing math — deliberately sidesteps the computeSadaka
+  month-bucketing subtlety that got it deferred, so it can never show a wrong money figure. 7 assertions
+  added to `sadaka.test.ts`. No migration, no money mutation.
+- **#25 recurring expenses** — ⏸ **BLOCKED ON OWNER MIGRATION.** Needs an `is_recurring` column on
+  `expenses` (owner runs SQL) + a confirm-to-create flow that writes real expense rows (feeds "yours to
+  keep"). Not built: shipping dormant, money-writing code before the column exists adds unattended-longevity
+  surface with no working feature. Ready to build on request — SplitForm already has the `is_recurring`
+  UI pattern to copy, and LoanForm has the column-missing (42703/PGRST204) graceful-degrade pattern.
+- **#41 per-stream sadaka %** — ⏸ **NEEDS OWNER DESIGN + NOT AUTO-SHIPPED.** Rewrites the
+  `auto_create_sadaka` + `adjust_sadaka_on_income_edit` triggers (`sadaka-trigger-v2.sql`) — the money-math
+  heart. Open decisions before any code: (a) where per-type % lives (new `sadaka_rates` table vs JSON on
+  `profiles`), (b) which income types get their own rate, (c) defaults + fallback to global `sadaka_pct`.
+  A live trigger change to a financial DB is not something to push without owner sign-off + testing.
+- Then Phase L bets on demand (#91 budgets, #92 receipts, #54 monthly statement).
+- **#47 wasiyya rethink** stays parked until owner asks for it.
 
 ---
 

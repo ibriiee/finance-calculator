@@ -163,5 +163,45 @@ export function computeSadaka(entries: SadakaEntry[]): SadakaComputed {
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+/**
+ * Sadaka giving streak: consecutive calendar months — ending at the latest month
+ * you gave in — that each hold at least one payment (amount_given > 0). The run
+ * only counts as "active" if it reaches the current month or the one before it
+ * (a one-month grace), so a long-abandoned streak reads as 0.
+ *
+ * Deliberately NOT obligation-clearing math: it rewards the giving *habit* and
+ * can never produce a wrong money figure, which is exactly why it sidesteps the
+ * income-scoped/advance-credit subtlety in computeSadaka. Months are bucketed in
+ * UTC (Vercel runs UTC) by date_given, falling back to created_at for payments
+ * logged before the date_given column existed. `now` is injectable for testing.
+ */
+export function sadakaStreak(
+  entries: { amount_given: number | string; date_given: string | null; created_at: string }[],
+  now: Date = new Date(),
+): number {
+  const key = (y: number, m: number) => `${y}-${String(m + 1).padStart(2, '0')}`
+  const months = new Set<string>()
+  for (const e of entries) {
+    if (Number(e.amount_given) <= 0) continue
+    const d = new Date(e.date_given ?? e.created_at)
+    if (isNaN(d.getTime())) continue
+    months.add(key(d.getUTCFullYear(), d.getUTCMonth()))
+  }
+  if (months.size === 0) return 0
+
+  let y = now.getUTCFullYear(), m = now.getUTCMonth()
+  if (!months.has(key(y, m))) {
+    // No gift yet this month — step back one for the grace window.
+    m -= 1; if (m < 0) { m = 11; y -= 1 }
+    if (!months.has(key(y, m))) return 0   // latest gift is older than last month
+  }
+  let streak = 0
+  while (months.has(key(y, m))) {
+    streak++
+    m -= 1; if (m < 0) { m = 11; y -= 1 }
+  }
+  return streak
+}
+
 // Self-check lives in sadaka.test.ts (kept out of this file so it never ships to
 // the browser bundle — top-level `module`/`require` refs crash an ESM import).

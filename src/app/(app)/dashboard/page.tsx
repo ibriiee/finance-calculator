@@ -1,12 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, shortDate, ownershipForEmail } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Receipt, ScrollText, Landmark, BarChart3, Hourglass, LayoutGrid, Moon } from 'lucide-react'
+import { ArrowRight, HandHeart, Scale, ArrowLeftRight, Target, LogOut, CreditCard, Receipt, ScrollText, Landmark, BarChart3, Hourglass, LayoutGrid, Moon, Flame } from 'lucide-react'
 import { EXPENSE_CATEGORIES } from '@/components/expenses/ExpenseForm'
 import StatusBadge from '@/components/shared/StatusBadge'
 import QuickAdd from '@/components/shared/QuickAdd'
 import { daysLeft } from '@/lib/lifeMath'
 import { toHijri } from '@/lib/hijri'
+import { sadakaStreak } from '@/lib/sadaka'
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const supabase = await createClient()
@@ -135,6 +136,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .filter((e: any) => e.currency === cur && (!monthly || inMonth(e.date_given ?? e.created_at)))
     .reduce((s: number, e: any) => s + Number(e.amount_given), 0)
   const sadakaGivenAed = sumGiven('AED') + sumGiven('PKR') * pkrToAed
+
+  // Giving consistency — consecutive months you gave sadaka (habit, not obligation
+  // math). Uses the same personal entries; currency-agnostic (any gift counts).
+  const givingStreak = sadakaStreak(sadakaEntries ?? [])
 
   // Expenses all-time (your share — shared expenses only cost you my_pct).
   const expenseShare = (cur: string) => (expensesData ?? [])
@@ -630,6 +635,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="text-sm text-emerald-400 font-medium">All Sadaka given ✓</p>
         )}
       </Link>
+      )}
+
+      {/* Sadaka giving streak — consistency of the habit */}
+      {enabled('sadaka') && givingStreak >= 2 && (
+        <Link href="/sadaka" className="card p-4 flex items-center justify-between"
+          style={{ background: 'var(--gold-dim)', border: '1px solid var(--gold)' }}>
+          <div className="flex items-center gap-2">
+            <Flame size={16} style={{ color: 'var(--gold)' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--gold)' }}>
+              {givingStreak} months giving in a row
+            </span>
+          </div>
+          <ArrowRight size={14} style={{ color: 'var(--gold)' }} />
+        </Link>
       )}
 
       {/* Goals preview */}

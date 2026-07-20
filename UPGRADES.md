@@ -63,7 +63,7 @@ What Copilot/Tricount get right: adding a record takes < 5 seconds.
 29. **P2 Voice note on any record** — attach a short audio memo (Supabase storage) for context that's faster spoken than typed.
 30. **P2 Bulk import CSV** — paste bank-statement rows into a mapping screen for backfilling history.
 
-## E. Dashboard & insight (P1) — ✅ #31, #32, #34 DONE 2026-07-19 · #33 deferred (Phase 6)
+## E. Dashboard & insight (P1) — ✅ #31, #32, #33, #34 DONE · #25 deferred (owner migration)
 
 31. **P1 Spending by category this month** — the dashboard shows totals but not *where* money went; a 5-bar mini breakdown (rent/food/transport/…) answers the #1 finance-app question.
 32. **P1 Month-over-month deltas** — "Expenses ↑ 12% vs last month" one-liners on the hero card (Monarch's most-loved surface).

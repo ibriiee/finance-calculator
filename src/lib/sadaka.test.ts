@@ -1,7 +1,7 @@
 // Runnable self-check for sadaka. No framework — run with:
 //   npx tsx src/lib/sadaka.test.ts
 import assert from 'node:assert'
-import { incomeOutstanding, remainingForIncome, isIncomeSettled, computeSadaka } from './sadaka'
+import { incomeOutstanding, remainingForIncome, isIncomeSettled, computeSadaka, sadakaStreak } from './sadaka'
 import type { SadakaEntry } from '@/types/database.types'
 
 const E = (p: Partial<SadakaEntry>): SadakaEntry => ({
@@ -61,5 +61,16 @@ const { byId: b2 } = computeSadaka([
   P('',   400, '2026-01-02'),   // untagged advance
 ])
 near(b2.get('obl-X')!.remaining, 600, 'untagged advance offsets X by 400')
+
+// ── sadakaStreak: consecutive giving months, UTC-bucketed, one-month grace ──
+const G = (given: number, date: string) => ({ amount_given: given, date_given: date, created_at: date })
+const at = (s: string) => new Date(s + 'T00:00:00Z')
+assert.equal(sadakaStreak([G(10, '2026-05-10'), G(10, '2026-06-02'), G(10, '2026-07-01')], at('2026-07-20')), 3, '3 gift-months in a row incl this month')
+assert.equal(sadakaStreak([G(10, '2026-05-10'), G(10, '2026-07-01')], at('2026-07-20')), 1, 'a skipped month breaks the run')
+assert.equal(sadakaStreak([G(10, '2026-05-10'), G(10, '2026-06-10')], at('2026-07-05')), 2, 'one-month grace keeps a run of 2 alive')
+assert.equal(sadakaStreak([G(10, '2026-03-10'), G(10, '2026-04-10')], at('2026-07-20')), 0, 'a run older than last month is inactive')
+assert.equal(sadakaStreak([G(0, '2026-07-01')], at('2026-07-20')), 0, 'obligation rows (given=0) never count')
+assert.equal(sadakaStreak([G(10, '2025-12-15'), G(10, '2026-01-10')], at('2026-01-20')), 2, 'run crosses the year boundary')
+assert.equal(sadakaStreak([], at('2026-07-20')), 0, 'no entries → no streak')
 
 console.log('sadaka: all assertions passed ✓')

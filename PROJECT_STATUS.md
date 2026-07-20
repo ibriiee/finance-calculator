@@ -143,6 +143,16 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-20 (b)** — **#33 sadaka streak shipped** (Phase 6, Opus). Dashboard now shows a gold
+  "N months giving in a row" card (gated `enabled('sadaka')` + streak ≥ 2). New pure helper
+  `sadakaStreak()` in `src/lib/sadaka.ts`: consecutive gift-months by `date_given` (UTC-bucketed,
+  one-month grace, abandoned run → 0); giving-consistency by design, NOT obligation-clearing math —
+  sidesteps the computeSadaka month-bucketing subtlety so it can never surface a wrong money figure.
+  +7 assertions in `sadaka.test.ts`. **Phase 6 remainder held for owner:** #25 recurring expenses
+  (needs `is_recurring` column migration + writes real expense rows) and #41 per-stream sadaka %
+  (rewrites the `auto_create_sadaka` trigger — money-math core, needs owner design decisions on
+  where per-type % lives + defaults). Neither auto-shipped; rationale + build-ready notes in
+  UPGRADE-PLAN.md Phase 6. Verified: tsc, tests (incl. streak), build.
 - **2026-07-20** — **Phase 5 shipped: all delegated polish items S-1…S-8 + H-1…H-3 in one pass**
   (owner chose to run the whole batch on Fable 5 instead of Sonnet/Haiku; specs in
   `UPGRADE-PLAN.md` followed verbatim, no money math touched). *Forms:* `inputMode="decimal"`
