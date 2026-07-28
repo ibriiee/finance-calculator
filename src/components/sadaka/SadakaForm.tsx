@@ -35,7 +35,18 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
     recipient_type: editItem?.recipient_type ?? 'named_relative',
     location: editItem?.location ?? 'UAE', method: editItem?.method ?? 'cash', notes: editItem?.notes ?? '',
     status: editItem?.status ?? 'pending',
+    is_jariyah: editItem?.is_jariyah ?? false,          // #45
+    jariyah_type: editItem?.jariyah_type ?? 'well',
   }
+
+// Until migration 14 (phase8-upgrades.sql) runs, the jariyah columns don't
+// exist. Tagging is a label — it must never cost someone their sadaka record.
+const isMissingJariyahCol = (e: any) =>
+  !!e && (e.code === '42703' || e.code === 'PGRST204' || /jariyah/.test(e.message ?? ''))
+const stripJariyah = (row: any) => {
+  const { is_jariyah, jariyah_type, ...rest } = row
+  return rest
+}
 
   const [form, setForm] = useState(() => {
     // Only restore draft for new entries, not edits
@@ -134,6 +145,8 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
         recipient_type: form.recipient_type as any,
         location: form.location as any, method: form.method as any,
         notes: form.notes || null,
+        is_jariyah: form.is_jariyah,
+        jariyah_type: form.is_jariyah ? form.jariyah_type : null,
       }
       if (statusChanged) payload.status = form.status
 
@@ -162,7 +175,10 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
         payload.shared = form.on_behalf !== 'me'
       }
 
-      const { error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id)
+      let { error: err } = await supabase.from('sadaka_entries').update(payload).eq('id', editItem.id)
+      if (isMissingJariyahCol(err)) {
+        ;({ error: err } = await supabase.from('sadaka_entries').update(stripJariyah(payload)).eq('id', editItem.id))
+      }
       setSaving(false)
       if (err) { setError(err.message); return }
       if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
@@ -195,24 +211,36 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
       recipient_type: form.recipient_type as any,
       location: form.location as any, method: form.method as any,
       notes: form.notes || null,
+      is_jariyah: form.is_jariyah,
+      jariyah_type: form.is_jariyah ? form.jariyah_type : null,
     }
     // Smart split: if paying more than one income owes, route the overflow to a second income
     const linkedRemaining = form.from_income_id ? remainingForIncome(outstanding, form.from_income_id) : 0
     const isOverpay = isPayment && form.from_income_id && amount > linkedRemaining && linkedRemaining > 0
     const canSplit = isOverpay && secondaryIncomeId
 
-    let err
+    // Single insert path so the jariyah-column fallback covers both branches.
+    const insertRows = async (rows: any[]) => {
+      const first = await Promise.all(rows.map(r => supabase.from('sadaka_entries').insert(r)))
+      const e: any = first.find(r => r.error)?.error
+      if (!isMissingJariyahCol(e)) return e
+      // Every row here shares one shape, so a missing column rejects them all
+      // before anything is written — retrying the set can't duplicate a saved row.
+      const retry = await Promise.all(rows.map(r => supabase.from('sadaka_entries').insert(stripJariyah(r))))
+      return retry.find(r => r.error)?.error as any
+    }
+
+    let err: any
     if (canSplit) {
       // Two entries: primary clears its income exactly, secondary gets the rest
       const secondaryAmount = amount - linkedRemaining
       const base = { ...payload, added_by_id: me.id, amount_owed: 0 }
-      const [r1, r2] = await Promise.all([
-        supabase.from('sadaka_entries').insert({ ...base, amount_given: linkedRemaining, source_income_id: form.from_income_id }),
-        supabase.from('sadaka_entries').insert({ ...base, amount_given: secondaryAmount, source_income_id: secondaryIncomeId }),
+      err = await insertRows([
+        { ...base, amount_given: linkedRemaining, source_income_id: form.from_income_id },
+        { ...base, amount_given: secondaryAmount, source_income_id: secondaryIncomeId },
       ])
-      err = r1.error ?? r2.error
     } else {
-      ;({ error: err } = await supabase.from('sadaka_entries').insert({ ...payload, added_by_id: me.id }))
+      err = await insertRows([{ ...payload, added_by_id: me.id }])
     }
     setSaving(false)
     if (err) { setError(err.message); return }
@@ -408,6 +436,27 @@ export default function SadakaForm({ onClose, onSaved, editItem }: Props) {
                   className="w-4 h-4 rounded accent-[var(--gold)]" />
                 <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Advance (given before income)</span>
               </label>
+
+              {/* Sadaqah jariyah — ongoing charity (#45). A label only: never
+                  affects owed/given math, just how the entry is remembered. */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.is_jariyah} onChange={e => F('is_jariyah', e.target.checked)}
+                  className="w-4 h-4 rounded accent-[var(--gold)]" />
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  🌱 Sadaqah jariyah (ongoing reward)
+                </span>
+              </label>
+              {form.is_jariyah && (
+                <select value={form.jariyah_type} onChange={e => F('jariyah_type', e.target.value)}
+                  className="px-3 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--gold)', color: 'var(--text-primary)' }}>
+                  <option value="well">Water well</option>
+                  <option value="quran">Quran / mushaf</option>
+                  <option value="tree">Tree planting</option>
+                  <option value="education">Education</option>
+                  <option value="masjid">Masjid</option>
+                  <option value="other">Other</option>
+                </select>
+              )}
             </div>
           )}
 

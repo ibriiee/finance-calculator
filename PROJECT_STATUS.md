@@ -143,6 +143,23 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-20 (d)** — **Phase 8: analytics suite + household reporting + migration-gated batch**
+  (Opus). *Analytics (#73–78, all six):* spending-by-category stacked trend (top 5 + Other, your
+  share only), all-time **Records** card (best earning / most generous / highest spending month),
+  income-by-source donut, sadaka-by-recipient donut, joint-account in/out rhythm, zakat-by-year.
+  Two new chart primitives (`StackedBars`, `GroupedBars`); every new chart reuses the page's existing
+  monthly/yearly buckets so they follow the toggle instead of inventing their own window.
+  *Household:* **#54** one-tap monthly statement on Joint (contributions, spend by category, fairness)
+  as WhatsApp-ready text; **#56** "Remind" button on the fairness banner. Both COPY to clipboard —
+  nothing is ever sent automatically. *Migration-gated batch (needs `supabase/phase8-upgrades.sql`):*
+  **#45** sadaqah jariyah tagging + lifetime jariyah card, **#48** niyyah on goals (shown on the card
+  and again on completion), **#55** ledger author attribution, **#71** append-only audit log with a
+  deliberately defensive trigger (any audit error is swallowed so it can never block a real financial
+  write). **All four ship safe BEFORE the SQL is run:** pages already read with `select('*')`, and
+  every write retries without the new field on 42703/PGRST204 — the `loans-shared.sql` pattern.
+  **#68 undo-toast declined again:** soft-delete adds a "deleted but not really" state that every
+  existing read path would have to filter — a data-model change, not a UI nicety.
+  Verified: tsc, tests, build.
 - **2026-07-20 (c)** — **Phase 7: remaining P1s + zero-risk polish** (Opus). *Direction clarity
   (finishes section B):* **#13** ExpenseForm red framing — red amount border, live "−X leaves your
   pocket" preview (shows your share + what's owed back on a split), red submit; **#14** IncomeForm

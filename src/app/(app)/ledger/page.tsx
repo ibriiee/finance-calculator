@@ -174,6 +174,14 @@ export default function LedgerPage() {
                         {CATEGORY_LABELS[entry.category]} · {shortDate(entry.transaction_date)}
                         {entry.is_settled && ' · Settled'}
                       </p>
+                      {/* Who logged it (#55) — absent on rows predating migration 14 */}
+                      {(entry as any).added_by_id && (
+                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          Added by {(entry as any).added_by_id === userId
+                            ? 'you'
+                            : (profiles.find(p => p.id === (entry as any).added_by_id)?.display_name ?? 'your brother')}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1">

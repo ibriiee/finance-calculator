@@ -154,6 +154,11 @@ export default function GoalsPage() {
                       </span>
                     </div>
                     <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>{goal.name}</h3>
+                    {(goal as any).niyyah && goal.pct < 100 && (
+                      <p className="text-xs italic mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        “{(goal as any).niyyah}”
+                      </p>
+                    )}
                     {goal.target_date && (
                       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                         Target: {shortDate(goal.target_date)} · {monthsLeft ?? 0} months left
@@ -299,8 +304,16 @@ export default function GoalsPage() {
                   )
                 )}
                 {goal.pct >= 100 && (
-                  <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
-                    <span>🎉</span> Goal reached!
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
+                      <span>🎉</span> Goal reached!
+                    </div>
+                    {/* The niyyah is the point of the goal — surface it on completion (#48) */}
+                    {(goal as any).niyyah && (
+                      <p className="text-xs italic" style={{ color: 'var(--gold)' }}>
+                        “{(goal as any).niyyah}”
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

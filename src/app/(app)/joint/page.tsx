@@ -6,7 +6,7 @@ import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Plus, Landmark, ArrowDownCircle, ArrowUpCircle, Building2, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Landmark, ArrowDownCircle, ArrowUpCircle, Building2, Pencil, Trash2, Share2, Check, Bell } from 'lucide-react'
 import AccountForm from '@/components/joint/AccountForm'
 import TxnForm from '@/components/joint/TxnForm'
 
@@ -29,6 +29,7 @@ export default function JointAccountPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [wantAdd, setWantAdd] = useState(false)
   const [equalize, setEqualize] = useState<{ acc: Account; amount: number } | null>(null)
+  const [copied, setCopied] = useState('')
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('add')) setWantAdd(true)
@@ -94,6 +95,64 @@ export default function JointAccountPage() {
     return { t, deposits, withdrawals, totalIn, totalOut, balance, byPerson }
   }
 
+  // Copy text to the clipboard for the user to paste — never sends anything itself.
+  async function copyText(text: string, tag: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(tag); setTimeout(() => setCopied(''), 2000)
+    } catch { alert('Could not copy — your browser blocked clipboard access.') }
+  }
+
+  /**
+   * Monthly household statement (#54): this month's contributions, spending by
+   * category and fairness per account, as plain WhatsApp-ready text. Reads only
+   * what's already loaded — no new query, no money mutation.
+   */
+  function buildStatement(): string {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const inThisMonth = (d: string) => new Date(d) >= monthStart
+    const title = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    const lines = [`*Household statement — ${title}*`, '']
+
+    accounts.forEach(acc => {
+      const t = txns.filter(x => x.account_id === acc.id && inThisMonth(x.txn_date))
+      if (t.length === 0) return
+      const deps = t.filter(x => x.txn_type === 'deposit')
+      const withd = t.filter(x => x.txn_type === 'withdrawal')
+      const totalIn = deps.reduce((s, x) => s + Number(x.amount), 0)
+      const totalOut = withd.reduce((s, x) => s + Number(x.amount), 0)
+      lines.push(`*${acc.name}* (${acc.currency})`)
+      lines.push(`In: ${formatCurrency(totalIn, acc.currency)} · Out: ${formatCurrency(totalOut, acc.currency)}`)
+
+      // Who chipped in, this month
+      const byPerson: Record<string, number> = {}
+      deps.forEach(x => { if (x.contributor_id) byPerson[x.contributor_id] = (byPerson[x.contributor_id] ?? 0) + Number(x.amount) })
+      Object.entries(byPerson).forEach(([id, amt]) =>
+        lines.push(`• ${names[id] ?? 'Someone'} chipped in ${formatCurrency(amt, acc.currency)}`))
+
+      // Where it went
+      const byCat: Record<string, number> = {}
+      withd.forEach(x => { const c = x.category ?? 'other'; byCat[c] = (byCat[c] ?? 0) + Number(x.amount) })
+      Object.entries(byCat).sort((a, b) => b[1] - a[1]).forEach(([c, amt]) =>
+        lines.push(`• ${c.replace(/_/g, ' ')}: ${formatCurrency(amt, acc.currency)}`))
+
+      // Fairness uses the SAME all-time contribution basis as the card above —
+      // a month-scoped fairness figure would contradict the on-screen banner.
+      const s = accountStats(acc)
+      const contribs = Object.keys(names).map(id => ({ id, amount: s.byPerson[id] ?? 0 }))
+      const maxC = Math.max(0, ...contribs.map(c => c.amount))
+      const behindList = contribs.filter(c => c.amount < maxC)
+      if (behindList.length === 0 && s.totalIn > 0) lines.push('Contributions are equal ✓')
+      else behindList.forEach(b =>
+        lines.push(`${names[b.id] ?? 'Someone'} owes ${formatCurrency(maxC - b.amount, acc.currency)} to be equal (all-time)`))
+      lines.push('')
+    })
+
+    if (lines.length <= 2) lines.push('No joint activity recorded this month.')
+    return lines.join('\n')
+  }
+
   if (loading) return <LoadingSpinner />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
@@ -114,6 +173,18 @@ export default function JointAccountPage() {
             <Plus size={14} /> Account
           </button>
         } />
+
+      {/* #54 — monthly household statement, WhatsApp-ready */}
+      {accounts.length > 0 && (
+        <button onClick={() => copyText(buildStatement(), 'statement')}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+          style={{ background: copied === 'statement' ? 'rgba(16,185,129,0.15)' : 'var(--surface-2)',
+            color: copied === 'statement' ? '#10B981' : 'var(--text-secondary)' }}>
+          {copied === 'statement'
+            ? <><Check size={15} /> Copied — paste into WhatsApp</>
+            : <><Share2 size={15} /> Copy this month's statement</>}
+        </button>
+      )}
 
       {accounts.length === 0 ? (
         <EmptyState icon={Landmark} title="No joint account yet"
@@ -189,11 +260,22 @@ export default function JointAccountPage() {
                 behind.map(b => (
                   <div key={b.id} className="flex items-center justify-between gap-2 text-xs mt-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
                     <span>{b.id === userId ? 'You owe' : `${b.name} owes`} {formatCurrency(b.owes, acc.currency)} to be equal</span>
-                    {b.id === userId && (
+                    {b.id === userId ? (
                       <button onClick={() => setEqualize({ acc, amount: b.owes })}
                         className="shrink-0 px-2 py-1 rounded-lg font-semibold"
                         style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
                         Chip in now
+                      </button>
+                    ) : (
+                      /* #56 — composes the reminder and copies it. You send it. */
+                      <button onClick={() => copyText(
+                        `Salam ${b.name} — quick reminder about *${acc.name}*: you're ${formatCurrency(b.owes, acc.currency)} behind to be equal on contributions. No rush, just so it's tracked. (via Mizan)`,
+                        `nudge-${acc.id}-${b.id}`)}
+                        className="shrink-0 px-2 py-1 rounded-lg font-semibold flex items-center gap-1"
+                        style={{ background: 'rgba(245,158,11,0.18)', color: '#F59E0B' }}>
+                        {copied === `nudge-${acc.id}-${b.id}`
+                          ? <><Check size={11} /> Copied</>
+                          : <><Bell size={11} /> Remind</>}
                       </button>
                     )}
                   </div>

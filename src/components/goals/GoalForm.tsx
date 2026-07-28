@@ -20,6 +20,7 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
     target_date: editGoal?.target_date ?? '',
     contribution_method: editGoal?.contribution_method ?? 'manual',
     auto_pct: '',
+    niyyah: (editGoal as any)?.niyyah ?? '',
   })
   const F = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }))
 
@@ -36,14 +37,22 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
       target_amount: parseFloat(form.target_amount), currency: form.currency as any,
       target_date: form.target_date || null,
       contribution_method: form.contribution_method as any,
+      niyyah: form.niyyah.trim() || null,   // #48
     }
-    const { error: err } = editGoal
-      ? await supabase.from('financial_goals').update(payload).eq('id', editGoal.id)
-      : await supabase.from('financial_goals').insert({
-          ...payload,
+    const write = (p: any) => editGoal
+      ? supabase.from('financial_goals').update(p).eq('id', editGoal.id)
+      : supabase.from('financial_goals').insert({
+          ...p,
           auto_pct: form.auto_pct ? parseFloat(form.auto_pct) / 100 : null,
           is_active: true,
         })
+    let { error: err } = await write(payload)
+    // Until migration 14 (phase8-upgrades.sql) runs, `niyyah` doesn't exist —
+    // save the goal without it rather than failing the whole write.
+    if (err && (err.code === '42703' || err.code === 'PGRST204' || err.message.includes('niyyah'))) {
+      const { niyyah, ...withoutNiyyah } = payload as any
+      ;({ error: err } = await write(withoutNiyyah))
+    }
     setSaving(false)
     if (err) { setError(err.message); return }
     if (typeof navigator !== 'undefined') navigator.vibrate?.(10)
@@ -89,6 +98,14 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
               <input placeholder="Target amount" type="number" inputMode="decimal" value={form.target_amount} onChange={e => F('target_amount', e.target.value)}
                 className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Niyyah — why this goal (optional)</label>
+            <textarea placeholder="e.g. So my family never has to ask anyone for help" value={form.niyyah}
+              onChange={e => F('niyyah', e.target.value)} rows={2}
+              className="w-full px-4 py-3 rounded-xl text-sm resize-none"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
           </div>
 
           <div>

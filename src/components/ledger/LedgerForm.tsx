@@ -46,9 +46,19 @@ export default function LedgerForm({ onClose, onSaved, userId, otherUser, editEn
       category: form.category as any, description: form.description,
       transaction_date: form.transaction_date,
     }
-    const { error: insErr } = editEntry
-      ? await supabase.from('brother_ledger').update(payload).eq('id', editEntry.id)
-      : await supabase.from('brother_ledger').insert({ ...payload, source_type: 'manual', is_settled: false })
+    let insErr
+    if (editEntry) {
+      ;({ error: insErr } = await supabase.from('brother_ledger').update(payload).eq('id', editEntry.id))
+    } else {
+      const row = { ...payload, source_type: 'manual' as const, is_settled: false }
+      // added_by_id records WHO LOGGED this IOU (not who owes) — #55.
+      ;({ error: insErr } = await supabase.from('brother_ledger').insert({ ...row, added_by_id: userId } as any))
+      // Until migration 14 (phase8-upgrades.sql) runs the column doesn't exist —
+      // save without it rather than losing the entry (same pattern as LoanForm).
+      if (insErr && (insErr.code === '42703' || insErr.code === 'PGRST204' || insErr.message.includes('added_by_id'))) {
+        ;({ error: insErr } = await supabase.from('brother_ledger').insert(row))
+      }
+    }
     setSaving(false)
     if (insErr) { setError(insErr.message); return }
     if (typeof navigator !== 'undefined') navigator.vibrate?.(10)

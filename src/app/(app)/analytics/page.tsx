@@ -5,8 +5,15 @@ import { formatCurrency } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Donut, MonthlyBars } from '@/components/analytics/Charts'
-import { TrendingUp, HandHeart, Wallet, Target, Scale } from 'lucide-react'
+import { Donut, MonthlyBars, StackedBars, GroupedBars } from '@/components/analytics/Charts'
+import { EXPENSE_CATEGORIES } from '@/components/expenses/ExpenseForm'
+import { TrendingUp, HandHeart, Wallet, Target, Scale, Receipt, Landmark, Award, Users, Briefcase } from 'lucide-react'
+
+// Shared palette for category/recipient/source slices — gold-family first so the
+// charts stay on-brand, then contrasting hues for readability.
+const PALETTE = ['#C9A84C', '#10B981', '#E8C97A', '#3B82F6', '#A855F7', '#7C6A2D', '#5C574A']
+const catLabel = (c: string) =>
+  EXPENSE_CATEGORIES.find(x => x.value === c)?.label ?? `• ${c.charAt(0).toUpperCase()}${c.slice(1)}`
 
 export default function AnalyticsPage() {
   const supabase = createClient()
@@ -21,15 +28,19 @@ export default function AnalyticsPage() {
   const [savings, setSavings] = useState<any[]>([])
   const [contribs, setContribs] = useState<any[]>([])
   const [goalCurrencies, setGoalCurrencies] = useState<Record<string, string>>({})
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [jointTxns, setJointTxns] = useState<any[]>([])
+  const [accCurrency, setAccCurrency] = useState<Record<string, string>>({})
+  const [zakatSnaps, setZakatSnaps] = useState<any[]>([])
   const [pkrToAed, setPkrToAed] = useState(0.0132)
   const [userId, setUserId] = useState('')
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     setUserId(user!.id)
-    const [{ data: inc, error }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }, { data: gls }] = await Promise.all([
-      supabase.from('income_projects').select('amount, currency, status, work_completed_date, created_at').eq('owner_id', user!.id),
-      supabase.from('sadaka_entries').select('amount_owed, amount_given, currency, location, date_given, created_at').or(`owner_id.eq.${user!.id},is_joint.eq.true`),
+    const [{ data: inc, error }, { data: sad }, { data: lns }, { data: reps }, { data: led }, { data: sav }, { data: con }, { data: rate }, { data: gls }, { data: exp }, { data: jAcc }, { data: jTx }, { data: zak }] = await Promise.all([
+      supabase.from('income_projects').select('name, amount, currency, status, work_completed_date, created_at').eq('owner_id', user!.id),
+      supabase.from('sadaka_entries').select('amount_owed, amount_given, currency, location, recipient_name, date_given, created_at').or(`owner_id.eq.${user!.id},is_joint.eq.true`),
       supabase.from('loans').select('id, owner_id, loan_type, currency_type, original_amount, status').eq('owner_id', user!.id).neq('status', 'cleared'),
       supabase.from('loan_repayments').select('loan_id, amount'),
       supabase.from('brother_ledger').select('from_user_id, to_user_id, amount, currency').eq('is_settled', false),
@@ -37,6 +48,10 @@ export default function AnalyticsPage() {
       supabase.from('goal_contributions').select('goal_id, amount, contributor_id'),
       supabase.from('rates_cache').select('rate_value').eq('rate_type', 'pkr_to_aed').single(),
       supabase.from('financial_goals').select('id, currency'),
+      supabase.from('expenses').select('amount, currency, my_pct, expense_date, category').eq('owner_id', user!.id),
+      supabase.from('joint_accounts').select('id, currency').eq('is_active', true),
+      supabase.from('joint_account_txns').select('account_id, txn_type, amount, txn_date'),
+      supabase.from('zakat_snapshots').select('snapshot_year, zakat_due_aed, is_wajib').eq('owner_id', user!.id),
     ])
     if (error) { setLoadError(true); setLoading(false); return }
     setLoadError(false)
@@ -50,6 +65,12 @@ export default function AnalyticsPage() {
     const gcMap: Record<string, string> = {}
     ;(gls ?? []).forEach((g: any) => { gcMap[g.id] = g.currency })
     setGoalCurrencies(gcMap)
+    setExpenses((exp as any) ?? [])
+    setJointTxns((jTx as any) ?? [])
+    const accMap: Record<string, string> = {}
+    ;(jAcc ?? []).forEach((a: any) => { accMap[a.id] = a.currency })
+    setAccCurrency(accMap)
+    setZakatSnaps((zak as any) ?? [])
     if (rate?.rate_value) setPkrToAed(Number(rate.rate_value))
     setLoading(false)
   }
@@ -154,6 +175,90 @@ export default function AnalyticsPage() {
   })
   const locSegments = Object.entries(byLoc).map(([label, value]) => ({ label, value, color: locColors[label] ?? '#7C6A2D' }))
 
+  // ---- New charts (#73-#78). All reuse `trend`'s buckets, so every chart below
+  // follows the monthly/yearly toggle rather than inventing its own window. ----
+  const buckets = trend.map(t => ({ label: t.month, key: t.key }))
+  const topSlice = (rec: Record<string, number>, n: number) =>
+    Object.entries(rec).sort((a, b) => b[1] - a[1]).slice(0, n)
+      .map(([label, value], i) => ({ label, value, color: PALETTE[i % PALETTE.length] }))
+
+  // #73 Expense category trend — your share, AED-folded, top 5 categories + Other
+  const expShare = (e: any) => toAed(Number(e.amount) * Number(e.my_pct ?? 1), e.currency)
+  const catTotals: Record<string, number> = {}
+  expenses.forEach(e => { catTotals[e.category ?? 'other'] = (catTotals[e.category ?? 'other'] ?? 0) + expShare(e) })
+  const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([c]) => c)
+  const OTHER_COLOR = PALETTE[PALETTE.length - 1]
+  const expenseTrend = buckets.map(bk => {
+    const inB = expenses.filter(e => e.expense_date && bucket(e.expense_date) === bk.key)
+    const parts = topCats.map((c, i) => ({
+      key: catLabel(c), color: PALETTE[i % PALETTE.length],
+      value: inB.filter(e => (e.category ?? 'other') === c).reduce((s, e) => s + expShare(e), 0),
+    }))
+    const other = inB.filter(e => !topCats.includes(e.category ?? 'other')).reduce((s, e) => s + expShare(e), 0)
+    if (other > 0) parts.push({ key: 'Other', value: other, color: OTHER_COLOR })
+    return { label: bk.label, parts: [...parts].sort((a, b) => b.value - a.value) }
+  })
+  const anyExpenses = Object.keys(catTotals).length > 0
+
+  // #74 Sadaka by recipient (all-time given) — who actually received what
+  const byRecipient: Record<string, number> = {}
+  sadaka.forEach(x => {
+    const v = toAed(Number(x.amount_given), x.currency)
+    if (v > 0) { const n = x.recipient_name || 'Unnamed / general'; byRecipient[n] = (byRecipient[n] ?? 0) + v }
+  })
+  const recipientSegments = topSlice(byRecipient, 6)
+
+  // #75 Income source breakdown — per client/project share of the selected period
+  const bySource: Record<string, number> = {}
+  periodIncome.forEach(x => {
+    const n = x.name || 'Unnamed'
+    bySource[n] = (bySource[n] ?? 0) + toAed(Number(x.amount), x.currency)
+  })
+  const sourceSegments = topSlice(bySource, 6)
+
+  // #76 Joint account rhythm — money in vs money out per period
+  const txnCurrency = (t: any) => accCurrency[t.account_id] ?? 'AED'
+  const jointSeries = buckets.map(bk => {
+    const inB = jointTxns.filter(t => t.txn_date && bucket(t.txn_date) === bk.key)
+    return {
+      label: bk.label,
+      a: inB.filter(t => t.txn_type === 'deposit').reduce((s, t) => s + toAed(Number(t.amount), txnCurrency(t)), 0),
+      b: inB.filter(t => t.txn_type === 'withdrawal').reduce((s, t) => s + toAed(Number(t.amount), txnCurrency(t)), 0),
+    }
+  })
+  const anyJoint = jointSeries.some(j => j.a > 0 || j.b > 0)
+
+  // #77 Zakat year over year — zakat due per snapshot year, oldest first
+  const zakatYears = [...zakatSnaps]
+    .sort((a, b) => Number(a.snapshot_year) - Number(b.snapshot_year))
+    .map(z => ({
+      label: String(z.snapshot_year),
+      parts: [{ key: 'Zakat due', value: Number(z.zakat_due_aed ?? 0), color: PALETTE[0] }],
+    }))
+
+  // #78 Best / worst months — always all-time monthly, independent of the toggle
+  const mKey = (d: string) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}` }
+  const mLabel = (k: string) => {
+    const [y, m] = k.split('-').map(Number)
+    return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  }
+  const addTo = (rec: Record<string, number>, d: string | null | undefined, v: number) => {
+    if (!d || !(v > 0)) return
+    const k = mKey(d); rec[k] = (rec[k] ?? 0) + v
+  }
+  const incByMonth: Record<string, number> = {}
+  const expByMonth: Record<string, number> = {}
+  const sadByMonth: Record<string, number> = {}
+  income.forEach(x => addTo(incByMonth, x.work_completed_date ?? x.created_at, toAed(Number(x.amount), x.currency)))
+  expenses.forEach(e => addTo(expByMonth, e.expense_date, expShare(e)))
+  sadaka.forEach(x => addTo(sadByMonth, x.date_given ?? x.created_at, toAed(Number(x.amount_given), x.currency)))
+  const peak = (rec: Record<string, number>) => Object.entries(rec).sort((a, b) => b[1] - a[1])[0] ?? null
+  const records = [
+    { label: 'Best earning month', entry: peak(incByMonth), Icon: TrendingUp, color: 'var(--gold)' },
+    { label: 'Most generous month', entry: peak(sadByMonth), Icon: HandHeart, color: '#10B981' },
+    { label: 'Highest spending month', entry: peak(expByMonth), Icon: Receipt, color: '#EF4444' },
+  ].filter(r => r.entry !== null)
+
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
       <ModuleHeader title="Analytics" subtitle="Earnings, sadaka & net position" />
@@ -244,6 +349,109 @@ export default function AnalyticsPage() {
         <div className="card p-4">
           <h3 className="text-sm font-semibold mb-3">Sadaka by Location</h3>
           <Donut segments={locSegments} />
+        </div>
+      )}
+
+      {/* #73 Expense category trend */}
+      {anyExpenses && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Receipt size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Spending by Category</h3>
+          </div>
+          <StackedBars data={expenseTrend} />
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
+            {topCats.map((c, i) => (
+              <span key={c} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                <span className="w-2 h-2 rounded-sm" style={{ background: PALETTE[i % PALETTE.length] }} />
+                {catLabel(c)}
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+              <span className="w-2 h-2 rounded-sm" style={{ background: OTHER_COLOR }} /> Other
+            </span>
+          </div>
+          <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+            Your share only — a split expense counts at your percentage.
+          </p>
+        </div>
+      )}
+
+      {/* #78 Records — best and worst months, all-time */}
+      {records.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Award size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Records (all time)</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {records.map(({ label, entry, Icon, color }) => (
+              <div key={label} className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <Icon size={13} style={{ color }} /> {label}
+                </span>
+                <span className="text-right">
+                  <span className="text-sm font-semibold block" style={{ color: 'var(--text-primary)' }}>
+                    {formatCurrency(entry![1], 'AED', true)}
+                  </span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{mLabel(entry![0])}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* #75 Income sources */}
+      {sourceSegments.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Briefcase size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Income by Source ({period === 'monthly' ? 'this month' : 'this year'})</h3>
+          </div>
+          <Donut segments={sourceSegments} />
+        </div>
+      )}
+
+      {/* #74 Sadaka by recipient */}
+      {recipientSegments.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Users size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Sadaka by Recipient (all time)</h3>
+          </div>
+          <Donut segments={recipientSegments} />
+        </div>
+      )}
+
+      {/* #76 Joint account rhythm */}
+      {anyJoint && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Landmark size={15} style={{ color: 'var(--gold)' }} />
+              <h3 className="text-sm font-semibold">Joint Account Rhythm</h3>
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#10B981' }} /> In</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#EF4444' }} /> Out</span>
+            </div>
+          </div>
+          <GroupedBars data={jointSeries} labelA="In" labelB="Out" />
+        </div>
+      )}
+
+      {/* #77 Zakat year over year */}
+      {zakatYears.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Scale size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold">Zakat by Year</h3>
+          </div>
+          <StackedBars data={zakatYears} />
+          <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+            Zakat due per saved snapshot. {zakatYears.length === 1 ? 'Save another year to see the trend.' : ''}
+          </p>
         </div>
       )}
     </div>

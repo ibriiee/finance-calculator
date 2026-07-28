@@ -106,11 +106,23 @@ export (new tested `calendarExport.ts`), **#65** dynamic backup age, **#87** 36p
 Assessed as already-solved: **#85** (deliberate centered phone column + desktop branding),
 **#90** (all modules already share ModuleHeader).
 
+### Phase 8 — Analytics + household + migration-gated batch (✅ shipped 2026-07-20, Opus)
+**#73–78** all six analytics charts (category trend, records, income sources, sadaka by recipient,
+joint rhythm, zakat by year) + two new primitives. **#54** monthly household statement, **#56** nudge
+— both clipboard-only, nothing auto-sends. **#45/#48/#55/#71** built against
+`supabase/phase8-upgrades.sql`, each with a write-fallback so the app is correct before *and* after
+the SQL runs.
+
+> ⚠️ **ACTION FOR OWNER:** run `supabase/phase8-upgrades.sql` in the Supabase SQL Editor to
+> activate jariyah tagging, goal niyyah, ledger attribution and the audit log. Until then those four
+> silently no-op — every other feature is unaffected.
+
 ### Remaining backlog — grouped by what actually blocks each item
-**A. Blocked on an owner-run migration (same class as #25/#41 on hold):**
-#45 jariyah tagging, #48 dua/niyyah on goals, #51 comment threads on joint txns,
-#55 ledger author attribution, #68 undo-toast (needs soft-delete column), #71 audit log.
-→ Ship these together in one migration batch whenever the owner is ready to run SQL.
+**A. Still blocked on an owner-run migration:**
+#51 comment threads on joint txns (needs its own table + realtime UI — not in the phase-8 SQL).
+#68 undo-toast — DECLINED, not merely deferred: soft-delete introduces a "deleted but not really"
+state that every existing read path in the app would have to filter. That is a data-model change
+with a correctness blast radius, sold as a UI nicety. `confirm()` already prevents the accident.
 
 **B. Decision-gated bigger bets (section L — each explicitly "needs a decision first"):**
 #91 budget envelopes, #92 receipt photos (storage quota), #94 gold/silver holdings,

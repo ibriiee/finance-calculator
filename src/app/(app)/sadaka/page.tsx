@@ -86,6 +86,14 @@ export default function SadakaPage() {
 
   const isPayment = (e: SadakaEntry) => Number(e.amount_owed) === 0 && Number(e.amount_given) > 0
 
+  // Lifetime sadaqah jariyah (#45) — ongoing-reward giving, per currency.
+  // Reporting only: read off amount_given, never folded into owed/pending math.
+  const jariyahTotal = (cur: string) => entries
+    .filter(e => (e as any).is_jariyah && e.currency === cur)
+    .reduce((s, e) => s + Number(e.amount_given), 0)
+  const jariyahAed = jariyahTotal('AED')
+  const jariyahPkr = jariyahTotal('PKR')
+
   // Single source of truth — income-scoped engine shared with Income page + Dashboard.
   // (Replaces the old owner+currency pool that leaked payments across unrelated incomes.)
   const computed = computeSadaka(entries)
@@ -199,6 +207,25 @@ export default function SadakaPage() {
         </div>
       )}
 
+      {/* Lifetime jariyah portfolio (#45) */}
+      {(jariyahAed > 0 || jariyahPkr > 0) && (
+        <div className="card p-4" style={{ border: '1px solid var(--gold)' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--gold)' }}>
+              🌱 Sadaqah jariyah — lifetime
+            </span>
+            <span className="font-display text-base font-semibold" style={{ color: 'var(--gold)' }}>
+              {jariyahAed > 0 && formatCurrency(jariyahAed, 'AED', true)}
+              {jariyahAed > 0 && jariyahPkr > 0 && ' · '}
+              {jariyahPkr > 0 && formatCurrency(jariyahPkr, 'PKR', true)}
+            </span>
+          </div>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            Giving whose reward continues — wells, Quran, trees, education.
+          </p>
+        </div>
+      )}
+
       {/* Recipients link + Export icon on same row */}
       <Link href="/recipients" className="card p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -247,10 +274,15 @@ export default function SadakaPage() {
             <div key={entry.id} className="card p-4" style={{ borderLeft: `3px solid ${borderColor}` }}>
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 mr-3">
-                  {(entry.is_advance || entry.is_joint) && (
+                  {(entry.is_advance || entry.is_joint || (entry as any).is_jariyah) && (
                     <div className="flex items-center gap-1.5 mb-1">
                       {entry.is_advance && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>Advance</span>}
                       {entry.is_joint && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>Joint</span>}
+                      {(entry as any).is_jariyah && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+                          🌱 Jariyah
+                        </span>
+                      )}
                     </div>
                   )}
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
