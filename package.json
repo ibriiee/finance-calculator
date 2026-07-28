@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx src/lib/sadaka.test.ts && tsx src/lib/lifeMath.test.ts && tsx src/lib/hijri.test.ts",
+    "test": "tsx src/lib/sadaka.test.ts && tsx src/lib/lifeMath.test.ts && tsx src/lib/hijri.test.ts && tsx src/lib/calendarExport.test.ts",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs",
     "snapshot": "node scripts/snapshot.mjs"

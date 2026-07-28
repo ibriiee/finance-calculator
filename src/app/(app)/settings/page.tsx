@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { User, Percent, LogOut, RefreshCw, Scale, Loader2, Coins, LayoutGrid, Download, Database, FlaskConical, Trash2, ChevronDown } from 'lucide-react'
+import CalendarExport from '@/components/shared/CalendarExport'
 import type { Profile, Currency } from '@/types/database.types'
 
 const MODULES: { key: string; label: string }[] = [
@@ -32,12 +33,26 @@ export default function SettingsPage() {
   const [testMode, setTestMode] = useState(false)
   const [devMode, setDevMode] = useState(false)
   const [open, setOpen] = useState<Set<string>>(new Set(['Profile']))
+  const [lastBackup, setLastBackup] = useState<string | null>(null)
   const toggle = (t: string) => setOpen(s => { const n = new Set(s); n.has(t) ? n.delete(t) : n.add(t); return n })
 
   useEffect(() => {
     setTestMode(localStorage.getItem('mizan_test_mode') === '1')
     setDevMode(localStorage.getItem('mizan_dev_mode') === '1')
+    setLastBackup(localStorage.getItem('mizan_last_backup'))
   }, [])
+
+  // Backup age (#65). Per-device by design: the file lands on THIS device, so
+  // "when did I last save one" is a device-local fact, not account state.
+  // Only ever stamped after a download actually succeeded.
+  function markBackupDone() {
+    const now = new Date().toISOString()
+    try { localStorage.setItem('mizan_last_backup', now) } catch {}
+    setLastBackup(now)
+  }
+  const backupAgeDays = lastBackup
+    ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / 86400000)
+    : null
   function toggleTestMode(v: boolean) {
     setTestMode(v)
     localStorage.setItem('mizan_test_mode', v ? '1' : '0')
@@ -193,6 +208,7 @@ export default function SettingsPage() {
       a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.json`
       a.click()
       URL.revokeObjectURL(url)
+      markBackupDone()
     } catch (e: any) {
       alert(`Backup failed — file NOT saved.\n${e.message}\nTry again in a moment.`)
     }
@@ -225,6 +241,7 @@ export default function SettingsPage() {
       a.download = `mizan-backup-${new Date().toISOString().split('T')[0]}.xls`
       a.click()
       URL.revokeObjectURL(url)
+      markBackupDone()
     } catch (e: any) {
       alert(`Backup failed — file NOT saved.\n${e.message}\nTry again in a moment.`)
     }
@@ -541,12 +558,22 @@ export default function SettingsPage() {
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Downloads every record to a file on your device. Keep it safe — that's your backup.
             </p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Tip: export a backup every few months — this app runs unattended.
+            {/* Backup age — the nudge that makes "I'll do it later" visible (#65) */}
+            <p className="text-xs" style={{ color: backupAgeDays !== null && backupAgeDays >= 90 ? '#F59E0B' : 'var(--text-muted)' }}>
+              {backupAgeDays === null
+                ? 'No backup taken on this device yet — export one now, this app runs unattended.'
+                : backupAgeDays === 0
+                  ? 'Last backup: today ✓'
+                  : `Last backup: ${backupAgeDays} day${backupAgeDays === 1 ? '' : 's'} ago${backupAgeDays >= 90 ? ' — time for a fresh one.' : '.'}`}
             </p>
+            {/* Finance dates → .ics (#59) */}
+            <div className="pt-2 mt-1 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border)' }}>
+              <CalendarExport />
+            </div>
+
             <button onClick={resetData} disabled={busy !== null}
               className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
-              style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+              style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', marginTop: '0.5rem' }}>
               {busy === 'reset' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
               {busy === 'reset' ? 'Clearing…' : 'Reset all financial data'}
             </button>

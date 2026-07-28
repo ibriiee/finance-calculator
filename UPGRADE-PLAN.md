@@ -99,6 +99,48 @@ H-2 found `themeColor` already present, added only `viewportFit: 'cover'`.
 - Then Phase L bets on demand (#91 budgets, #92 receipts, #54 monthly statement).
 - **#47 wasiyya rethink** stays parked until owner asks for it.
 
+### Phase 7 — Remaining P1s + zero-risk polish (✅ shipped 2026-07-20, Opus)
+Shipped: **#13/#14/#15** direction clarity (expense red / income green / signed red expense rows),
+**#26** native-datalist description autocomplete, **#35** dashboard net worth, **#59** `.ics` finance-date
+export (new tested `calendarExport.ts`), **#65** dynamic backup age, **#87** 36px icon-button hit areas.
+Assessed as already-solved: **#85** (deliberate centered phone column + desktop branding),
+**#90** (all modules already share ModuleHeader).
+
+### Remaining backlog — grouped by what actually blocks each item
+**A. Blocked on an owner-run migration (same class as #25/#41 on hold):**
+#45 jariyah tagging, #48 dua/niyyah on goals, #51 comment threads on joint txns,
+#55 ledger author attribution, #68 undo-toast (needs soft-delete column), #71 audit log.
+→ Ship these together in one migration batch whenever the owner is ready to run SQL.
+
+**B. Decision-gated bigger bets (section L — each explicitly "needs a decision first"):**
+#91 budget envelopes, #92 receipt photos (storage quota), #94 gold/silver holdings,
+#95 asset register, #96 third profile (RLS everywhere — own project), #97 hajj template,
+#98 faraid calculator (pairs with the parked #47), #99 debt-free timeline, #100 Mizan Score.
+
+**C. Deliberately NOT built (advisor position — reopen only with a reason):**
+- **#80** confirm() → custom sheet: rewrites the control flow of every money-delete path to async.
+  Native `confirm()` is reliable, accessible, and unskippable. High risk, cosmetic gain.
+- **#81** live currency formatting in inputs: fights the `type="number"` + `inputMode="decimal"`
+  keypad shipped in S-1; would force text inputs + custom parsing on money entry.
+- **#57** offline data cache: showing stale balances in a finance app is worse than showing nothing.
+  Would need explicit "as of <time>" staleness UI first.
+- **#28** calculator in amount field: the +100/+500/+1k chips (S-4) already cover the real case.
+- **#19** swipe between modules (fights vertical scroll), **#30** bulk CSV import (speculative for
+  2 users), **#36/#37/#38** (compact mode / card reorder / week digest — Recent Activity covers it),
+  **#70** per-module CSV (Settings already exports every table to JSON + Excel),
+  **#72** yearly archive (YAGNI at this data volume), **#69** in-app restore (destructive),
+  **#83** date-range chips (search #82 + scope tabs + pagination already cover it).
+- **#29** voice notes, **#64** web push, **#93** AI categorization: all add a dependency or external
+  service — against the longevity rule.
+
+**D. Needs owner approval to delete files:**
+**#21** remove dead `/splits` — CONFIRMED dead (`src/app/(app)/splits/page.tsx` +
+`src/components/splits/SplitForm.tsx` reference only each other; nothing links to `/splits`).
+The file move was blocked by the sandbox; say the word and it's a 2-file deletion.
+
+**E. Analytics charts (#73–78)** — all legitimate, data exists, each is a self-contained chart on
+`/analytics`. Pure additive work, no blockers; batch them when analytics is the session's focus.
+
 ---
 
 ## Delegation specs — Sonnet (S-1 … S-8)

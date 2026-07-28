@@ -1,12 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ownershipForEmail, validateAmount } from '@/lib/utils'
+import { ownershipForEmail, validateAmount, formatCurrency } from '@/lib/utils'
 import { X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
 import type { Currency, IncomeType, Ownership } from '@/types/database.types'
 
 interface Props { onClose: () => void; onSaved: () => void; editItem?: any }
+
+// Income is always an inflow — green framing, mirroring the expense form's red (#14).
+const GREEN = '#10B981'
 
 export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
   const supabase = createClient()
@@ -125,9 +128,18 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
                 <option value="PKR">PKR</option>
               </select>
               <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
-                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: `1px solid ${GREEN}`, color: 'var(--text-primary)' }} />
             </div>
           </div>
+
+          {/* Live inflow preview — money coming in */}
+          {parseFloat(form.amount) > 0 && (
+            <div className="px-3 py-2.5 rounded-xl text-xs font-semibold -mt-1"
+              style={{ background: 'rgba(16,185,129,0.12)', color: GREEN }}>
+              +{formatCurrency(parseFloat(form.amount), form.currency, true)} coming in
+              {form.ownership === 'shared' && ' · shared, counted at your half'}
+            </div>
+          )}
           {sadakaLocked && (
             <p className="text-[11px] -mt-1" style={{ color: 'var(--text-muted)' }}>
               Currency & ownership locked — linked sadaka exists (delete & re-add to change).
@@ -181,7 +193,7 @@ export default function IncomeForm({ onClose, onSaved, editItem }: Props) {
 
           <button onClick={save} disabled={saving || !form.name || !form.amount}
             className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-            style={{ background: (!form.name || !form.amount) ? 'var(--border)' : 'var(--gold)', color: '#0a0a0a' }}>
+            style={{ background: (!form.name || !form.amount) ? 'var(--border)' : GREEN, color: '#fff' }}>
             {saving && <Loader2 size={15} className="animate-spin" />}
             {saving ? 'Saving…' : isEdit ? 'Update Income' : 'Save Income'}
           </button>

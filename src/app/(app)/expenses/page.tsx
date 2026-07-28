@@ -66,6 +66,9 @@ export default function ExpensesPage() {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
   }
   const scoped = scope === 'month' ? items.filter(inMonth) : items
+  // Your own past descriptions, newest first — feeds the form's native autocomplete (#26).
+  // items is already ordered newest-first by the query, so a Set preserves that order.
+  const descriptionSuggestions = [...new Set(items.map(e => e.description).filter(Boolean))].slice(0, 30)
   // Search narrows the list only — the spent summary keeps using the full scoped array
   const searched = q ? scoped.filter(e => (e.description ?? '').toLowerCase().includes(q.toLowerCase())) : scoped
 
@@ -160,8 +163,9 @@ export default function ExpensesPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                    {formatCurrency(myShare(e), e.currency)}
+                  {/* Expenses are an outflow — signed + red, app-wide rule (#15) */}
+                  <p className="text-base font-bold text-red-400">
+                    −{formatCurrency(myShare(e), e.currency)}
                   </p>
                   {e.is_shared && (
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
@@ -185,7 +189,8 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      {showForm && <ExpenseForm onClose={() => { setShowForm(false); setEditItem(null) }} onSaved={load} editItem={editItem} />}
+      {showForm && <ExpenseForm onClose={() => { setShowForm(false); setEditItem(null) }} onSaved={load} editItem={editItem}
+        suggestions={descriptionSuggestions} />}
     </div>
   )
 }

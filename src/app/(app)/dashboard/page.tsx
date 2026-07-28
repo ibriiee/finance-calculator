@@ -183,6 +183,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // already correct) — only this rollup total folds PKR for the hero waterfall.
   const ledgerDebtAed = (aedBalance < 0 ? -aedBalance : 0) + (pkrBalance < 0 ? -pkrBalance * pkrToAed : 0)
   const totalOwedAed = loanDebtAed + ledgerDebtAed
+
+  // Money owed TO you — the mirror of totalOwedAed, needed for net worth (#35).
+  // Same exclusions as loanDebtAed: USD/gold/silver loans are display-only, never folded.
+  let loanOwedToMeAed = 0
+  ;(loansData ?? []).forEach((l: any) => {
+    if (l.loan_type === 'they_owe' && (l.currency_type === 'AED' || l.currency_type === 'PKR')) {
+      const repaid = (repays ?? []).filter((r: any) => r.loan_id === l.id).reduce((s: number, r: any) => s + Number(r.amount), 0)
+      loanOwedToMeAed += toAed(Math.max(0, Number(l.original_amount) - repaid), l.currency_type)
+    }
+  })
+  // A currency balance is either owed-to-you or owed-by-you, never both, so this
+  // can't double-count against ledgerDebtAed above.
+  const ledgerOwedToMeAed = (aedBalance > 0 ? aedBalance : 0) + (pkrBalance > 0 ? pkrBalance * pkrToAed : 0)
   const anyPkrFolded = myIncome.some((i: any) => i.currency === 'PKR')
     || (sadakaEntries ?? []).some((e: any) => e.currency === 'PKR' && Number(e.amount_given) > 0)
     || (expensesData ?? []).some((e: any) => e.currency === 'PKR')
@@ -206,6 +219,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .reduce((t: number, s: any) => t + (s.txn_type === 'withdrawal' ? -1 : 1) * Number(s.amount), 0)
   const stashAed = Math.max(0, stash('AED'))
   const stashPkr = Math.max(0, stash('PKR'))
+
+  // Net worth (#35): what you hold + what's owed to you − what you owe.
+  // Deliberately NOT the same as "yours to keep" (that's spendable cash flow);
+  // this is a balance-sheet number, so it counts savings/stash as assets.
+  const netWorthAed =
+    totalSavingsAed + stashAed + stashPkr * pkrToAed
+    + loanOwedToMeAed + ledgerOwedToMeAed
+    - totalOwedAed
 
   // Joint account fairness: persistent nudge while the other brother has chipped in more
   const chipNudges: { account: string; currency: string; otherName: string; diff: number }[] = []
@@ -482,6 +503,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </details>
       </div>
       )}
+
+      {/* Net worth — the one balance-sheet number (#35) */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Net worth</p>
+            <p className="font-display text-2xl font-semibold"
+               style={{ color: netWorthAed >= 0 ? 'var(--text-primary)' : '#EF4444' }}>
+              {formatCurrency(netWorthAed, 'AED', true)}
+            </p>
+          </div>
+          <Scale size={18} style={{ color: 'var(--gold)' }} />
+        </div>
+        <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+          savings + stash{(loanOwedToMeAed + ledgerOwedToMeAed) > 0 ? ' + owed to you' : ''}
+          {totalOwedAed > 0 ? ' − what you owe' : ''}
+        </p>
+      </div>
 
       {/* Savings & what you owe — both tap through to their modules */}
       <div className="grid grid-cols-2 gap-3">

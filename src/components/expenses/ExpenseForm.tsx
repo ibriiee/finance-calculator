@@ -3,10 +3,20 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Loader2, ChevronDown, ChevronUp, Users } from 'lucide-react'
 import FormSheet from '@/components/shared/FormSheet'
-import { validateAmount } from '@/lib/utils'
+import { validateAmount, formatCurrency } from '@/lib/utils'
 import type { Expense } from '@/types/database.types'
 
-interface Props { onClose: () => void; onSaved: () => void; editItem?: Expense | null }
+// Expenses are always an outflow — red framing everywhere money is shown,
+// matching the savings/joint withdrawal language (UPGRADES #13).
+const RED = '#EF4444'
+
+interface Props {
+  onClose: () => void
+  onSaved: () => void
+  editItem?: Expense | null
+  /** Past descriptions from the already-loaded list — powers native autocomplete (#26) */
+  suggestions?: string[]
+}
 
 export const EXPENSE_CATEGORIES: { value: string; label: string }[] = [
   { value: 'rent', label: '🏠 Rent / Housing' },
@@ -28,7 +38,7 @@ function lastExpense(): { description: string; category: string; amount: string;
   try { return JSON.parse(localStorage.getItem('mizan_last_expense') ?? 'null') } catch { return null }
 }
 
-export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
+export default function ExpenseForm({ onClose, onSaved, editItem, suggestions = [] }: Props) {
   const supabase = createClient()
   const isEdit = !!editItem
   const last = !isEdit ? lastExpense() : null
@@ -151,7 +161,7 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
               <option value="PKR">PKR</option>
             </select>
             <input placeholder="Amount" type="number" inputMode="decimal" value={form.amount} onChange={e => F('amount', e.target.value)}
-              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+              className="col-span-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: `1px solid ${RED}`, color: 'var(--text-primary)' }} />
           </div>
         </div>
 
@@ -188,7 +198,14 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Description</label>
           <input placeholder="What was it for?" value={form.description} onChange={e => F('description', e.target.value)}
+            list={suggestions.length > 0 ? 'expense-descriptions' : undefined}
             className="w-full px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          {/* Native autocomplete from your own past descriptions — no dep, no query */}
+          {suggestions.length > 0 && (
+            <datalist id="expense-descriptions">
+              {suggestions.map(s => <option key={s} value={s} />)}
+            </datalist>
+          )}
         </div>
 
         {/* One-tap repeat of the last expense (petrol, Du bill…) */}
@@ -263,11 +280,20 @@ export default function ExpenseForm({ onClose, onSaved, editItem }: Props) {
           </div>
         )}
 
+        {/* Live outflow preview — money is leaving your pocket */}
+        {amountNum > 0 && (
+          <div className="px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+            style={{ background: 'rgba(239,68,68,0.12)', color: RED }}>
+            −{formatCurrency(form.is_shared ? myShare : amountNum, form.currency, true)} leaves your pocket
+            {form.is_shared && theirShare > 0 && ` · ${formatCurrency(theirShare, form.currency, true)} owed back to you`}
+          </div>
+        )}
+
         {error && <div className="px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444' }}>⚠ {error}</div>}
 
         <button onClick={save} disabled={saving || !form.amount || !form.description}
           className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-          style={{ background: 'var(--gold)', color: '#0a0a0a' }}>
+          style={{ background: RED, color: '#fff' }}>
           {saving && <Loader2 size={15} className="animate-spin" />}
           {saving ? 'Saving…' : isEdit ? 'Update Expense' : 'Save Expense'}
         </button>

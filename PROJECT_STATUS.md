@@ -143,6 +143,25 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-20 (c)** — **Phase 7: remaining P1s + zero-risk polish** (Opus). *Direction clarity
+  (finishes section B):* **#13** ExpenseForm red framing — red amount border, live "−X leaves your
+  pocket" preview (shows your share + what's owed back on a split), red submit; **#14** IncomeForm
+  green framing — green border, "+X coming in" preview, green submit; **#15** expense list rows now
+  signed red (`−AED 50`). *Entry speed:* **#26** description autocomplete via native `<datalist>`,
+  fed by your own last 30 descriptions from the already-loaded list (no query, no dep).
+  *Dashboard:* **#35** net worth card — savings + stash + owed-to-you − what you owe; explicitly a
+  balance-sheet number, distinct from the "yours to keep" cash figure. *Longevity:* **#59** finance
+  dates → `.ics` download (zakat/loan/goal dates, day-before alarm) via new tested `calendarExport.ts`
+  — a DOWNLOAD, not a subscribable URL, because a live feed needs a public tokenized endpoint
+  exposing financial dates (owner security decision); **#65** backup age is now dynamic — Settings
+  shows "Last backup: N days ago", ambers past 90 days, stamped only after a download succeeds
+  (per-device localStorage, since the file lands on that device). *A11y:* **#87** icon-only buttons
+  (`button[aria-label]`) grow to a real 36px box — deliberately not a 44px invisible overlay, which
+  would overlap adjacent Edit/Delete targets. New test file `calendarExport.test.ts` (9 assertions:
+  CRLF, exclusive DTEND, month/year rollover, RFC-5545 escaping, 75-octet folding) wired into
+  `npm test`. **Assessed as already-solved, no code:** #85 tablet layout (app is a deliberate centered
+  phone column with desktop branding), #90 header consistency (all modules already share ModuleHeader).
+  Verified: tsc, tests, build.
 - **2026-07-20 (b)** — **#33 sadaka streak shipped** (Phase 6, Opus). Dashboard now shows a gold
   "N months giving in a row" card (gated `enabled('sadaka')` + streak ≥ 2). New pure helper
   `sadakaStreak()` in `src/lib/sadaka.ts`: consecutive gift-months by `date_given` (UTC-bucketed,
