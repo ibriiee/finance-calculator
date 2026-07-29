@@ -67,6 +67,19 @@ export default function GoalForm({ onClose, onSaved, editGoal }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
+          {/* Hajj preset (#97) — the one goal that always carries a niyyah */}
+          {!editGoal && !form.name && (
+            <button type="button"
+              onClick={() => setForm(p => ({
+                ...p, name: 'Hajj', goal_type: 'individual', currency: 'AED',
+                niyyah: 'To stand at Arafah and return with sins forgiven, in shaa Allah.',
+              }))}
+              className="text-xs px-3 py-2 rounded-xl text-left"
+              style={{ background: 'var(--surface-2)', border: '1px dashed var(--gold)', color: 'var(--gold)' }}>
+              🕋 Start a Hajj goal — name and niyyah filled in, you set the cost
+            </button>
+          )}
+
           <div>
             <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Goal name</label>
             <input placeholder="Goal name (e.g. Emergency Fund, Toyota Camry)" value={form.name} onChange={e => F('name', e.target.value)}

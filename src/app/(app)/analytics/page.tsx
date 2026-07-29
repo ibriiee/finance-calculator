@@ -259,6 +259,14 @@ export default function AnalyticsPage() {
     { label: 'Highest spending month', entry: peak(expByMonth), Icon: Receipt, color: '#EF4444' },
   ].filter(r => r.entry !== null)
 
+  // #100 Mizan Score — muhasabah (self-accounting) for the selected period.
+  // Four plain facts, no gamified score out of 100: earned, given, spent, kept.
+  // "Kept" mirrors the dashboard's cash logic (earned − sadaka given − expenses)
+  // and deliberately leaves out debt, which is a balance not a period flow.
+  const periodExpensesAed = expenses.filter(e => inPeriod(e.expense_date)).reduce((s, e) => s + expShare(e), 0)
+  const keptAed = earned - sadakaGiven - periodExpensesAed
+  const givenRatio = earned > 0 ? sadakaGiven / earned : 0
+
   return (
     <div className="flex flex-col gap-4 p-4 animate-slide-up">
       <ModuleHeader title="Analytics" subtitle="Earnings, sadaka & net position" />
@@ -289,6 +297,45 @@ export default function AnalyticsPage() {
           </div>
         ))}
       </div>
+
+      {/* #100 Mizan Score — muhasabah, the app's philosophical close */}
+      {earned > 0 && (
+        <div className="card p-4" style={{ border: '1px solid var(--gold)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Scale size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--gold)' }}>
+              Mizan — {period === 'monthly' ? 'this month' : 'this year'}
+            </h3>
+          </div>
+          <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
+            Muhasabah — taking account of yourself before you are taken to account.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { k: 'Earned', v: earned, c: 'var(--text-primary)' },
+              { k: 'Given', v: sadakaGiven, c: '#10B981' },
+              { k: 'Spent', v: periodExpensesAed, c: '#EF4444' },
+              { k: 'Kept', v: keptAed, c: keptAed >= 0 ? 'var(--gold)' : '#EF4444' },
+            ].map(({ k, v, c }) => (
+              <div key={k}>
+                <p className="text-[11px] mb-0.5" style={{ color: 'var(--text-muted)' }}>{k}</p>
+                <p className="font-display text-lg font-semibold" style={{ color: c }}>
+                  {formatCurrency(v, 'AED', true)}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+              <div className="h-full rounded-full"
+                style={{ width: `${Math.min(100, givenRatio * 100)}%`, background: '#10B981' }} />
+            </div>
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              {(givenRatio * 100).toFixed(1)}% of what you earned went out as sadaka.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Net position — are you in profit or loss overall? */}
       <div className="card p-4" style={{ border: `1px solid ${inProfit ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}` }}>

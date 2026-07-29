@@ -21,6 +21,7 @@ const MODULES = [
   { href: '/goals',      icon: Target,         label: 'Goals',      desc: 'Targets & contributions',    key: 'goals' },
   { href: '/zakat',      icon: Scale,          label: 'Zakat',      desc: 'Nisab, hawl & snapshots',    key: 'zakat' },
   { href: '/wasiyya',    icon: ScrollText,     label: 'Wasiyya',    desc: 'Digital will vault',         key: 'wasiyya' },
+  { href: '/faraid',     icon: Scale,          label: 'Faraid',     desc: 'Inheritance shares',         key: 'wasiyya' },
   { href: '/analytics',  icon: BarChart3,      label: 'Analytics',  desc: 'Trends & insights',          key: null },
   { href: '/life',       icon: Hourglass,      label: 'Life',       desc: 'Memento mori tracker',       key: 'life' },
   { href: '/settings',   icon: Settings,       label: 'Settings',   desc: 'Preferences & backup',       key: null },

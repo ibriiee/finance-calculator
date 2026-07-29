@@ -89,6 +89,27 @@ export default function LoansPage() {
     owedByPerson[l.counterparty_name][l.currency_type] = (owedByPerson[l.counterparty_name][l.currency_type] ?? 0) + remaining
   })
 
+  // #99 Debt-free plan — what you still owe, ordered by intended repayment date.
+  // Cash currencies only: gold/silver loans are settled in grams, so folding them
+  // into a single AED "remaining" figure would misstate the obligation.
+  const debtPlan = iOwe
+    .map(l => ({
+      loan: l,
+      remaining: Math.max(0, Number(l.original_amount) - repaidFor(l.id)),
+      cash: l.currency_type === 'AED' || l.currency_type === 'PKR',
+    }))
+    .filter(d => d.remaining > 0)
+    .sort((a, b) => {
+      // Dated debts first, soonest first; undated fall to the end.
+      if (a.loan.due_date && b.loan.due_date) return a.loan.due_date.localeCompare(b.loan.due_date)
+      if (a.loan.due_date) return -1
+      if (b.loan.due_date) return 1
+      return 0
+    })
+  const datedDebts = debtPlan.filter(d => d.loan.due_date)
+  const undatedCount = debtPlan.length - datedDebts.length
+  const debtFreeDate = datedDebts.length > 0 ? datedDebts[datedDebts.length - 1].loan.due_date : null
+
   function getReturnDisplay(loan: Loan) {
     if (loan.currency_type === 'gold_grams') {
       const val = loan.original_amount * rates.gold_aed_gram
@@ -381,6 +402,48 @@ export default function LoansPage() {
               </Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* #99 Debt-free plan */}
+      {debtPlan.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="section-label">Debt-free plan</p>
+            {debtFreeDate && undatedCount === 0 && (
+              <span className="text-xs font-semibold" style={{ color: 'var(--gold)' }}>
+                clear by {shortDate(debtFreeDate)}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col">
+            {debtPlan.map(({ loan, remaining, cash }, i) => {
+              const overdue = loan.due_date && new Date(loan.due_date) < new Date()
+              return (
+                <div key={loan.id} className="flex items-center justify-between py-2 border-t first:border-0"
+                  style={{ borderColor: 'var(--border)' }}>
+                  <div className="flex items-center gap-2.5 min-w-0 mr-3">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                      style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{loan.counterparty_name}</p>
+                      <p className="text-[11px]" style={{ color: overdue ? '#EF4444' : 'var(--text-muted)' }}>
+                        {loan.due_date ? `${overdue ? '⚠ overdue · ' : 'due '}${shortDate(loan.due_date)}` : 'no date set'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold shrink-0 text-red-400">
+                    {cash ? formatCurrency(remaining, loan.currency_type) : `${remaining}g`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
+            {undatedCount > 0
+              ? `${undatedCount} loan${undatedCount === 1 ? '' : 's'} without a date — set one to project when you're clear.`
+              : 'Pay in this order and the last one clears your debts, in shaa Allah.'}
+          </p>
         </div>
       )}
 

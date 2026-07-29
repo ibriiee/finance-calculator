@@ -5,7 +5,8 @@ import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
-import { Scale, CheckCircle2, XCircle, Info, Trash2 } from 'lucide-react'
+import { Scale, CheckCircle2, XCircle, Info, Trash2, Moon } from 'lucide-react'
+import { toHijri } from '@/lib/hijri'
 import type { ZakatSnapshot } from '@/types/database.types'
 
 const NISAB_GOLD_GRAMS = 87.48
@@ -32,7 +33,29 @@ export default function ZakatPage() {
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [ratesFailed, setRatesFailed] = useState(false)
+  // Zakat al-Fitr (#46) — household size and the per-head rate are local
+  // preferences: the rate is set by local scholars each year and varies by
+  // region, so the app must never hardcode or silently age one.
+  const [fitrHeads, setFitrHeads] = useState(1)
+  const [fitrRate, setFitrRate] = useState('')
   const supabase = createClient()
+
+  useEffect(() => {
+    const h = localStorage.getItem('mizan_fitr_heads')
+    const r = localStorage.getItem('mizan_fitr_rate')
+    if (h) setFitrHeads(Math.max(1, parseInt(h) || 1))
+    if (r) setFitrRate(r)
+  }, [])
+  function saveFitr(heads: number, rate: string) {
+    setFitrHeads(heads); setFitrRate(rate)
+    try {
+      localStorage.setItem('mizan_fitr_heads', String(heads))
+      localStorage.setItem('mizan_fitr_rate', rate)
+    } catch {}
+  }
+  const hijriNow = toHijri(new Date())
+  const isRamadan = hijriNow.m === 9
+  const fitrTotal = (parseFloat(fitrRate) || 0) * fitrHeads
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -203,6 +226,52 @@ export default function ZakatPage() {
           {hawlStart && <p className="mt-0.5">Hawl: {Math.floor((Date.now() - new Date(hawlStart).getTime()) / 86400000)}/{HAWL_DAYS} days</p>}
         </div>
       </div>
+
+      {/* Zakat al-Fitr — only during Ramadan, when it's actually due (#46) */}
+      {isRamadan && (
+        <div className="card p-4" style={{ border: '1px solid var(--gold)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Moon size={15} style={{ color: 'var(--gold)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--gold)' }}>Zakat al-Fitr</h3>
+            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+              Ramadan {hijriNow.y}
+            </span>
+          </div>
+          <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
+            One portion per person in the household, including children — due before the Eid prayer.
+          </p>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>People</label>
+              <div className="flex items-center gap-2">
+                <button onClick={() => saveFitr(Math.max(1, fitrHeads - 1), fitrRate)} aria-label="One fewer person"
+                  className="p-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>−</button>
+                <span className="flex-1 text-center text-sm font-semibold">{fitrHeads}</span>
+                <button onClick={() => saveFitr(Math.min(30, fitrHeads + 1), fitrRate)} aria-label="One more person"
+                  className="p-2 rounded-lg" style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>+</button>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Rate per person</label>
+              <input type="number" inputMode="decimal" placeholder="e.g. 25" value={fitrRate}
+                onChange={e => saveFitr(fitrHeads, e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            </div>
+          </div>
+          {fitrTotal > 0 && (
+            <div className="px-3 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-between"
+              style={{ background: 'var(--gold-dim)', color: 'var(--gold)' }}>
+              <span>{fitrHeads} × {fitrRate}</span>
+              <span>{formatCurrency(fitrTotal, 'AED', true)}</span>
+            </div>
+          )}
+          <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+            The rate is set locally each year (roughly 2.5kg of a staple food) — enter what your
+            masjid announces. Nothing here is saved to the cloud or counted in the zakat above.
+          </p>
+        </div>
+      )}
 
       {/* Asset inputs */}
       <div className="card p-4">
