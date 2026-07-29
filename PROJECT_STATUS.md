@@ -143,6 +143,14 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-20 (g)** — **#62 / #63 longevity audits run (verification, no code changed).**
+  *#63 self-hosting:* **PASS** — `next/font` emits 13 self-hosted `.woff2` files into
+  `.next/static/media`; zero CDN references for fonts, CSS or images. The app will still render
+  correctly in 2028 with every external host dead. The only outbound calls are the three rate APIs
+  (`exchangerate-api`, `metals-api`, `goldapi`), which already have cached fallbacks — that is the
+  known, accepted drift risk, not a load-blocking dependency.
+  *#62 PWA meta:* **PASS** — `apple-touch-icon` (192 + 512), `apple-mobile-web-app-capable`,
+  status-bar style, `themeColor` and `viewportFit: 'cover'` all present in `layout.tsx`.
 - **2026-07-20 (f)** — **Phase 10: longevity, comments, holdings, loading polish** (Opus).
   **#66 keepalive** — the real 2-year risk finally addressed: `vercel.json` weekly cron →
   `/api/keepalive`, which touches Supabase with the ANON key (no new secret needed; reaching the DB
