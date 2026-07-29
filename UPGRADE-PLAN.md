@@ -117,12 +117,26 @@ the SQL runs.
 > activate jariyah tagging, goal niyyah, ledger attribution and the audit log. Until then those four
 > silently no-op — every other feature is unaffected.
 
+### Phases 9–10 (✅ shipped 2026-07-20, Opus)
+**#98** faraid calculator (`/faraid`, exact fractions, 12 textbook assertions), **#100** Mizan Score,
+**#99** debt-free plan, **#46** Zakat al-Fitr, **#97** Hajj preset, **#66** Supabase keepalive
+(cron + route + Settings surface), **#51** joint-txn comments, **#94** gold/silver holdings,
+**#61** skeletons, **#20** back-to-top.
+
+> ⚠️ **SECOND ACTION FOR OWNER:** run `supabase/phase10-upgrades.sql` too, and (optional, for the
+> keepalive date only) set `SUPABASE_SERVICE_ROLE_KEY` in Vercel env. The weekly cron works without it.
+
 ### Remaining backlog — grouped by what actually blocks each item
-**A. Still blocked on an owner-run migration:**
-#51 comment threads on joint txns (needs its own table + realtime UI — not in the phase-8 SQL).
-#68 undo-toast — DECLINED, not merely deferred: soft-delete introduces a "deleted but not really"
+**A. Everything migration-gated is now BUILT** — it just needs the two SQL files run
+(`phase8-upgrades.sql`, `phase10-upgrades.sql`). Each feature hides itself until then.
+
+**#68 undo-toast — DECLINED, not deferred:** soft-delete introduces a "deleted but not really"
 state that every existing read path in the app would have to filter. That is a data-model change
 with a correctness blast radius, sold as a UI nicety. `confirm()` already prevents the accident.
+
+**#49 hijri-first display — DECLINED:** dates render inside server components, so a localStorage
+toggle cannot reach them. Doing it properly means a cookie plus rewriting every date call site,
+for a cosmetic preference. Revisit only if you actually want hijri as the primary calendar.
 
 **B. Decision-gated bigger bets (section L — each explicitly "needs a decision first"):**
 #91 budget envelopes, #92 receipt photos (storage quota), #94 gold/silver holdings,

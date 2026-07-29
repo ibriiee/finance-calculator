@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate, getLagDays, getLagColor } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import Skeleton from '@/components/shared/Skeleton'
 import LoadError from '@/components/shared/LoadError'
 import { Plus, Briefcase, Clock, Pencil, Trash2, HandHeart, Check, Lock, ChevronDown, ChevronUp } from 'lucide-react'
 import IncomeForm from '@/components/income/IncomeForm'
@@ -106,7 +106,7 @@ export default function IncomePage() {
   const totalEarned = items.reduce((s, i) => s + toAed(Number(i.amount), i.currency), 0)
   const totalPending = items.filter(i => !isReceivedItem(i)).reduce((s, i) => s + toAed(Number(i.amount), i.currency), 0)
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <Skeleton />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
       <ModuleHeader title="Income & Projects" />

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import { SkeletonStats } from '@/components/shared/Skeleton'
 import LoadError from '@/components/shared/LoadError'
 import { Donut, MonthlyBars, StackedBars, GroupedBars } from '@/components/analytics/Charts'
 import { EXPENSE_CATEGORIES } from '@/components/expenses/ExpenseForm'
@@ -76,7 +76,7 @@ export default function AnalyticsPage() {
   }
   useEffect(() => { load() }, [])
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <SkeletonStats />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
       <ModuleHeader title="Analytics" />

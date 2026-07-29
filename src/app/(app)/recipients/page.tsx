@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import Skeleton from '@/components/shared/Skeleton'
 import LoadError from '@/components/shared/LoadError'
 import { Plus, Users, Share2, Check, AlertTriangle, Pencil, Trash2 } from 'lucide-react'
 import RecipientForm from '@/components/sadaka/RecipientForm'
@@ -100,7 +100,7 @@ export default function RecipientsPage() {
     } catch { /* clipboard blocked */ }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <Skeleton />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
       <ModuleHeader title="Recipients" />

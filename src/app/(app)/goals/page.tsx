@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate, calcMonthsRemaining, validateAmount } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import Skeleton from '@/components/shared/Skeleton'
 import LoadError from '@/components/shared/LoadError'
 import { Plus, Target, TrendingUp, Pencil, Trash2, Check, X } from 'lucide-react'
 import GoalForm from '@/components/goals/GoalForm'
@@ -100,7 +100,7 @@ export default function GoalsPage() {
     load()
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <Skeleton />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
       <ModuleHeader title="Financial Goals" />

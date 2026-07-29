@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import LoadError from '@/components/shared/LoadError'
 import { Scale, CheckCircle2, XCircle, Info, Trash2, Moon } from 'lucide-react'
 import { toHijri } from '@/lib/hijri'
+import MetalHoldings from '@/components/zakat/MetalHoldings'
 import type { ZakatSnapshot } from '@/types/database.types'
 
 const NISAB_GOLD_GRAMS = 87.48
@@ -272,6 +273,14 @@ export default function ZakatPage() {
           </p>
         </div>
       )}
+
+      {/* Gold & silver held (#94) — flows into the grams fields below */}
+      <MetalHoldings goldRate={rates.gold} silverRate={rates.silver}
+        onApply={(g, s) => setAssets(p => ({
+          ...p,
+          gold_grams: g > 0 ? String(g) : p.gold_grams,
+          silver_grams: s > 0 ? String(s) : p.silver_grams,
+        }))} />
 
       {/* Asset inputs */}
       <div className="card p-4">

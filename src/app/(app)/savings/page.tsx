@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import Skeleton from '@/components/shared/Skeleton'
 import LoadError from '@/components/shared/LoadError'
 import { Plus, PiggyBank, MapPin, ArrowDownCircle, ArrowUpCircle, Trash2, Pencil } from 'lucide-react'
 import SavingsForm from '@/components/savings/SavingsForm'
@@ -58,7 +58,7 @@ export default function SavingsPage() {
     .filter(s => s.currency === cur)
     .reduce((t, s) => t + s.balance, 0)
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <Skeleton />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
       <ModuleHeader title="Savings" />

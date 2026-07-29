@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import BottomNav from '@/components/shared/BottomNav'
 import TestBanner from '@/components/shared/TestBanner'
+import BackToTop from '@/components/shared/BackToTop'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="pb-24">
           {children}
         </main>
+        <BackToTop />
         <BottomNav />
       </div>
     </div>

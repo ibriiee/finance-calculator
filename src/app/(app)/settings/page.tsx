@@ -53,6 +53,19 @@ export default function SettingsPage() {
   const backupAgeDays = lastBackup
     ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / 86400000)
     : null
+
+  // #66 — surface the Supabase keepalive so the "free tier pauses on inactivity"
+  // risk is visible in-app rather than discovered as an outage two years from now.
+  const [lastPing, setLastPing] = useState<string | null>(null)
+  useEffect(() => {
+    // system_health only exists after phase10-upgrades.sql — a miss is expected,
+    // not an error, so it stays silent.
+    supabase.from('system_health').select('last_ping_at').eq('id', 'keepalive').single()
+      .then(({ data }: any) => { if (data?.last_ping_at) setLastPing(data.last_ping_at) })
+  }, [])
+  const pingAgeDays = lastPing
+    ? Math.floor((Date.now() - new Date(lastPing).getTime()) / 86400000)
+    : null
   function toggleTestMode(v: boolean) {
     setTestMode(v)
     localStorage.setItem('mizan_test_mode', v ? '1' : '0')
@@ -569,6 +582,20 @@ export default function SettingsPage() {
             {/* Finance dates → .ics (#59) */}
             <div className="pt-2 mt-1 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border)' }}>
               <CalendarExport />
+            </div>
+
+            {/* Database keepalive (#66) */}
+            <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>
+                Database keepalive
+              </p>
+              <p className="text-xs" style={{ color: pingAgeDays !== null && pingAgeDays > 14 ? '#F59E0B' : 'var(--text-muted)' }}>
+                {pingAgeDays === null
+                  ? 'A weekly cron pings Supabase so the free tier never pauses from inactivity. To see the date here, run supabase/phase10-upgrades.sql and set SUPABASE_SERVICE_ROLE_KEY on Vercel — the ping itself works without either.'
+                  : pingAgeDays === 0
+                    ? 'Last ping: today ✓ — the database is being kept awake.'
+                    : `Last ping: ${pingAgeDays} day${pingAgeDays === 1 ? '' : 's'} ago${pingAgeDays > 14 ? ' — check the Vercel cron is still enabled.' : ' ✓'}`}
+              </p>
             </div>
 
             <button onClick={resetData} disabled={busy !== null}

@@ -333,6 +333,31 @@ export interface RatesCache {
 // to Record<string, unknown> (no implicit index signature) — that made every
 // .select() infer as `never`. Loosen<T> re-maps the interface into a homomorphic
 // mapped type, which IS Record-compatible, so the schema satisfies GenericSchema.
+// ── Phase 10 tables (supabase/phase10-upgrades.sql) ──
+export interface JointTxnComment {
+  id: string
+  txn_id: string
+  author_id: string
+  body: string
+  created_at: string
+}
+
+export interface MetalHolding {
+  id: string
+  owner_id: string
+  metal: 'gold' | 'silver'
+  grams: number
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SystemHealth {
+  id: string
+  last_ping_at: string
+}
+
 type Loosen<T> = { [K in keyof T]: T[K] }
 type Tbl<T> = { Row: Loosen<T>; Insert: Partial<Loosen<T>>; Update: Partial<Loosen<T>>; Relationships: [] }
 
@@ -363,6 +388,13 @@ export type Database = {
       joint_account_txns: Tbl<JointAccountTxn>
       life_events: Tbl<LifeEvent>
       expenses: Tbl<Expense>
+      // Phase 10 (supabase/phase10-upgrades.sql). Registered here even though the
+      // tables may not exist in the database yet — without a Tbl<> entry every
+      // query against them infers `never` and won't compile. The runtime code
+      // checks for 42P01/PGRST205 and hides the feature until the SQL is run.
+      joint_txn_comments: Tbl<JointTxnComment>
+      metal_holdings: Tbl<MetalHolding>
+      system_health: Tbl<SystemHealth>
     }
   }
 }

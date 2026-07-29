@@ -143,6 +143,23 @@ project in one paste. Used during the 2026-06-22 project rebuild — see Changel
 ---
 
 ## Changelog (newest first)
+- **2026-07-20 (f)** — **Phase 10: longevity, comments, holdings, loading polish** (Opus).
+  **#66 keepalive** — the real 2-year risk finally addressed: `vercel.json` weekly cron →
+  `/api/keepalive`, which touches Supabase with the ANON key (no new secret needed; reaching the DB
+  *is* the keepalive, so an RLS-empty result still counts). If `SUPABASE_SERVICE_ROLE_KEY` is set it
+  also records the ping in `system_health`, and Settings shows "Last ping: N days ago", ambering past
+  14. **#51** comment threads on joint transactions — notes live next to the number they're about;
+  RLS lets both read, only the author delete. **#94** gold/silver holdings on Zakat with full CRUD
+  (parity rule), grams stored and value derived at read time so it can't rot, plus one tap to push
+  totals into the zakat fields. **#61** content-shaped skeletons replace spinners on 8 list pages
+  (`Skeleton`, `SkeletonStats`). **#20** back-to-top button in the app layout; pull-to-refresh
+  deliberately skipped — every mobile browser does it natively.
+  New SQL: `supabase/phase10-upgrades.sql` (system_health, joint_txn_comments, metal_holdings).
+  All three features hide themselves on 42P01/PGRST205, so the app is unchanged until it's run.
+  New tables registered in `database.types.ts` via `Tbl<>` — without that, queries infer `never`.
+  **#49 hijri-first display declined:** dates render in server components, so a localStorage toggle
+  can't reach them; it would need a cookie + a rewrite of every date call site for a cosmetic option.
+  Verified: tsc, tests (5 suites), build.
 - **2026-07-20 (d)** — **Phase 8: analytics suite + household reporting + migration-gated batch**
   (Opus). *Analytics (#73–78, all six):* spending-by-category stacked trend (top 5 + Other, your
   share only), all-time **Records** card (best earning / most generous / highest spending month),

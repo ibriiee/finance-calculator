@@ -9,6 +9,7 @@ import LoadError from '@/components/shared/LoadError'
 import { Plus, Landmark, ArrowDownCircle, ArrowUpCircle, Building2, Pencil, Trash2, Share2, Check, Bell } from 'lucide-react'
 import AccountForm from '@/components/joint/AccountForm'
 import TxnForm from '@/components/joint/TxnForm'
+import TxnComments from '@/components/joint/TxnComments'
 
 interface Account { id: string; name: string; bank_name: string | null; currency: string; is_active: boolean }
 interface Txn { id: string; account_id: string; txn_type: string; contributor_id: string | null; amount: number; description: string | null; category: string | null; txn_date: string; created_by_id: string | null }
@@ -296,7 +297,8 @@ export default function JointAccountPage() {
                   {s.t.map(x => {
                     const isDep = x.txn_type === 'deposit'
                     return (
-                      <div key={x.id} className="flex items-center justify-between py-2 px-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                      <div key={x.id} className="py-2 px-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {isDep ? <ArrowDownCircle size={16} className="text-emerald-400" /> : <ArrowUpCircle size={16} className="text-red-400" />}
                           <div>
@@ -322,6 +324,9 @@ export default function JointAccountPage() {
                             <Trash2 size={12} />
                           </button>
                         </div>
+                      </div>
+                      {/* #51 — notes live next to the number they're about */}
+                      <TxnComments txnId={x.id} userId={userId} names={names} />
                       </div>
                     )
                   })}

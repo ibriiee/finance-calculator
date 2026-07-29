@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, shortDate } from '@/lib/utils'
 import ModuleHeader from '@/components/shared/ModuleHeader'
 import EmptyState from '@/components/shared/EmptyState'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import Skeleton from '@/components/shared/Skeleton'
 import LoadError from '@/components/shared/LoadError'
 import { Plus, Wallet, Pencil, Trash2, Users } from 'lucide-react'
 import ExpenseForm, { EXPENSE_CATEGORIES } from '@/components/expenses/ExpenseForm'
@@ -83,7 +83,7 @@ export default function ExpensesPage() {
   scoped.filter(e => e.currency === 'AED').forEach(e => { byCat[e.category] = (byCat[e.category] ?? 0) + myShare(e) })
   const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <Skeleton />
   if (loadError) return (
     <div className="flex flex-col gap-4 animate-slide-up">
       <ModuleHeader title="Expenses" />
